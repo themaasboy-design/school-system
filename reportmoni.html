@@ -185,100 +185,100 @@
             console.error("خطأ في الاتصال بالخادم:", error);
         }
     }
-    async function generateReportPDF() {
-        if (currentReportData.length === 0) return;
+async function generateReportPDF() {
+    if (currentReportData.length === 0) return;
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-        try {
-            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
-            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+    try {
+        const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+        const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+        
+        doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+        doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+        doc.setFont("Noto", "normal");
+        
+        const img = new Image();
+        img.src = 'logo.png';
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const imgData = canvas.toDataURL('image/png');
+
+        doc.addImage(imgData, 'PNG', 70, 5, 70, 40);
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + (mainInfo.B2 || ""), 160, 27, { align: 'center' });
+        doc.line(15, 48, 195, 48);
+
+        const addBorder = () => {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        };
+        addBorder();
+
+        doc.setFontSize(15);
+        
+        // ✅ التعديل هنا: صياغة النص بشكل آمن يمنع اختفاء الكلمات بسبب الأقواس
+        const titleText = "جدول توزيع الإشراف اليومي ليوم " + currentDayText;
+        doc.text(titleText, 105, 57, { align: 'center' });
+
+        let currentY = 66; 
+        
+        doc.setFillColor(44, 62, 80); 
+        doc.rect(15, currentY, 180, 10, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.text(" اسم المعلم ", 155, currentY + 7, { align: 'center' });
+        doc.text("المهمة ", 65, currentY + 7, { align: 'center' });
+
+        currentY += 10;
+        doc.setTextColor(0, 0, 0); 
+
+        currentReportData.forEach(item => {
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.3);
             
-            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-            doc.setFont("Noto", "normal");
+            const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
+            const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
             
-            const img = new Image();
-            img.src = 'logo.png';
-            await img.decode();
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width; canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            const imgData = canvas.toDataURL('image/png');
+            doc.rect(15, currentY, 180, rowHeight);
+            doc.line(115, currentY, 115, currentY + rowHeight);
 
-            doc.addImage(imgData, 'PNG', 70, 5, 70, 40);
-            doc.setFontSize(12);
-            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-            doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-            doc.text("مدرسة " + (mainInfo.B2 || ""), 160, 27, { align: 'center' });
-            doc.line(15, 48, 195, 48);
-
-            const addBorder = () => {
-                doc.setDrawColor(0, 0, 0);
-                doc.setLineWidth(0.5);
-                doc.rect(5, 5, 200, 287);
-            };
-            addBorder();
-
-            doc.setFontSize(15);
-// دمج النص باستخدام + بدلاً من Template Literals لتفادي تعارض اتجاه المحارف
-const titleText = "بيان توزيع الإشراف اليومي - يوم (" + currentDayText + ")";
-
-doc.text(titleText, 105, 57, { align: 'center' });
-            let currentY = 66; 
+            doc.setFontSize(11);
             
-            doc.setFillColor(44, 62, 80); 
-            doc.rect(15, currentY, 180, 10, "F");
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(12);
-            doc.text(" اسم المعلم ", 155, currentY + 7, { align: 'center' });
-            doc.text("المهمة ", 65, currentY + 7, { align: 'center' });
+            const teachersYStart = currentY + (rowHeight / 2) - ((teacherLines.length - 1) * 5 / 2) + 1.5;
+            doc.text(teacherLines, 155, teachersYStart, { align: 'center' });
 
-            currentY += 10;
-            doc.setTextColor(0, 0, 0); 
-
-            currentReportData.forEach(item => {
-                doc.setDrawColor(180, 180, 180);
-                doc.setLineWidth(0.3);
-                
-                const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
-                const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
-                
-                doc.rect(15, currentY, 180, rowHeight);
-                doc.line(115, currentY, 115, currentY + rowHeight);
-
-                doc.setFontSize(11);
-                
-                const teachersYStart = currentY + (rowHeight / 2) - ((teacherLines.length - 1) * 5 / 2) + 1.5;
-                doc.text(teacherLines, 155, teachersYStart, { align: 'center' });
-
-                const taskY = currentY + (rowHeight / 2) + 1.5;
-                doc.text(item.task, 65, taskY, { align: 'center' });
-                
-                currentY += rowHeight;
-            });
-
-            const pageCount = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFont("Noto");
-                doc.setFontSize(11);
-                
-                doc.text("مدير المدرسة", 40, 270, { align: 'center' });
-                doc.text((mainInfo.B3 || ""), 40, 277, { align: 'center' });
-                
-                doc.text("وكيل المدرسة", 170, 270, { align: 'center' });
-                doc.text((mainInfo.B4 || ""), 170, 277, { align: 'center' });
-            }
-
-            doc.save(`جدول الإشراف ليوم ${currentDayText}.pdf`);
+            const taskY = currentY + (rowHeight / 2) + 1.5;
+            doc.text(item.task, 65, taskY, { align: 'center' });
             
-        } catch (error) {
-            console.error("حدث خطأ أثناء صياغة الـ PDF:", error);
+            currentY += rowHeight;
+        });
+
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFont("Noto");
+            doc.setFontSize(11);
+            
+            doc.text("مدير المدرسة", 40, 270, { align: 'center' });
+            doc.text((mainInfo.B3 || ""), 40, 277, { align: 'center' });
+            
+            doc.text("وكيل المدرسة", 170, 270, { align: 'center' });
+            doc.text((mainInfo.B4 || ""), 170, 277, { align: 'center' });
         }
-    }
 
+        doc.save(`جدول الإشراف ليوم ${currentDayText}.pdf`);
+        
+    } catch (error) {
+        console.error("حدث خطأ أثناء صياغة الـ PDF:", error);
+    }
+}
     document.getElementById('btnFetchReport').addEventListener('click', fetchReportData);
     document.getElementById('btnDownloadPDF').addEventListener('click', generateReportPDF);
      

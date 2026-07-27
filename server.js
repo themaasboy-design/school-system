@@ -6,100 +6,80 @@ const path = require('path');
 const fs = require('fs');
 const xlsx = require('xlsx');
 const bodyParser = require('body-parser');
-const initSqlJs = require('sql.js');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const session = require('express-session');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(__dirname));
+// 🏠 توجيه الزائر عند فتح الرابط الرئيسي إلى صفحة تسجيل الدخول مباشرة
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// تعطيل الفهرس التلقائي index.html لضمان عدم تجاوز التوجيه
+app.use(express.static(__dirname, { index: false }));
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🎯 إعداد الجلسات (Session) لحفظ هوية المدرسة المسجلة
+// 🎯 إعداد الجلسات (Session)
 app.use(session({
   secret: 'school_management_secret_key_2026',
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    maxAge: 24 * 60 * 60 * 1000, // صلاحية الجلسة 24 ساعة
+    maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true 
   }
 }));
 
-// منع التخزين المؤقت (Cache) للبيانات
+// منع التخزين المؤقت (Cache)
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   next();
 });
 
-// 🏠 [تمت الإضافة]: توجيه الزائر تلقائياً من الرابط الرئيسي إلى صفحة تسجيل الدخول
-app.get('/', (req, res) => {
-  res.redirect('/login.html');
+// =========================================================================
+// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL
+// =========================================================================
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// =========================================================================
-// 🗄️ 2. التعامل مع قاعدة البيانات SQLite (sql.js)
-// =========================================================================
-async function getDb() {
-  const SQL = await initSqlJs();
-  const dbPath = path.join(__dirname, 'app_data.db');
-  let db;
-
-  if (fs.existsSync(dbPath)) {
-    const filebuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(filebuffer);
-  } else {
-    db = new SQL.Database();
-    db.run(`
+// إنشـاء جدول المستخدمين تلقائياً في حال عدم وجوده
+async function initDb() {
+  try {
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE,
         password TEXT,
         full_name TEXT,
         region TEXT,
         school_name TEXT,
         school_excel_file TEXT
-      )
+      );
     `);
-    const data = db.export();
-    fs.writeFileSync(dbPath, Buffer.from(data));
+    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL بنجاح");
+  } catch (err) {
+    console.error("❌ خطأ في تهيئة قاعدة البيانات:", err.message);
   }
-
-  // التأكد من وجود كافة الأعمدة المطلوبة
-  const columns = ['full_name', 'region', 'school_name', 'school_excel_file'];
-  let tableUpdated = false;
-  columns.forEach(col => {
-    try {
-      db.run(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
-      tableUpdated = true;
-    } catch (e) {
-      // العمود موجود مسبقاً
-    }
-  });
-
-  if (tableUpdated) {
-    const data = db.export();
-    fs.writeFileSync(dbPath, Buffer.from(data));
-  }
-
-  return db;
 }
+
+initDb();
 
 // 🔐 مسار تسجيل الدخول
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const db = await getDb();
-    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-    stmt.bind([username]);
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
 
-    if (stmt.step()) {
-      const user = stmt.getAsObject();
-      stmt.free();
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
 
       let isPasswordValid = false;
       if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
@@ -120,8 +100,6 @@ app.post('/login', async (req, res) => {
           fullName: user.full_name || ''
         });
       }
-    } else {
-      stmt.free();
     }
 
     return res.status(401).json({
@@ -171,14 +149,10 @@ async function getUserExcelPath(req) {
 
   let schoolFileName = null;
   try {
-    const db = await getDb();
-    const stmt = db.prepare('SELECT school_excel_file FROM users WHERE username = ?');
-    stmt.bind([username]);
-    if (stmt.step()) {
-      const user = stmt.getAsObject();
-      schoolFileName = user.school_excel_file;
+    const result = await pool.query('SELECT school_excel_file FROM users WHERE username = $1', [username]);
+    if (result.rows.length > 0) {
+      schoolFileName = result.rows[0].school_excel_file;
     }
-    stmt.free();
   } catch (e) {
     console.error('خطأ في تحديد ملف المستخدم من DB:', e.message);
   }
@@ -514,14 +488,10 @@ app.post('/register', upload.none(), async (req, res) => {
       return res.status(400).json({ success: false, message: 'يرجى تعبئة جميع الحقول المطلوبة!' });
     }
 
-    const db = await getDb();
-    const checkStmt = db.prepare('SELECT username FROM users WHERE username = ?');
-    checkStmt.bind([username]);
-    if (checkStmt.step()) {
-      checkStmt.free();
+    const checkResult = await pool.query('SELECT username FROM users WHERE username = $1', [username]);
+    if (checkResult.rows.length > 0) {
       return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل بالفعل، اختر اسماً آخر!' });
     }
-    checkStmt.free();
 
     const uploadsDir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -546,16 +516,12 @@ app.post('/register', upload.none(), async (req, res) => {
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    const insertStmt = db.prepare(`
-      INSERT INTO users (full_name, region, school_name, username, password, school_excel_file) 
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
     
-    insertStmt.run([fullName, region, schoolName, username, hashedPassword, userExcelFileName]);
-    insertStmt.free();
-
-    const data = db.export();
-    fs.writeFileSync(path.join(__dirname, 'app_data.db'), Buffer.from(data));
+    await pool.query(
+      `INSERT INTO users (full_name, region, school_name, username, password, school_excel_file) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [fullName, region, schoolName, username, hashedPassword, userExcelFileName]
+    );
 
     return res.json({
       success: true,
@@ -579,13 +545,7 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
     if (username) {
       const targetFileName = req.file.filename;
 
-      const db = await getDb();
-      const updateStmt = db.prepare('UPDATE users SET school_excel_file = ? WHERE username = ?');
-      updateStmt.run([targetFileName, username]);
-      updateStmt.free();
-
-      const data = db.export();
-      fs.writeFileSync(path.join(__dirname, 'app_data.db'), Buffer.from(data));
+      await pool.query('UPDATE users SET school_excel_file = $1 WHERE username = $2', [targetFileName, username]);
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
@@ -602,17 +562,11 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 // 🛠️ 3. مسارات لوحة تحكم الأدمن المكتملة الشاملة (Admin Routes)
 // =========================================================================
 
-// 1. جلب قائمة كل المدارس والبيانات الكاملة (بما فيها كلمَة المرور و المَلف)
+// 1. جلب قائمة كل المدارس والبيانات الكاملة
 app.get('/api/admin/schools', async (req, res) => {
   try {
-    const db = await getDb();
-    const stmt = db.prepare('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path FROM users');
-    let schools = [];
-    while (stmt.step()) {
-      schools.push(stmt.getAsObject());
-    }
-    stmt.free();
-    res.json({ success: true, schools });
+    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path FROM users');
+    res.json({ success: true, schools: result.rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -623,9 +577,7 @@ app.put('/api/admin/schools/:id', upload.single('excel_file'), async (req, res) 
   try {
     const { id } = req.params;
     const { full_name, school_name, region, username, password } = req.body;
-    const db = await getDb();
 
-    // تشفير كلمة المرور إذا تم تغييرها وتوفيرها بصيغة جديدة غير مشفرة
     let finalPassword = password;
     if (password && !password.startsWith('$2a$') && !password.startsWith('$2b$')) {
       finalPassword = bcrypt.hashSync(password, 10);
@@ -634,28 +586,20 @@ app.put('/api/admin/schools/:id', upload.single('excel_file'), async (req, res) 
     let excelFileName = req.file ? req.file.filename : null;
 
     if (excelFileName) {
-      // تعديل مع رفع/استبدال ملف إكسل جديد
-      const updateStmt = db.prepare(`
-        UPDATE users 
-        SET full_name = ?, school_name = ?, region = ?, username = ?, password = ?, school_excel_file = ? 
-        WHERE id = ?
-      `);
-      updateStmt.run([full_name, school_name, region, username, finalPassword, excelFileName, id]);
-      updateStmt.free();
+      await pool.query(
+        `UPDATE users 
+         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6 
+         WHERE id = $7`,
+        [full_name, school_name, region, username, finalPassword, excelFileName, id]
+      );
     } else {
-      // تعديل البيانات بدون استبدال الملف الحالي
-      const updateStmt = db.prepare(`
-        UPDATE users 
-        SET full_name = ?, school_name = ?, region = ?, username = ?, password = ? 
-        WHERE id = ?
-      `);
-      updateStmt.run([full_name, school_name, region, username, finalPassword, id]);
-      updateStmt.free();
+      await pool.query(
+        `UPDATE users 
+         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5 
+         WHERE id = $6`,
+        [full_name, school_name, region, username, finalPassword, id]
+      );
     }
-
-    // حفظ التغييرات فوراً في قاعدة البيانات SQLite
-    const data = db.export();
-    fs.writeFileSync(path.join(__dirname, 'app_data.db'), Buffer.from(data));
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة وملف الإكسل بنجاح' });
   } catch (error) {
@@ -667,15 +611,7 @@ app.put('/api/admin/schools/:id', upload.single('excel_file'), async (req, res) 
 app.delete('/api/admin/schools/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    const deleteStmt = db.prepare('DELETE FROM users WHERE id = ?');
-    deleteStmt.run([id]);
-    deleteStmt.free();
-
-    // حفظ التغييرات فوراً في قاعدة البيانات SQLite
-    const data = db.export();
-    fs.writeFileSync(path.join(__dirname, 'app_data.db'), Buffer.from(data));
-
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
