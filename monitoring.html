@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام توزيع الإشراف اليومي</title>
+    
+    <!-- Bootstrap RTL CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <!-- Toastify CSS للرسائل التنبيهية -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="/style.css">
+    
+    <style>
+        .navbar-custom {
+            background-color: #2c3e50;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-custom .navbar-brand, .navbar-custom .nav-link {
+            color: #ffffff !important;
+        }
+        .navbar-custom .nav-link:hover {
+            color: #2bc48a !important;
+        }
+        .main-card {
+            background: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-top: 6px solid #0d6efd;
+        }
+        .checkbox-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .teacher-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .teacher-item:hover {
+            background-color: #e9ecef;
+        }
+        .summary-card {
+            background: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-top: 6px solid #2bc48a;
+        }
+        .btn-save {
+            background-image: linear-gradient(to left, #2ecc71, #27ae60);
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+        }
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        .card h5 {
+            font-size: 1.1rem !important; 
+            margin-bottom: 15px !important;
+        }
+        .form-label, label {
+            font-size: 0.85rem !important;
+            font-weight: 600;
+        }
+        .form-select {
+            font-size: 0.85rem !important;
+            padding: 6px 12px !important;
+        }
+        .table th {
+            font-size: 0.78rem !important;
+            padding: 8px 4px !important;
+        }
+        .table tbody td {
+            font-size: 11px !important;
+            padding: 6px 4px !important;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom px-4">
+    <h2 id="schoolName" class="h4 mb-0 text-white">لوحة التحكم</h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo ms-auto me-3" style="height: 40px;">
+
+    <div class="navbar-links d-flex align-items-center gap-3">
+        <a href="index.html" class="text-white text-decoration-none">الرئيسية</a>
+        <a href="dashboard.html" class="text-white text-decoration-none">الانتظار</a>
+        <a href="/monitoring" class="text-white text-decoration-none">الإشراف</a>
+        
+        <div class="dropdown-container position-relative">
+            <a href="#" class="dropdown-trigger text-white text-decoration-none">التقارير</a>
+            <div class="dropdown-menu">
+                <a href="report.html" class="dropdown-item">تقرير الغياب</a>
+                <a href="reportmoni.html" class="dropdown-item">تقرير الإشراف</a>
+            </div>
+        </div>
+
+        <a href="/login.html" class="logout" onclick="localStorage.clear();">تسجيل الخروج</a>
+    </div>
+</nav>
+
+<div class="container-fluid px-lg-5 my-4">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-primary">توزيع جدول الإشراف للفسحة</h2>
+        <p class="text-muted">تُحفظ التعديلات تلقائياً في المتصفح وتظل ثابتة حتى بعد تحديث الصفحة</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- 1️⃣ لوحة الإدخال والتحكم (اليمين) -->
+        <div class="col-12 col-lg-3">
+            <div class="card main-card p-3 p-md-4 h-100">
+                <h5 class="fw-bold text-secondary mb-4">🛠️ أدوات التوزيع السريع</h5>
+                
+                <!-- قائمة الأيام -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">1. اختر اليوم المراد:</label>
+                    <select id="daySelect" class="form-select">
+                        <option value="">-- اختر اليوم --</option>
+                        <option value="sun">الأحد</option>
+                        <option value="mon">الإثنين</option>
+                        <option value="tue">الثلاثاء</option>
+                        <option value="wed">الأربعاء</option>
+                        <option value="thu">الخميس</option>
+                    </select>
+                </div>
+
+                <!-- قائمة المهام -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">2. اختر المهمة المحددة:</label>
+                    <select id="taskSelect" class="form-select" disabled>
+                        <option value="">-- اختر المهمة أولاً --</option>
+                        <option value="المقصف الغربي">المقصف الغربي</option>
+                        <option value="المقصف الشرقي">المقصف الشرقي</option>
+                        <option value="الساحة الغربية">الساحة الغربية</option>
+                        <option value="الساحة الشرقية">الساحة الشرقية</option>
+                        <option value="الدور الثاني">الدور الثاني</option>
+                    </select>
+                </div>
+
+                <!-- قائمة المعلمين المتاحين -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                        <span>3. حدد المعلم للمهمة:</span>
+                        <span id="poolCount" class="badge bg-secondary">0 متاح</span>
+                    </label>
+                    
+                    <div id="teachersContainer" class="checkbox-container text-muted text-center py-4">
+                        يرجى تحديد اليوم والمهمة لإظهار المعلمين المتاحين...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2️⃣ لوحة عرض الجدول الإجمالي (اليسار) -->
+        <div class="col-12 col-lg-9">
+            <div class="card summary-card p-3 p-md-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="fw-bold text-success mb-4">📅 نظرة عامة على جدول الأسبوع الحالي</h5>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped text-center align-middle m-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 20%;">المهمة</th>
+                                    <th style="width: 16%;">الأحد</th>
+                                    <th style="width: 16%;">الإثنين</th>
+                                    <th style="width: 16%;">الثلاثاء</th>
+                                    <th style="width: 16%;">الأربعاء</th>
+                                    <th style="width: 16%;">الخميس</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody">
+                                <!-- يتم البناء تلقائياً بالجافا سكريبت -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap justify-content-between gap-2 mt-4 pt-3 border-top">
+                    <button type="button" id="btnClear" class="btn btn-outline-danger fw-bold">
+                        تفريغ الجدول الحالي 🗑️
+                    </button>
+                    <button type="button" id="btnSave" class="btn btn-success btn-save fw-bold text-white">
+                        حفظ الجدول بالكامل في  
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مكتبة التنبيهات الخارجية -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+    const tasks = ["المقصف الغربي", "المقصف الشرقي", "الساحة الغربية", "الساحة الشرقية", "الدور الثاني"];
+    const daysKeys = ["sun", "mon", "tue", "wed", "thu"];
+
+    let weeklySchedule = { sun: {}, mon: {}, tue: {}, wed: {}, thu: {} };
+    let currentSchoolName = "";
+
+    function initEmptySchedule() {
+        daysKeys.forEach(day => {
+            weeklySchedule[day] = {};
+            tasks.forEach(task => { weeklySchedule[day][task] = []; });
+        });
+    }
+    initEmptySchedule();
+
+    // مفتاح تخزين منفصل ومخصص لكل مدرسة على حدة لمنع تداخل المدارس
+    function getSchoolStorageKey() {
+        return currentSchoolName ? `localWeeklySchedule_${currentSchoolName}` : 'localWeeklySchedule_default';
+    }
+
+    let allTeachers = []; 
+
+    function showNotification(message, type = 'success') {
+        Toastify({
+            text: message,
+            duration: 3500,
+            gravity: "top",
+            position: "right",
+            style: {
+                background: type === 'success' ? "linear-gradient(to left, #2ecc71, #27ae60)" : "linear-gradient(to left, #e74c3c, #c0392b)",
+                borderRadius: "8px",
+                direction: "rtl"
+            }
+        }).showToast();
+    }
+
+    async function loadTeachers() {
+        try {
+            const response = await fetch('/get-monitoring-teachers'); 
+            const result = await response.json();
+            if (result.success && Array.isArray(result.teachers)) {
+                allTeachers = result.teachers;
+            }
+        } catch (err) {
+            console.error("خطأ في جلب قائمة المعلمين:", err);
+        }
+    }
+
+    async function loadLocalSchedule() {
+        // مسح الذاكرة العامة القديمة حتى لا تؤثر على أي مدرسة
+        localStorage.removeItem('localWeeklySchedule');
+
+        let loadedFromServer = false;
+
+        // 1. محاولة جلب الجدول الخاص بالمدرسة الحالية من السيرفر فوراً
+        try {
+            const response = await fetch('/get-monitoring-schedule');
+            const result = await response.json();
+            if (result && result.success && result.schedule) {
+                initEmptySchedule();
+                daysKeys.forEach(day => {
+                    if (result.schedule[day]) {
+                        tasks.forEach(task => {
+                            let val = result.schedule[day][task];
+                            if (typeof val === 'string') {
+                                weeklySchedule[day][task] = val ? val.split('، ').map(s => s.trim()).filter(Boolean) : [];
+                            } else if (Array.isArray(val)) {
+                                weeklySchedule[day][task] = val;
+                            }
+                        });
+                    }
+                });
+                loadedFromServer = true;
+            }
+        } catch (e) {
+            console.log("سيتم اعتماد الذاكرة المحلية الخاصة بالمدرسة الحالية.");
+        }
+
+        // 2. إذا لم يتوفر جدول على السيرفر، يتم استرجاع ذاكرة هذه المدرسة فقط
+        if (!loadedFromServer) {
+            const savedData = localStorage.getItem(getSchoolStorageKey());
+            if (savedData) {
+                try {
+                    weeklySchedule = JSON.parse(savedData);
+                } catch (e) {
+                    console.error("خطأ في قراءة التخزين المحلي، سيتم بدء جدول فارغ", e);
+                    initEmptySchedule();
+                }
+            } else {
+                initEmptySchedule();
+            }
+        }
+
+        renderSummaryTable();
+        renderTeachersCheckboxes();
+    }
+
+    const daySelect = document.getElementById('daySelect');
+    const taskSelect = document.getElementById('taskSelect');
+    const teachersContainer = document.getElementById('teachersContainer');
+
+    daySelect.addEventListener('change', () => {
+        if (daySelect.value) {
+            taskSelect.disabled = false;
+        } else {
+            taskSelect.disabled = true;
+            taskSelect.value = "";
+        }
+        renderTeachersCheckboxes();
+    });
+
+    taskSelect.addEventListener('change', renderTeachersCheckboxes);
+
+    // التحقق لمنع تكرار المعلم طوال الأسبوع
+    function isTeacherSelectedElsewhere(teacherName, currentDay, currentTask) {
+        for (let d of daysKeys) {
+            for (let t of tasks) {
+                if (d === currentDay && t === currentTask) continue;
+                if (Array.isArray(weeklySchedule[d][t]) && weeklySchedule[d][t].includes(teacherName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function renderTeachersCheckboxes() {
+        const day = daySelect.value;
+        const task = taskSelect.value;
+
+        if (!day || !task) {
+            teachersContainer.innerHTML = `يرجى تحديد اليوم والمهمة لإظهار المعلمين المتاحين...`;
+            teachersContainer.classList.add('text-muted', 'text-center');
+            document.getElementById('poolCount').textContent = "0 متاح";
+            return;
+        }
+
+        teachersContainer.innerHTML = "";
+        teachersContainer.classList.remove('text-muted', 'text-center');
+
+        let availableCount = 0;
+        const currentAssignedTeachers = weeklySchedule[day][task] || [];
+
+        allTeachers.forEach((teacher, idx) => {
+            if (!isTeacherSelectedElsewhere(teacher, day, task)) {
+                availableCount++;
+                const isChecked = currentAssignedTeachers.includes(teacher) ? "checked" : "";
+                
+                const div = document.createElement('div');
+                div.className = "form-check teacher-item mb-2";
+                div.innerHTML = `
+                    <input class="form-check-input teacher-checkbox cursor-pointer" type="checkbox" 
+                           value="${teacher}" id="chk_${idx}" ${isChecked}>
+                    <label class="form-check-label w-100 ps-2 cursor-pointer fw-semibold text-dark" for="chk_${idx}">
+                        ${teacher}
+                    </label>
+                `;
+                teachersContainer.appendChild(div);
+            }
+        });
+
+        document.getElementById('poolCount').textContent = `${availableCount} متاح`;
+
+        document.querySelectorAll('.teacher-checkbox').forEach(chk => {
+            chk.addEventListener('change', (e) => {
+                const teacherName = e.target.value;
+                if (e.target.checked) {
+                    if (!weeklySchedule[day][task].includes(teacherName)) {
+                        weeklySchedule[day][task].push(teacherName);
+                    }
+                } else {
+                    weeklySchedule[day][task] = weeklySchedule[day][task].filter(t => t !== teacherName);
+                }
+
+                // الحفظ بذاكرة المدرسة الحالية بشكل مستقل
+                localStorage.setItem(getSchoolStorageKey(), JSON.stringify(weeklySchedule));
+                renderSummaryTable();
+                renderTeachersCheckboxes(); 
+            });
+        });
+    }
+
+    function renderSummaryTable() {
+        const tbody = document.getElementById('summaryTableBody');
+        tbody.innerHTML = "";
+
+        tasks.forEach(task => {
+            let rowHtml = `<tr><td class="fw-bold bg-light text-start ps-3">${task}</td>`;
+            daysKeys.forEach(day => {
+                const namesArray = weeklySchedule[day][task] || [];
+                if (namesArray.length > 0) {
+                    const namesStr = namesArray.join('، ');
+                    rowHtml += `<td><span class="badge bg-primary p-1.5 w-100 text-wrap" style="font-size: 11px; font-weight: 500;">${namesStr}</span></td>`;
+                } else {
+                    rowHtml += `<td><span class="text-muted small">-</span></td>`;
+                }
+            });
+            rowHtml += `</tr>`;
+            tbody.innerHTML += rowHtml;
+        });
+    }
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+        try {
+            let formattedSchedule = {};
+            daysKeys.forEach(day => {
+                formattedSchedule[day] = {};
+                tasks.forEach(task => {
+                    formattedSchedule[day][task] = (weeklySchedule[day][task] || []).join('، ');
+                });
+            });
+
+            const response = await fetch('/save-monitoring', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formattedSchedule)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // حفظ النسخة بذاكرة المدرسة الحالية
+                localStorage.setItem(getSchoolStorageKey(), JSON.stringify(weeklySchedule));
+                showNotification("تم حفظ جدول الإشراف الأسبوعي بنجاح  ", "success");
+            } else {
+                showNotification("فشل الحفظ: " + (result.error || "خطأ غير معروف"), "error");
+            }
+        } catch (err) {
+            showNotification("حدث خطأ غير متوقع أثناء الاتصال بالسيرفر", "error");
+            console.error(err);
+        }
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+        if (confirm("هل أنت متأكد من رغبتك في تفريغ الجدول الحالي بالكامل للبدء من جديد؟")) {
+            localStorage.removeItem(getSchoolStorageKey());
+            localStorage.removeItem('localWeeklySchedule');
+            initEmptySchedule();
+            daySelect.value = "";
+            taskSelect.value = "";
+            taskSelect.disabled = true;
+            renderSummaryTable();
+            renderTeachersCheckboxes();
+            showNotification("تم تفريغ الجدول بنجاح ومسحه من ذاكرة المتصفح", "success");
+        }
+    });
+
+    async function loadSchoolName() {
+        try {
+            const response = await fetch('/get-report-data'); 
+            const data = await response.json();
+            const schoolNameEle = document.getElementById('schoolName');
+            
+            if (schoolNameEle && data.mainInfo && data.mainInfo.B2) {
+                currentSchoolName = data.mainInfo.B2;
+                schoolNameEle.textContent = "مدرسة " + data.mainInfo.B2;
+            }
+        } catch (e) {
+            console.error("خطأ في جلب اسم المدرسة:", e);
+        }
+    }
+
+    window.onload = async () => {
+        await loadSchoolName();
+        await loadTeachers();
+        await loadLocalSchedule();
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+const express = require('express');
+const xlsx = require('xlsx');
+const bodyParser = require('body-parser');
+const app = express();
+const PORT = 3000;
+
+app.use(express.static(__dirname));
+app.use(bodyParser.json());
+
+// مسار جلب المعلمين الأربعة للانتظار بناءً على اليوم وعمود الحصة
+app.get('/get-waiting-teachers', (req, res) => {
+    const { day, period } = req.query; 
+    try {
+        const workbook = xlsx.readFile('Teachers_names.xlsx');
+        const sheet = workbook.Sheets[workbook.SheetNames[2]]; 
+        const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+        let dayIndex = data.findIndex(row => row && row[0] === day);
+        if (dayIndex === -1) return res.json({ teachers: [] });
+
+        const colIndex = parseInt(period) - 1; 
+        let resultTeachers = [];
+        
+        for (let i = 1; i <= 4; i++) {
+            let row = data[dayIndex + i];
+            if (row && row[colIndex] !== undefined) {
+                resultTeachers.push(row[colIndex]);
+            }
+        }
+        res.json({ teachers: resultTeachers });
+    } catch (e) { 
+        res.status(500).json({ error: "خطأ في قراءة الملف: " + e.message }); 
+    }
+});
+
+// مسار حفظ التقرير في ورقة 'report'
+app.post('/save-report', (req, res) => {
+    const reportData = req.body;
+    try {
+        const workbook = xlsx.readFile('Teachers_names.xlsx');
+        const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
+        
+        let data = [];
+        let worksheet;
+
+        if (workbook.SheetNames.includes('report')) {
+            worksheet = workbook.Sheets['report'];
+            data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+        } else {
+            data.push(header);
+        }
+
+        // إضافة البيانات الجديدة كصف
+        let row = [reportData.date, reportData.day, reportData.absentTeacher];
+        for(let i = 1; i <= 7; i++) {
+            row.push(reportData[`class${i}_room`], reportData[`class${i}_teacher`]);
+        }
+        data.push(row);
+
+        const newSheet = xlsx.utils.aoa_to_sheet(data);
+        
+        if (!workbook.SheetNames.includes('report')) {
+            xlsx.utils.book_append_sheet(workbook, newSheet, 'report');
+        } else {
+            workbook.Sheets['report'] = newSheet;
+        }
+
+        xlsx.writeFile(workbook, 'Teachers_names.xlsx');
+        res.json({ success: true });
+    } catch (e) { 
+        res.status(500).json({ error: "خطأ أثناء الحفظ: " + e.message }); 
+    }
+});
+
+// المسارات الأخرى
+app.get('/get-data', (req, res) => {
+    try {
+        const workbook = xlsx.readFile('Teachers_names.xlsx');
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        res.json(xlsx.utils.sheet_to_json(sheet));
+    } catch (e) { res.status(500).json([]); }
+});
+
+app.get('/get-classes', (req, res) => {
+    try {
+        const workbook = xlsx.readFile('Teachers_names.xlsx');
+        const sheet = workbook.Sheets[workbook.SheetNames[1]];
+        res.json(xlsx.utils.sheet_to_json(sheet));
+    } catch (e) { res.status(500).json([]); }
+});
+
+app.listen(PORT, () => {
+    console.log(`السيرفر يعمل الآن على الرابط: http://localhost:${PORT}`);
+});
+
+// --- التعديل المضاف هنا للمسار المطلوب ---
+app.get('/get-report-data', (req, res) => {
+    try {
+        const workbook = xlsx.readFile('Teachers_names.xlsx');
+        
+        // 1. جلب بيانات التقارير
+        let reportData = [];
+        if (workbook.SheetNames.includes('report')) {
+            reportData = xlsx.utils.sheet_to_json(workbook.Sheets['report']);
+        }
+
+        // 2. جلب بيانات maininfo (الخلايا B1, B2, B3, B4)
+        let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
+        if (workbook.SheetNames.includes('maininfo')) {
+            const infoSheet = workbook.Sheets['maininfo'];
+            const infoData = xlsx.utils.sheet_to_json(infoSheet, { header: 1 });
+            // نفترض أن البيانات في العمود الثاني (index 1) للصفوف 0,1,2,3
+            mainInfo = {
+                B1: infoData[0] ? infoData[0][1] : "", 
+                B2: infoData[1] ? infoData[1][1] : "", 
+                B3: infoData[2] ? infoData[2][1] : "", 
+                B4: infoData[3] ? infoData[3][1] : ""
+            };
+        }
+        
+        // إرسال الكائنين معاً
+        res.json({ teachers: reportData, mainInfo: mainInfo });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});

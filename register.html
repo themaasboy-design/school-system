@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل جديد</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color, #f4f7f6);
+            margin: 20px 0;
+        }
+        .register-card {
+            width: 100%;
+            max-width: 480px;
+        }
+        .register-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .register-header h1 {
+            color: var(--primary-color, #2c3e50);
+            margin-bottom: 5px;
+        }
+        .register-header p {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .links {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .links a {
+            color: var(--secondary-color, #3498db);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* 🔔 تنبيه الإشعارات المنبثقة */
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 50%;
+            transform: translateX(50%) translateY(-20px);
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 15px;
+            font-weight: 600;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+            z-index: 1000;
+        }
+        #notification.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(50%) translateY(0);
+        }
+        #notification.success {
+            background-color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 🔔 عنصر الإشعار العائم -->
+    <div id="notification"></div>
+
+    <div class="register-card card">
+        <div class="register-header">
+            <h1>إنشاء حساب جديد</h1>
+            <p>انضم إلى منصة إدارة أعمال الوكيل رقمياً</p>
+        </div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label>الاسم الكامل</label>
+                <input type="text" id="fullName" placeholder="أدخل الاسم الكامل" required>
+            </div>
+
+            <div class="form-group">
+                <label>اسم المنطقة</label>
+                <input type="text" id="region" placeholder="مثال: الرياض / حائل / الشرقية" required>
+            </div>
+
+            <div class="form-group">
+                <label>اسم المدرسة</label>
+                <input type="text" id="schoolName" placeholder="أدخل اسم المدرسة الكامل" required>
+            </div>
+
+            <div class="form-group">
+                <label>اسم المستخدم (حروف إنجليزية وأرقام فقط)</label>
+                <input type="text" id="username" placeholder="مثال: school2026" dir="ltr" style="text-align: right;" required>
+            </div>
+            
+            <div class="form-group">
+                <label>كلمة المرور</label>
+                <input type="password" id="password" placeholder="أدخل كلمة المرور" required>
+            </div>
+
+            <div class="form-group">
+                <label>تأكيد كلمة المرور</label>
+                <input type="password" id="confirmPassword" placeholder="أعِد كتابة كلمة المرور" required>
+            </div>
+
+            <button type="submit" style="background-color: var(--primary-color, #2c3e50); margin-top: 15px; width: 100% !important; display: block;">إنشاء الحساب</button>
+        </form>
+
+        <div class="links">
+            لديك حساب بالفعل؟ <a href="login.html">تسجيل الدخول</a>
+        </div>
+    </div>
+
+    <script>
+        // 🔔 دالة عرض الإشعارات المنبثقة
+        function showNotification(message, isSuccess = false) {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            
+            if (isSuccess) {
+                notif.classList.add('success');
+            } else {
+                notif.classList.remove('success');
+            }
+
+            notif.classList.add('show');
+
+            setTimeout(() => {
+                notif.classList.remove('show');
+            }, 3500);
+        }
+
+        // 🛑 تقييد حقل اسم المستخدم باللغة الإنجليزية والأرقام فقط أثناء الكتابة
+        document.getElementById('username').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+        });
+
+        // 🚀 معالجة نموذج التسجيل
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const fullName = document.getElementById('fullName').value.trim();
+            const region = document.getElementById('region').value.trim();
+            const schoolName = document.getElementById('schoolName').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // 1️⃣ التحقق من تعبئة جميع الحقول
+            if (!fullName || !region || !schoolName || !username || !password || !confirmPassword) {
+                showNotification('يرجى تعبئة كافة الحقول!');
+                return;
+            }
+
+            // 2️⃣ التحقق من صيغة اسم المستخدم (حروف إنجليزية وأرقام فقط)
+            const usernameRegex = /^[a-zA-Z0-9]+$/;
+            if (!usernameRegex.test(username)) {
+                showNotification('اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام فقط!');
+                return;
+            }
+
+            // 3️⃣ التحقق من تطابق كلمتي المرور
+            if (password !== confirmPassword) {
+                showNotification('كلمة المرور وتأكيدها غير متطابقين!');
+                return;
+            }
+
+            // 4️⃣ تجهيز البيانات وإرسالها إلى السيرفر كـ FormData
+            const formData = new FormData();
+            formData.append('fullName', fullName);
+            formData.append('region', region);
+            formData.append('schoolName', schoolName);
+            formData.append('username', username);
+            formData.append('password', password);
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(result.message, true);
+                    // التوجيه لصفحة تسجيل الدخول بعد النجاح
+                    setTimeout(() => {
+                        window.location.href = '/login.html';
+                    }, 2000);
+                } else {
+                    showNotification(result.message);
+                }
+            } catch (error) {
+                console.error('خطأ أثناء التسجيل:', error);
+                showNotification('حدث خطأ في الاتصال بالسيرفر أثناء التسجيل!');
+            }
+        });
+    </script>
+
+</body>
+</html>

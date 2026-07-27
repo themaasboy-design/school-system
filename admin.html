@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم الأدمن - إدارة المدارس والشيتات</title>
+    
+    <!-- Bootstrap RTL CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="/style.css">
+
+    <style>
+        body { background-color: #f4f6f9; }
+        .admin-header {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-right: 5px solid #0d6efd;
+        }
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .pass-text {
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<header class="admin-header mb-4">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="fw-bold mb-1">👑 لوحة إدارة النظام والمدارس</h3>
+            <p class="text-muted small mb-0">الاطلاع الكامل، تعديل بيانات الدخول، ورفع ملفات الإكسل للمدارس</p>
+        </div>
+        <a href="/index.html" class="btn btn-outline-light btn-sm">الرئيسية 🏠</a>
+    </div>
+</header>
+
+<div class="container-fluid px-lg-5 my-4">
+    <!-- إحصائية سريعة -->
+    <div class="row mb-4">
+        <div class="col-12 col-md-3">
+            <div class="stat-card">
+                <span class="text-muted d-block small fw-bold">إجمالي المدارس المسجلة</span>
+                <h2 id="totalSchoolsCount" class="fw-bold text-primary mb-0">0</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- جدول المدارس الشامل -->
+    <div class="table-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-secondary mb-0">🏫 قائمة المدارس والبيانات الكاملة</h5>
+            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="fetchSchools()">تحديث القائمة 🔄</button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle text-center table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>اسم ومدير المدرسة</th>
+                        <th>اسم المدرسة</th>
+                        <th>المنطقة التعليمية</th>
+                        <th>اسم المستخدم (السجل)</th>
+                        <th>كلمة المرور</th>
+                        <th>ملف الإكسل</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="schoolsTableBody">
+                    <tr><td colspan="8" class="text-muted py-4">جاري تحميل البيانات...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة Modal للتعديل الشامل ورفع الإكسل -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">⚙️ تعديل بيانات المدرسة وملف الإكسل</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" enctype="multipart/form-data">
+                    <input type="hidden" id="editSchoolId">
+                    
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">الاسم الثلاثي / المدير:</label>
+                            <input type="text" id="editFullName" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">اسم المدرسة:</label>
+                            <input type="text" id="editSchoolName" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">المنطقة التعليمية:</label>
+                            <input type="text" id="editRegion" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">اسم المستخدم (السجل المدني):</label>
+                            <input type="text" id="editUsername" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">كلمة المرور:</label>
+                            <input type="text" id="editPassword" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-bold">رفع / استبدال ملف الإكسل (.xlsx):</label>
+                            <input type="file" id="editExcelFile" class="form-control" accept=".xlsx, .xls">
+                            <small class="text-muted">اتركه فارغاً إذا كنت لا تريد تغيير الملف الحالي.</small>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top d-flex gap-2">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">حفظ والتحديث الكامل 💾</button>
+                        <button type="button" class="btn class-secondary w-100" data-bs-dismiss="modal">إلغاء</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+    let editModalObj;
+
+    function notify(msg, isSuccess = true) {
+        Toastify({
+            text: msg,
+            duration: 3500,
+            gravity: "top",
+            position: "right",
+            style: { background: isSuccess ? "#2ecc71" : "#e74c3c" }
+        }).showToast();
+    }
+
+    async function fetchSchools() {
+        try {
+            const res = await fetch('/api/admin/schools');
+            const data = await res.json();
+            
+            if (data.success) {
+                renderSchools(data.schools);
+            } else {
+                notify("فشل جلب البيانات", false);
+            }
+        } catch (err) {
+            notify("خطأ في الاتصال بالسيرفر", false);
+        }
+    }
+
+    function renderSchools(schools) {
+        const tbody = document.getElementById('schoolsTableBody');
+        document.getElementById('totalSchoolsCount').textContent = schools.length;
+
+        if (schools.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-muted py-4">لا توجد مدارس مسجلة حتى الآن</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = schools.map((s, idx) => `
+            <tr>
+                <td>${idx + 1}</td>
+                <td class="fw-bold">${s.full_name || '-'}</td>
+                <td><span class="badge bg-info text-dark fs-6">${s.school_name || '-'}</span></td>
+                <td>${s.region || '-'}</td>
+                <td><code>${s.username || '-'}</code></td>
+                <td><span class="badge bg-warning text-dark pass-text">${s.password || '-'}</span></td>
+                <td>
+                    ${s.excel_path 
+                        ? `<span class="badge bg-success">مرفوع 📊</span>` 
+                        : `<span class="badge bg-danger">غير مرفوع ❌</span>`}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-warning ms-1 fw-bold" onclick='openEditModal(${JSON.stringify(s)})'>تعديل / رفع ✏️</button>
+                    <button class="btn btn-sm btn-outline-danger fw-bold" onclick="deleteSchool(${s.id}, '${s.school_name}')">حذف 🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function openEditModal(school) {
+        document.getElementById('editSchoolId').value = school.id;
+        document.getElementById('editFullName').value = school.full_name || '';
+        document.getElementById('editSchoolName').value = school.school_name || '';
+        document.getElementById('editRegion').value = school.region || '';
+        document.getElementById('editUsername').value = school.username || '';
+        document.getElementById('editPassword').value = school.password || '';
+        document.getElementById('editExcelFile').value = ''; // إعادة تعيين الحقل
+
+        editModalObj.show();
+    }
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editSchoolId').value;
+        
+        // استخدام FormData لدعم إرسال النصوص والملفات معاً
+        const formData = new FormData();
+        formData.append('full_name', document.getElementById('editFullName').value);
+        formData.append('school_name', document.getElementById('editSchoolName').value);
+        formData.append('region', document.getElementById('editRegion').value);
+        formData.append('username', document.getElementById('editUsername').value);
+        formData.append('password', document.getElementById('editPassword').value);
+        
+        const fileInput = document.getElementById('editExcelFile');
+        if (fileInput.files[0]) {
+            formData.append('excel_file', fileInput.files[0]);
+        }
+
+        try {
+            const res = await fetch(`/api/admin/schools/${id}`, {
+                method: 'PUT',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                notify("تم تحديث البيانات وملف الإكسل بنجاح!");
+                editModalObj.hide();
+                fetchSchools();
+            } else {
+                notify("فشل التعديل: " + data.error, false);
+            }
+        } catch (err) {
+            notify("حدث خطأ أثناء التعديل والرفع", false);
+        }
+    });
+
+    async function deleteSchool(id, name) {
+        if (!confirm(`هل أنت متأكد من حذف مدرسة (${name}) نهائياً؟`)) return;
+
+        try {
+            const res = await fetch(`/api/admin/schools/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            
+            if (data.success) {
+                notify("تم حذف المدرسة بنجاح");
+                fetchSchools();
+            } else {
+                notify("فشل الحذف", false);
+            }
+        } catch (err) {
+            notify("حدث خطأ أثناء الاتصال بالسيرفر", false);
+        }
+    }
+
+    window.onload = () => {
+        editModalObj = new bootstrap.Modal(document.getElementById('editModal'));
+        fetchSchools();
+    };
+</script>
+</body>
+</html>

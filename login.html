@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* تنسيق خاص لتوسيط بطاقة الدخول في منتصف الشاشة */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color, #f4f7f6);
+            margin: 0;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .login-header h2 {
+            color: var(--primary-color, #2c3e50);
+            font-weight: 700;
+            margin-bottom: 8px;
+            border: none;
+            padding: 0;
+        }
+        .login-header p {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin: 0;
+        }
+        .links {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .links a {
+            color: var(--secondary-color, #3498db);
+            text-decoration: none;
+            font-weight: 600;
+            margin: 0 5px;
+            transition: color 0.2s;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        /* 🔔 تنسيق الإشعار المنبثق (showNotification) */
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 50%;
+            transform: translateX(50%) translateY(-20px);
+            background-color: #e74c3c; /* لون أحمر للخطأ/التنبيه */
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 15px;
+            font-weight: 600;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+            z-index: 1000;
+            text-align: center;
+        }
+        #notification.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(50%) translateY(0);
+        }
+        #notification.success {
+            background-color: #2ecc71; /* لون أخضر للنجاح */
+        }
+        #notification.warning {
+            background-color: #e67e22; /* لون برتقالي للتنبيهات */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 🔔 عنصر الإشعار العائم -->
+    <div id="notification"></div>
+
+    <div class="login-card card">
+        <div class="login-header">
+            <h1> وكيل</h1>
+            <p> منصة لإدارة أعمال الوكيل في المدرسة رقميا </p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label>اسم المستخدم</label>
+                <input type="text" id="username" placeholder="أدخل اسم المستخدم" required>
+            </div>
+            
+            <div class="form-group">
+                <label>كلمة المرور</label>
+                <input type="password" id="password" placeholder="أدخل كلمة المرور" required>
+            </div>
+
+            <button type="submit" style="background-color: var(--primary-color, #2c3e50); margin-top: 10px; width: 100% !important; display: block;">دخول</button>
+        </form>
+
+        <div class="links">
+            <a href="register.html">تسجيل جديد</a> | <a href="#">نسيت كلمة المرور؟</a>
+        </div>
+    </div>
+
+    <script>
+        // 🔔 دالة إظهار الإشعار بالأنواع المختلفة (error, success, warning)
+        function showNotification(message, type = 'error') {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            
+            notif.classList.remove('success', 'warning');
+            if (type === 'success') {
+                notif.classList.add('success');
+            } else if (type === 'warning') {
+                notif.classList.add('warning');
+            }
+
+            notif.classList.add('show');
+
+            setTimeout(() => {
+                notif.classList.remove('show');
+            }, 3500);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: usernameInput,
+                        password: passwordInput
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // 1️⃣ حفظ بيانات المستخدم والمدرسة في LocalStorage لاستخدامها في باقي الصفحات
+                    localStorage.setItem('username', result.username || usernameInput);
+                    localStorage.setItem('schoolExcelFile', result.excelFile || '');
+                    localStorage.setItem('schoolName', result.schoolName || '');
+                    localStorage.setItem('fullName', result.fullName || '');
+
+                    // 2️⃣ الفحص: هل يوجد ملف إكسل مسجل لهذا المستخدم؟
+                    const hasExcel = result.excelFile && result.excelFile.trim() !== '';
+
+                    if (!hasExcel) {
+                        // مستخدم جديد لا يملك ملف إكسل 👈 توجيه للإعدادات
+                        showNotification('مرحباً بك! يرجى رفع ملف إكسل المدرسة من صفحة الإعدادات للبدء.', 'warning');
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 2000);
+                    } else {
+                        // مستخدم لديه ملف إكسل 👈 توجيه للصفحة الرئيسية
+                        showNotification('تم تسجيل الدخول بنجاح!', 'success');
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 1000);
+                    }
+                } else {
+                    showNotification(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('خطأ في الاتصال بالسيرفر:', error);
+                showNotification('حدث خطأ أثناء الاتصال بالسيرفر!', 'error');
+            }
+        });
+    </script>
+
+</body>
+</html>

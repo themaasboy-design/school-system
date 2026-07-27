@@ -1,0 +1,374 @@
+/* --- استيراد خط Cairo --- */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
+/* --- المتغيرات اللونية (لتسهيل التعديل مستقبلاً) --- */
+:root {
+    --primary-color: #2c3e50;    /* كحلي غامق للهيدر */
+    --secondary-color: #3498db;  /* أزرق فاتح للتفاعل */
+    --bg-color: #f4f7f6;         /* لون خلفية الصفحة */
+    --card-bg: #ffffff;          /* لون خلفية البطاقة */
+    --text-color: #333333;       /* لون النص */
+    --danger-color: #e74c3c;     /* لون زر الخروج */
+    --success-color: #27ae60;    /* لون زر الحفظ */
+    --border-radius: 8px;
+}
+
+/* --- الإعدادات العامة --- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+    font-family: 'Cairo', Tahoma, sans-serif; 
+    background-color: var(--bg-color); 
+    color: var(--text-color); 
+    direction: rtl; 
+}
+
+/* --- الشريط العلوي (Navbar) الموحد --- */
+.navbar {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 40px;
+    padding-top: 30px !important;    /* يمكنك زيادة هذا الرقم (مثلاً 25px) إذا أردته أكثر ارتفاعاً */
+    padding-bottom: 30px !important; /* تأكد أن الرقمين متساويين ليبقى النص في المنتصف */
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    position: relative !important; /* 👈 ضروري جداً لكي يعرف الشعار أين يتوسط */    top: 0;
+    z-index: 1000;
+    display: flex !important;
+    justify-content: space-between !important; /* يوزع المكونات الثلاثة بالتساوي على أطراف ووسط الشريط */
+    align-items: center !important;
+    overflow: visible !important;  /* يسمح للشعار بالخروج عن الحدود دون الاختفاء */
+}
+.navbar-logo {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important; /* السحر الذي يضعها في السنتر تماماً */
+    
+    /* 📐 كبّر حجم الصورة هنا بالرقم الذي يناسبك، ولن يتحرك الـ navbar بكسل واحد! */
+    height: 180px !important; 
+    
+    width: auto !important;
+    object-fit: contain !important;
+    z-index: 9999 !important; /* لجعلها تطفو فوق كل شيء بشكل أنيق */
+
+}
+.navbar h2 { font-size: 22px; margin: 0; font-weight: 700; }
+.navbar-links { display: flex; gap: 15px; align-items: center; }
+.navbar-links a { 
+    color: #bdc3c7; 
+    text-decoration: none; 
+    padding: 8px 15px; 
+    border-radius: 5px; 
+    font-weight: 600;
+    transition: all 0.3s ease; 
+}
+.navbar-links a:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+.navbar-links a.logout { color: var(--danger-color); }
+.navbar-links a.logout:hover { background-color: rgba(231, 76, 60, 0.1); }
+
+/* --- الحاوية الرئيسية للمحتوى --- */
+.main-container { 
+    max-width: 1000px; 
+    margin: 40px auto; 
+    padding: 0 20px; 
+}
+.card { 
+    background: var(--card-bg); 
+    padding: 40px; 
+    border-radius: var(--border-radius); 
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05); 
+}
+h3 { color: var(--primary-color); border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 25px; }
+
+/* --- تصميم النماذج والحقول --- */
+.form-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;}
+.form-group { flex: 1; min-width: 250px; }
+label { display: block; margin-bottom: 8px; font-weight: 600; color: #34495e; font-size: 15px; }
+select, input { 
+    width: 100%; padding: 12px; margin-bottom: 15px; 
+    border: 1px solid #dcdde1; border-radius: 6px; 
+    font-family: inherit; font-size: 14px; 
+    transition: border-color 0.3s, box-shadow 0.3s; 
+}
+select:focus, input:focus { border-color: var(--secondary-color); outline: none; box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+
+/* --- تصميم شبكة الحصص --- */
+.classes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+.class-box { 
+    border: 1px solid #eee; padding: 20px; 
+    border-radius: var(--border-radius); 
+    background-color: #fafbfc; 
+    transition: transform 0.2s, box-shadow 0.2s; 
+}
+.class-box:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+.class-box label { color: var(--primary-color); }
+
+/* --- زر الحفظ --- */
+button { 
+    width: 100%; padding: 16px; background-color: var(--success-color); 
+    color: white; border: none; border-radius: 6px; 
+    margin-top: 30px; cursor: pointer; font-size: 18px; 
+    font-weight: bold; font-family: inherit; 
+    transition: background 0.3s, transform 0.1s; 
+    /* 🎯 جعل الزر بمقاس حجم النص تماماً */
+
+    width: fit-content !important;   /* يأخذ العرض الخاص بالنص فقط دون أي زيادة */
+    padding: 6px 6px !important;     /* مسافة خفيفة جداً حول النص لراحة العين (يمكنك جعلها 0 إذا أردت) */
+    white-space: nowrap !important;  /* يمنع انقسام النص على سطرين */
+    display: inline-block !important;
+}
+
+button:hover { background-color: #219150; }
+button:active { transform: scale(0.98); }
+/* حاوية القائمة المنسدلة */
+.dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+/* ⚡ التعديل الجديد لحل مشكلة اختفاء القائمة عند الحركة ⚡ */
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    background-color: #ffffff !important;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px rgba(0,0,0,0.2) !important;
+    z-index: 9999 !important;
+    border-radius: 6px;
+    top: 100%;
+    right: 0;
+    margin-top: 2px; /* 👈 تم تقليل المسافة جداً لتلتصق الفأرة بالقائمة فوراً */
+    padding: 0;
+}
+
+/* 💡 الحيلة الذكية: جسر غير مرئي يربط زر التقارير بالقائمة لمنع الاختفاء نهائياً */
+.dropdown-menu::before {
+    content: "";
+    position: absolute;
+    top: -10px; /* يمد منطقة استشعار الماوس للأعلى */
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: transparent; /* شفاف تماماً لا يراه المستخدم */
+}
+
+/* روابط القائمة المنسدلة من الداخل */
+.dropdown-menu a {
+    color: #2c3e50 !important; /* لون النص */
+    padding: 12px 16px !important;
+    text-decoration: none;
+    display: block;
+    border-bottom: 1px solid #f1f1f1 !important; /* خط خفيف بين الروابط */
+    font-size: 0.95rem;
+    transition: background 0.3s;
+}
+
+/* إزالة الخط السفلي من آخر رابط في القائمة */
+.dropdown-menu a:last-child {
+    border-bottom: none !important;
+}
+
+/* تغيير لون الرابط عند المرور عليه بالفأرة */
+.dropdown-menu a:hover {
+    background-color: #f8f9fa;
+    color: #3498db !important; /* يتغير للون الأزرق */
+}
+
+/* السحر هنا: إظهار القائمة عند تمرير الماوس أو اللمس */
+.dropdown-container:hover .dropdown-menu {
+    display: block;
+}
+/* تنسيق النافذة الرئيسية */
+.custom-modal {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  direction: rtl;
+}
+
+/* رأس النافذة */
+.modal-header {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #ffffff;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+/* جسم النافذة */
+.modal-body {
+  padding: 24px 20px 16px 20px;
+}
+
+/* منطقة السحب والإفلات */
+.drop-zone {
+  display: block;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.upload-icon {
+  color: #3b82f6;
+  margin-bottom: 10px;
+}
+
+.drop-title {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+.drop-title span {
+  color: #2563eb;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.drop-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* مربع اسم الملف المختار */
+.file-info-box {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #166534;
+  font-size: 0.9rem;
+}
+
+.file-name {
+  flex-grow: 1;
+  margin: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.remove-file {
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #dc2626;
+  font-weight: bold;
+}
+
+/* أسفل النافذة والزر */
+.modal-footer {
+  padding: 0 20px 20px 20px;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 12px;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-submit:hover {
+  background-color: #059669;
+}
+
+.btn-submit:active {
+  transform: scale(0.99);
+}
+/* ==========================================
+   📱 تنسيقات الاستجابة مع الشاشات الصغيرة والجوال
+   ========================================== */
+@media (max-width: 768px) {
+    /* تصغير العناوين والمسافات لتناسب الجوال */
+    h2 {
+        font-size: 1.25rem !important;
+    }
+    
+    .container-fluid {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    /* جعل كروت الأدوات والجدول تأخذ العرض الكامل مع مساحات مريحة */
+    .main-card, .summary-card {
+        padding: 15px !important;
+        margin-bottom: 15px;
+    }
+
+    /* جعل الجدول يسحب أفقياً بسلاسة إذا كان أعرض من الشاشة */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ضبط خطوط الجدول لتكون واضحة ومقروءة على الشاشات الصغيرة */
+    .table th, .table td {
+        font-size: 10px !important;
+        padding: 4px 2px !important;
+        white-space: nowrap; /* يمنع انكسار الكلمات بشكل مشوه */
+    }
+
+    /* جعل الأزرار في الأسفل تترتب تحت بعضها على الجوال */
+    .summary-card .d-flex {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .btn-save, #btnClear {
+        width: 100% !important;
+    }
+}

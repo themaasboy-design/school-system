@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير الإشراف </title>
+    <!-- Bootstrap RTL CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    
+    <!-- 📄 ربط ملف الـ CSS الخارجي الخاص بك الموجود في المشروع -->
+    <link rel="stylesheet" href="/style.css">
+    
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    
+    <!-- 📚 استدعاء مكتبة jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+       
+        .table th {
+            background-color: #34495e !important;
+            color: #ffffff !important;
+            font-size: 1.1rem;
+            padding: 12px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <h2 id="schoolName">لوحة التحكم</h2>
+        <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+
+    <div class="navbar-links">
+        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
+        <a href="dashboard.html#"style="color: #ffffff;">الانتظار</a>
+        <a href="/monitoring"style="color: #ffffff;"> الإشراف </a>
+        
+        <!-- 🎯 تم دمج وتغليف زر التقارير وقائمته هنا داخل الحاوية المشتركة بنجاح -->
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;"> التقارير </a>
+                 <div class="dropdown-menu">
+                     <a href="report.html">تقرير الغياب</a>
+                     <a href="reportmoni.html">تقرير الإشراف</a>
+                <!-- يمكنك إضافة المزيد من التقارير هنا مستقبلاً -->
+                </div>
+        </div>
+
+       
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
+    </div>
+</nav>
+<div class="container my-4">
+    <!-- قسم خيارات التصفية -->
+    <div class="card filter-card p-4 mb-4">
+      
+        
+   <div class="container my-4">
+    <!-- قسم خيارات التصفية -->
+    <div class="card filter-card p-4 mb-4">
+<h5 class="fw-bold text-secondary mb-3" style="color: black !important;"> اختر اليوم والمهمة المرادة </h5>        
+        <div class="row g-3">
+            
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">اختر اليوم:</label>
+                <select id="dayFilter" class="form-select">
+                    <option value="sun">الأحد</option>
+                    <option value="mon">الإثنين</option>
+                    <option value="tue">الثلاثاء</option>
+                    <option value="wed">الأربعاء</option>
+                    <option value="thu">الخميس</option>
+                </select>
+            </div>
+
+            <div class="col-md-5">
+                <label class="form-label fw-semibold">اختر المهمة:</label>
+                <select id="taskFilter" class="form-select">
+                    <option value="all">الكل (جميع المهام)</option>
+                    <option value="المقصف الغربي">المقصف الغربي</option>
+                    <option value="المقصف الشرقي">المقصف الشرقي</option>
+                    <option value="الساحة الغربية">الساحة الغربية</option>
+                    <option value="الساحة الشرقية">الساحة الشرقية</option>
+                    <option value="الدور الثاني">الدور الثاني</option>
+                </select>
+            </div>
+
+            <!-- 🎯 تم استخدام align-items-end مع رفعة خفيفة للزر -->
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" id="btnFetchReport" class="btn btn-primary w-100 fw-bold" style="transform: translateY(-16px);">
+                    عرض الجدول
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+    <!-- قسم عرض جدول البيانات المعني بالطباعة -->
+    <div class="card report-card p-4">
+        <div class="text-center mb-4">
+            <h3 class="fw-bold text-dark" id="reportTitle">جدول الإشراف  </h3>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered text-center align-middle m-0">
+                <thead>
+                    <tr>
+                        <th style="width: 55%;"> اسم المعلم   </th>
+                        <th style="width: 45%;">المهمة الإشرافية</th>
+                    </tr>
+                </thead>
+                <tbody id="reportTableBody">
+                    <tr>
+                        <td colspan="2" class="text-muted py-4">يرجى تحديد الخيارات ثم الضغط على زر عرض التقرير لجلب البيانات...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- زر استخراج الـ PDF -->
+        <div class="text-end mt-4">
+            <button type="button" id="btnDownloadPDF" class="btn btn-success fw-bold px-4" disabled>
+               طباعة جدول الإشراف 
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script>
+    let currentReportData = [];
+    let currentDayText = "الأحد";
+    let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
+
+   async function fetchReportData() {
+        const day = document.getElementById('dayFilter').value;
+        currentDayText = document.getElementById('dayFilter').options[document.getElementById('dayFilter').selectedIndex].text;
+        const task = document.getElementById('taskFilter').value;
+        const taskText = document.getElementById('taskFilter').options[document.getElementById('taskFilter').selectedIndex].text;
+
+        // تحديث العناوين المتبقية في الصفحة
+        const reportTitleEle = document.getElementById('reportTitle');
+        if (reportTitleEle) reportTitleEle.textContent = `جدول الإشراف ليوم ${currentDayText}`;
+
+        const reportSubtitleEle = document.getElementById('reportSubtitle');
+        if (reportSubtitleEle) reportSubtitleEle.textContent = `المهمة المستهدفة: ${taskText}`;
+
+        try {
+            const response = await fetch(`/get-reportmoni-data?day=${encodeURIComponent(day)}&task=${encodeURIComponent(task)}`);
+            const result = await response.json();
+
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = "";
+
+            if (result.success) {
+                // احتفظنا بـ mainInfo هنا لأنها تُستخدم لاحقاً في طباعة اسم المدرسة داخل الـ PDF
+                if (result.mainInfo) {
+                    mainInfo = result.mainInfo; 
+                }
+
+                if (result.data.length > 0) {
+                    currentReportData = result.data;
+                    document.getElementById('btnDownloadPDF').disabled = false;
+
+                    result.data.forEach(item => {
+                        const teacherHtml = item.teachers.split(/،|,/)
+                            .map(name => `<div class="text-dark fs-5 fw-medium my-2">${name.trim()}</div>`)
+                            .join('');
+
+                        const row = `
+                            <tr>
+                                <td class="bg-white p-2 align-middle">${teacherHtml}</td>
+                                <td class="fw-bold text-center bg-light fs-5 text-secondary align-middle">${item.task}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                } else {
+                    currentReportData = [];
+                    document.getElementById('btnDownloadPDF').disabled = true;
+                    tbody.innerHTML = `<tr><td colspan="2" class="text-danger fw-semibold py-4">⚠️ لا توجد بيانات مسجلة لهذا اليوم بناءً على الفلاتر المختارة.</td></tr>`;
+                }
+            }
+
+        } catch (error) {
+            console.error("خطأ في الاتصال بالخادم:", error);
+        }
+    }
+    async function generateReportPDF() {
+        if (currentReportData.length === 0) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+            
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+            
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+
+            doc.addImage(imgData, 'PNG', 70, 5, 70, 40);
+            doc.setFontSize(12);
+            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+            doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+            doc.text("مدرسة " + (mainInfo.B2 || ""), 160, 27, { align: 'center' });
+            doc.line(15, 48, 195, 48);
+
+            const addBorder = () => {
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.rect(5, 5, 200, 287);
+            };
+            addBorder();
+
+            doc.setFontSize(15);
+            doc.text(`بيان توزيع الإشراف اليومي - يوم (${currentDayText})`, 105, 57, { align: 'center' });
+
+            let currentY = 66; 
+            
+            doc.setFillColor(44, 62, 80); 
+            doc.rect(15, currentY, 180, 10, "F");
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.text(" اسم المعلم ", 155, currentY + 7, { align: 'center' });
+            doc.text("المهمة ", 65, currentY + 7, { align: 'center' });
+
+            currentY += 10;
+            doc.setTextColor(0, 0, 0); 
+
+            currentReportData.forEach(item => {
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.3);
+                
+                const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
+                const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
+                
+                doc.rect(15, currentY, 180, rowHeight);
+                doc.line(115, currentY, 115, currentY + rowHeight);
+
+                doc.setFontSize(11);
+                
+                const teachersYStart = currentY + (rowHeight / 2) - ((teacherLines.length - 1) * 5 / 2) + 1.5;
+                doc.text(teacherLines, 155, teachersYStart, { align: 'center' });
+
+                const taskY = currentY + (rowHeight / 2) + 1.5;
+                doc.text(item.task, 65, taskY, { align: 'center' });
+                
+                currentY += rowHeight;
+            });
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFont("Noto");
+                doc.setFontSize(11);
+                
+                doc.text("مدير المدرسة", 40, 270, { align: 'center' });
+                doc.text((mainInfo.B3 || ""), 40, 277, { align: 'center' });
+                
+                doc.text("وكيل المدرسة", 170, 270, { align: 'center' });
+                doc.text((mainInfo.B4 || ""), 170, 277, { align: 'center' });
+            }
+
+            doc.save(`جدول الإشراف ليوم ${currentDayText}.pdf`);
+            
+        } catch (error) {
+            console.error("حدث خطأ أثناء صياغة الـ PDF:", error);
+        }
+    }
+
+    document.getElementById('btnFetchReport').addEventListener('click', fetchReportData);
+    document.getElementById('btnDownloadPDF').addEventListener('click', generateReportPDF);
+     
+        async function loadSchoolName() {
+            try {
+                // جلب البيانات من المسار الصحيح
+                const response = await fetch('/get-report-data'); 
+                const data = await response.json();
+                
+                const schoolNameEle = document.getElementById('schoolName');
+                
+                // 🛡️ الفحص الصحيح والمطابق لسيرفرك: وجود العنصر + وجود البيانات
+                if (schoolNameEle && data.mainInfo && data.mainInfo.B2) {
+                    schoolNameEle.textContent = "مدرسة " + data.mainInfo.B2;
+                }
+            } catch (e) {
+                console.error("خطأ في جلب اسم المدرسة:", e);
+            }
+        }
+
+        // هذا السطر السحري هو ما يجعله يعمل بأمان داخل الـ head
+        document.addEventListener("DOMContentLoaded", () => {
+            loadSchoolName(); 
+        });
+    
+   
+</script>
+</body>
+</html>
