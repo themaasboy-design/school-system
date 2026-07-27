@@ -222,8 +222,10 @@
             addBorder();
 
             doc.setFontSize(15);
-            doc.text(`بيان توزيع الإشراف اليومي - يوم (${currentDayText})`, 105, 57, { align: 'center' });
+// دمج النص باستخدام + بدلاً من Template Literals لتفادي تعارض اتجاه المحارف
+const titleText = "بيان توزيع الإشراف اليومي - يوم (" + currentDayText + ")";
 
+doc.text(titleText, 105, 57, { align: 'center' });
             let currentY = 66; 
             
             doc.setFillColor(44, 62, 80); 
