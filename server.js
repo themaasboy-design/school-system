@@ -42,19 +42,17 @@ app.use((req, res, next) => {
 });
 
 // =========================================================================
-// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL (تمت إضافة الفحص ومهلة الاتصال)
+// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL
 // =========================================================================
 
-// طباعة فورية لمعرفة هل المتغير مقروء من Render أم لا
 console.log("🔍 حالة متغير DATABASE_URL:", process.env.DATABASE_URL ? "موجود ومقروء ✅" : "غير موجود ❌");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-  connectionTimeoutMillis: 5000 // تحديد مهلة 5 ثوانٍ لمنع تعليق السيرفر
+  connectionTimeoutMillis: 5000
 });
 
-// إنشـاء جدول المستخدمين تلقائياً في حال عدم وجوده
 async function initDb() {
   if (!process.env.DATABASE_URL) {
     console.error("🚨 خطأ: لم يتم العثور على DATABASE_URL بداخل بيئة Render!");
@@ -63,7 +61,7 @@ async function initDb() {
 
   try {
     console.log("⏳ جاري الاتصال بقاعدة بيانات PostgreSQL...");
-    const client = await pool.connect(); // تجربة الاتصال المباشر
+    const client = await pool.connect();
     
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -77,7 +75,7 @@ async function initDb() {
       );
     `);
     
-    client.release(); // إنهاء جلسة الفحص
+    client.release();
     console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجدول بنجاح!");
   } catch (err) {
     console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
@@ -86,7 +84,7 @@ async function initDb() {
 
 initDb();
 
-// 🔐 مسار تسجيل الدخول
+// 🔐 مسار تسجيل الدخول للمدارس
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -574,21 +572,64 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 });
 
 // =========================================================================
-// 🛠️ 3. مسارات لوحة تحكم الأدمن المكتملة الشاملة (Admin Routes)
+// 🛠️ 3. مسارات لوحة تحكم الأدمن (Admin Routes) مع التحقق الأمني
 // =========================================================================
 
-// 1. جلب قائمة كل المدارس والبيانات الكاملة
-app.get('/api/admin/schools', async (req, res) => {
+// دالة التحقق من دخول الأدمن
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.isAdmin) {
+    return next();
+  }
+  return res.status(401).json({ success: false, message: 'غير مصرح بالوصول! يرجى تسجيل الدخول كمسؤول للنظام.' });
+}
+
+// رابط فتح صفحة لوحة التحكم
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// تسجيل دخول الأدمن
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+  const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
+
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    req.session.isAdmin = true;
+    return res.json({ success: true, message: 'تم تسجيل دخول الأدمن بنجاح' });
+  } else {
+    return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة!' });
+  }
+});
+
+// فحص هل الأدمن مسجل الدخول حالياً
+app.get('/api/admin/check-auth', (req, res) => {
+  if (req.session && req.session.isAdmin) {
+    return res.json({ authenticated: true });
+  }
+  return res.json({ authenticated: false });
+});
+
+// تسجيل خروج الأدمن
+app.post('/api/admin/logout', (req, res) => {
+  if (req.session) {
+    req.session.isAdmin = false;
+  }
+  return res.json({ success: true, message: 'تم تسجيل خروج الأدمن بنجاح' });
+});
+
+// 1. جلب قائمة كل المدارس والبيانات (محمي)
+app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path FROM users');
+    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path FROM users ORDER BY id DESC');
     res.json({ success: true, schools: result.rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. تعديل كافة بيانات المدرسة + إمكانية رفع/استبدال ملف الإكسل مباشرة
-app.put('/api/admin/schools/:id', upload.single('excel_file'), async (req, res) => {
+// 2. تعديل بيانات المدرسة + إمكانية رفع/استبدال ملف الإكسل (محمي)
+app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
   try {
     const { id } = req.params;
     const { full_name, school_name, region, username, password } = req.body;
@@ -616,14 +657,14 @@ app.put('/api/admin/schools/:id', upload.single('excel_file'), async (req, res) 
       );
     }
 
-    res.json({ success: true, message: 'تم تحديث بيانات المدرسة وملف الإكسل بنجاح' });
+    res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 3. حذف مدرسة نهائياً من قاعدة البيانات
-app.delete('/api/admin/schools/:id', async (req, res) => {
+// 3. حذف مدرسة نهائياً (محمي)
+app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM users WHERE id = $1', [id]);

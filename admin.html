@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/style.css">
 
     <style>
-        body { background-color: #f4f6f9; }
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .admin-header {
             background: linear-gradient(135deg, #1e293b, #0f172a);
             color: white;
@@ -41,56 +41,96 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        /* كارت تسجيل الدخول */
+        .admin-login-card {
+            max-width: 420px;
+            margin: 80px auto;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            background: #ffffff;
+        }
     </style>
 </head>
 <body>
 
-<header class="admin-header mb-4">
-    <div class="container d-flex justify-content-between align-items-center">
-        <div>
-            <h3 class="fw-bold mb-1">👑 لوحة إدارة النظام والمدارس</h3>
-            <p class="text-muted small mb-0">الاطلاع الكامل، تعديل بيانات الدخول، ورفع ملفات الإكسل للمدارس</p>
+<!-- 🔒 1. شاشة تسجيل دخول الأدمن -->
+<div id="loginSection" class="container d-none">
+    <div class="card admin-login-card p-4">
+        <div class="text-center mb-4">
+            <h3 class="fw-bold text-primary mb-2">👑 دخول الأدمن</h3>
+            <p class="text-muted small">يرجى إدخال بيانات الاعتماد للوصول للوحة التحكم</p>
         </div>
-        <a href="/" class="btn btn-outline-light btn-sm">الرئيسية 🏠</a>
+        
+        <form id="adminLoginForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold">اسم مستخدم الأدمن</label>
+                <input type="text" id="adminUser" class="form-control" required placeholder="admin">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">كلمة المرور</label>
+                <input type="password" id="adminPass" class="form-control" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mt-2">تسجيل الدخول 🔓</button>
+        </form>
+        <div class="text-center mt-3">
+            <a href="/" class="text-decoration-none small text-muted">← العودة للرئيسية</a>
+        </div>
     </div>
-</header>
+</div>
 
-<div class="container-fluid px-lg-5 my-4">
-    <!-- إحصائية سريعة -->
-    <div class="row mb-4">
-        <div class="col-12 col-md-3">
-            <div class="stat-card">
-                <span class="text-muted d-block small fw-bold">إجمالي المدارس المسجلة</span>
-                <h2 id="totalSchoolsCount" class="fw-bold text-primary mb-0">0</h2>
+<!-- 📊 2. لوحة التحكم الكاملة (تظهر فقط بعد المصادقة) -->
+<div id="adminSection" class="d-none">
+    <header class="admin-header mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="fw-bold mb-1">👑 لوحة إدارة النظام والمدارس</h3>
+                <p class="text-muted small mb-0">الاطلاع الكامل، تعديل بيانات الدخول، ورفع ملفات الإكسل للمدارس</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-outline-light btn-sm">الرئيسية 🏠</a>
+                <button onclick="logoutAdmin()" class="btn btn-danger btn-sm fw-bold">تسجيل الخروج 🚪</button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- جدول المدارس الشامل -->
-    <div class="table-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-bold text-secondary mb-0">🏫 قائمة المدارس والبيانات الكاملة</h5>
-            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="fetchSchools()">تحديث القائمة 🔄</button>
+    <div class="container-fluid px-lg-5 my-4">
+        <!-- إحصائية سريعة -->
+        <div class="row mb-4">
+            <div class="col-12 col-md-3">
+                <div class="stat-card">
+                    <span class="text-muted d-block small fw-bold">إجمالي المدارس المسجلة</span>
+                    <h2 id="totalSchoolsCount" class="fw-bold text-primary mb-0">0</h2>
+                </div>
+            </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle text-center table-bordered">
-                <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>اسم المدير</th>
-                        <th>اسم المدرسة</th>
-                        <th>المنطقة التعليمية</th>
-                        <th>اسم المستخدم (السجل)</th>
-                        <th>كلمة المرور</th>
-                        <th>ملف الإكسل</th>
-                        <th>الإجراءات</th>
-                    </tr>
-                </thead>
-                <tbody id="schoolsTableBody">
-                    <tr><td colspan="8" class="text-muted py-4">جاري تحميل البيانات...</td></tr>
-                </tbody>
-            </table>
+        <!-- جدول المدارس الشامل -->
+        <div class="table-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-secondary mb-0">🏫 قائمة المدارس والبيانات الكاملة</h5>
+                <button class="btn btn-sm btn-outline-primary fw-bold" onclick="fetchSchools()">تحديث القائمة 🔄</button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>اسم المدير</th>
+                            <th>اسم المدرسة</th>
+                            <th>المنطقة التعليمية</th>
+                            <th>اسم المستخدم (السجل)</th>
+                            <th>كلمة المرور</th>
+                            <th>ملف الإكسل</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schoolsTableBody">
+                        <tr><td colspan="8" class="text-muted py-4">جاري تحميل البيانات...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -161,6 +201,62 @@
         }).showToast();
     }
 
+    // 🔐 فحص حالة المصادقة
+    async function checkAuth() {
+        try {
+            const res = await fetch('/api/admin/check-auth');
+            const data = await res.json();
+
+            if (data.authenticated) {
+                document.getElementById('loginSection').classList.add('d-none');
+                document.getElementById('adminSection').classList.remove('d-none');
+                fetchSchools();
+            } else {
+                document.getElementById('loginSection').classList.remove('d-none');
+                document.getElementById('adminSection').classList.add('d-none');
+            }
+        } catch (err) {
+            notify("حدث خطأ أثناء التحقق من الجلسة", false);
+        }
+    }
+
+    // 🔑 تسجيل دخول الأدمن
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('adminUser').value;
+        const password = document.getElementById('adminPass').value;
+
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                notify("تم تسجيل الدخول بنجاح كمسؤول بالنظام!");
+                checkAuth();
+            } else {
+                notify(data.message || "اسم المستخدم أو كلمة المرور غير صحيحة", false);
+            }
+        } catch (err) {
+            notify("حدث خطأ أثناء الاتصال بالسيرفر", false);
+        }
+    });
+
+    // 🚪 تسجيل الخروج
+    async function logoutAdmin() {
+        try {
+            await fetch('/api/admin/logout', { method: 'POST' });
+            notify("تم تسجيل الخروج بنجاح");
+            checkAuth();
+        } catch (err) {
+            notify("تعذر تسجيل الخروج", false);
+        }
+    }
+
+    // 📊 جلب بيانات المدارس
     async function fetchSchools() {
         try {
             const res = await fetch('/api/admin/schools');
@@ -169,7 +265,11 @@
             if (data.success) {
                 renderSchools(data.schools);
             } else {
-                notify("فشل جلب البيانات", false);
+                if (res.status === 401) {
+                    checkAuth();
+                } else {
+                    notify("فشل جلب البيانات", false);
+                }
             }
         } catch (err) {
             notify("خطأ في الاتصال بالسيرفر", false);
@@ -246,7 +346,7 @@
                 editModalObj.hide();
                 fetchSchools();
             } else {
-                notify("فشل التعديل: " + data.error, false);
+                notify("فشل التعديل: " + (data.error || data.message), false);
             }
         } catch (err) {
             notify("حدث خطأ أثناء التعديل والرفع", false);
@@ -273,7 +373,7 @@
 
     window.onload = () => {
         editModalObj = new bootstrap.Modal(document.getElementById('editModal'));
-        fetchSchools();
+        checkAuth();
     };
 </script>
 </body>
