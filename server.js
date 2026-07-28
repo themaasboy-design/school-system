@@ -42,17 +42,30 @@ app.use((req, res, next) => {
 });
 
 // =========================================================================
-// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL
+// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL (تمت إضافة الفحص ومهلة الاتصال)
 // =========================================================================
+
+// طباعة فورية لمعرفة هل المتغير مقروء من Render أم لا
+console.log("🔍 حالة متغير DATABASE_URL:", process.env.DATABASE_URL ? "موجود ومقروء ✅" : "غير موجود ❌");
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 5000 // تحديد مهلة 5 ثوانٍ لمنع تعليق السيرفر
 });
 
 // إنشـاء جدول المستخدمين تلقائياً في حال عدم وجوده
 async function initDb() {
+  if (!process.env.DATABASE_URL) {
+    console.error("🚨 خطأ: لم يتم العثور على DATABASE_URL بداخل بيئة Render!");
+    return;
+  }
+
   try {
-    await pool.query(`
+    console.log("⏳ جاري الاتصال بقاعدة بيانات PostgreSQL...");
+    const client = await pool.connect(); // تجربة الاتصال المباشر
+    
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE,
@@ -63,9 +76,11 @@ async function initDb() {
         school_excel_file TEXT
       );
     `);
-    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL بنجاح");
+    
+    client.release(); // إنهاء جلسة الفحص
+    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجدول بنجاح!");
   } catch (err) {
-    console.error("❌ خطأ في تهيئة قاعدة البيانات:", err.message);
+    console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
   }
 }
 
