@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 });
 
 // =========================================================================
-// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL
+// 🗄️ 2. التعامل مع قاعدة البيانات PostgreSQL والتخزين الدائم
 // =========================================================================
 
 console.log("🔍 حالة متغير DATABASE_URL:", process.env.DATABASE_URL ? "موجود ومقروء ✅" : "غير موجود ❌");
@@ -63,6 +63,7 @@ async function initDb() {
     console.log("⏳ جاري الاتصال بقاعدة بيانات PostgreSQL...");
     const client = await pool.connect();
     
+    // إنشاء الجدول وتحديثه ليتضمن حفظ ملفات الإكسل (excel_data)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -71,18 +72,37 @@ async function initDb() {
         full_name TEXT,
         region TEXT,
         school_name TEXT,
-        school_excel_file TEXT
+        school_excel_file TEXT,
+        excel_data BYTEA
       );
+    `);
+
+    // إضافة العمود إذا كان الجدول مسبق الإنشاء
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS excel_data BYTEA;
     `);
     
     client.release();
-    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجدول بنجاح!");
+    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجدول وتأمين التخزين الدائم بنجاح!");
   } catch (err) {
     console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
   }
 }
 
 initDb();
+
+// 🔄 دالة حفظ ملف الإكسل بداخل قاعدة البيانات
+async function syncExcelToDb(username, filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const fileBuffer = fs.readFileSync(filePath);
+      await pool.query('UPDATE users SET excel_data = $1 WHERE username = $2', [fileBuffer, username]);
+      console.log(`💾 تم مزامنة وحفظ ملف الإكسل للمستخدم (${username}) في قاعدة البيانات الدائمة.`);
+    }
+  } catch (e) {
+    console.error(`❌ فشل مزامنة ملف الإكسل لقاعدة البيانات: ${e.message}`);
+  }
+}
 
 // 🔐 مسار تسجيل الدخول للمدارس
 app.post('/login', async (req, res) => {
@@ -147,7 +167,7 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإنشاء ملف المدرسة
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (حتى بعد إعادة تشغيل السيرفر)
 async function getUserExcelPath(req) {
   const username = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -160,25 +180,23 @@ async function getUserExcelPath(req) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  let schoolFileName = null;
-  try {
-    const result = await pool.query('SELECT school_excel_file FROM users WHERE username = $1', [username]);
-    if (result.rows.length > 0) {
-      schoolFileName = result.rows[0].school_excel_file;
-    }
-  } catch (e) {
-    console.error('خطأ في تحديد ملف المستخدم من DB:', e.message);
-  }
+  const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
-  if (!schoolFileName || schoolFileName.trim() === '') {
-    schoolFileName = `data_${username}.xlsx`;
-  }
-
-  const userFilePath = path.join(uploadsDir, schoolFileName);
-
+  // 1. إذا كان الملف غير موجود محلياً (بسبب إعادة التشغيل) -> نسترجعه فوراً من قاعدة البيانات
   if (!fs.existsSync(userFilePath)) {
+    try {
+      const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
+      if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
+        fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
+        console.log(`⚡ تم استرجاع ملف الإكسل للمستخدم (${username}) تلقائياً من PostgreSQL!`);
+        return userFilePath;
+      }
+    } catch (err) {
+      console.error('خطأ في استعادة الملف من DB:', err.message);
+    }
+
+    // 2. إذا لم يتواجد بالـ DB ننشئ ملفاً جديداً ونحفظ نسخته بالقاعدة
     const templatePath = path.join(__dirname, 'template.xlsx');
-    
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, userFilePath);
     } else if (fs.existsSync(EXCEL_FILE)) {
@@ -193,6 +211,9 @@ async function getUserExcelPath(req) {
       xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), MONITORING_SHEET);
       xlsx.writeFile(newWb, userFilePath);
     }
+
+    // حفظ النسخة الأولية في قاعدة البيانات
+    await syncExcelToDb(username, userFilePath);
   }
 
   return userFilePath;
@@ -264,6 +285,7 @@ app.get('/get-waiting-teachers', async (req, res) => {
 app.post('/save-report', async (req, res) => {
   const reportData = req.body;
   try {
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
     const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
@@ -288,6 +310,8 @@ app.post('/save-report', async (req, res) => {
     }
 
     xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "خطأ أثناء الحفظ: " + e.message });
@@ -344,6 +368,7 @@ app.get('/get-monitoring-teachers', async (req, res) => {
 app.post('/save-monitoring', async (req, res) => {
   const weeklySchedule = req.body;
   try {
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
     
@@ -370,6 +395,8 @@ app.post('/save-monitoring', async (req, res) => {
     }
 
     xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
@@ -529,11 +556,12 @@ app.post('/register', upload.none(), async (req, res) => {
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
+    const fileBuffer = fs.readFileSync(userExcelPath);
     
     await pool.query(
-      `INSERT INTO users (full_name, region, school_name, username, password, school_excel_file) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fullName, region, schoolName, username, hashedPassword, userExcelFileName]
+      `INSERT INTO users (full_name, region, school_name, username, password, school_excel_file, excel_data) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [fullName, region, schoolName, username, hashedPassword, userExcelFileName, fileBuffer]
     );
 
     return res.json({
@@ -557,8 +585,12 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 
     if (username) {
       const targetFileName = req.file.filename;
+      const fileBuffer = fs.readFileSync(uploadedPath);
 
-      await pool.query('UPDATE users SET school_excel_file = $1 WHERE username = $2', [targetFileName, username]);
+      await pool.query(
+        'UPDATE users SET school_excel_file = $1, excel_data = $2 WHERE username = $3', 
+        [targetFileName, fileBuffer, username]
+      );
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
@@ -575,7 +607,6 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 // 🛠️ 3. مسارات لوحة تحكم الأدمن (Admin Routes) مع التحقق الأمني
 // =========================================================================
 
-// دالة التحقق من دخول الأدمن
 function requireAdmin(req, res, next) {
   if (req.session && req.session.isAdmin) {
     return next();
@@ -583,12 +614,10 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ success: false, message: 'غير مصرح بالوصول! يرجى تسجيل الدخول كمسؤول للنظام.' });
 }
 
-// رابط فتح صفحة لوحة التحكم
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// تسجيل دخول الأدمن
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
   const ADMIN_USER = process.env.ADMIN_USER || 'admin';
@@ -602,7 +631,6 @@ app.post('/api/admin/login', (req, res) => {
   }
 });
 
-// فحص هل الأدمن مسجل الدخول حالياً
 app.get('/api/admin/check-auth', (req, res) => {
   if (req.session && req.session.isAdmin) {
     return res.json({ authenticated: true });
@@ -610,7 +638,6 @@ app.get('/api/admin/check-auth', (req, res) => {
   return res.json({ authenticated: false });
 });
 
-// تسجيل خروج الأدمن
 app.post('/api/admin/logout', (req, res) => {
   if (req.session) {
     req.session.isAdmin = false;
@@ -618,17 +645,15 @@ app.post('/api/admin/logout', (req, res) => {
   return res.json({ success: true, message: 'تم تسجيل خروج الأدمن بنجاح' });
 });
 
-// 1. جلب قائمة كل المدارس والبيانات (محمي)
 app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path FROM users ORDER BY id DESC');
+    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path, (excel_data IS NOT NULL) AS has_excel FROM users ORDER BY id DESC');
     res.json({ success: true, schools: result.rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. تعديل بيانات المدرسة + إمكانية رفع/استبدال ملف الإكسل (محمي)
 app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -639,14 +664,15 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
       finalPassword = bcrypt.hashSync(password, 10);
     }
 
-    let excelFileName = req.file ? req.file.filename : null;
+    if (req.file) {
+      const excelFileName = req.file.filename;
+      const fileBuffer = fs.readFileSync(req.file.path);
 
-    if (excelFileName) {
       await pool.query(
         `UPDATE users 
-         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6 
-         WHERE id = $7`,
-        [full_name, school_name, region, username, finalPassword, excelFileName, id]
+         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
+         WHERE id = $8`,
+        [full_name, school_name, region, username, finalPassword, excelFileName, fileBuffer, id]
       );
     } else {
       await pool.query(
@@ -663,7 +689,6 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
   }
 });
 
-// 3. حذف مدرسة نهائياً (محمي)
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
