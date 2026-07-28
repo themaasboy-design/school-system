@@ -77,7 +77,6 @@ async function initDb() {
       );
     `);
 
-    // إضافة العمود إذا كان الجدول مسبق الإنشاء
     await client.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS excel_data BYTEA;
     `);
@@ -167,7 +166,7 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (حتى بعد إعادة تشغيل السيرفر)
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (تضمن جلب آخر نسخة دائماً)
 async function getUserExcelPath(req) {
   const username = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -182,7 +181,7 @@ async function getUserExcelPath(req) {
 
   const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
-  // 1. إذا كان الملف غير موجود محلياً (بسبب إعادة التشغيل) -> نسترجعه فوراً من قاعدة البيانات
+  // 1. إذا كان الملف غير موجود محلياً -> نسترجعه فوراً من قاعدة البيانات
   if (!fs.existsSync(userFilePath)) {
     try {
       const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
@@ -195,7 +194,7 @@ async function getUserExcelPath(req) {
       console.error('خطأ في استعادة الملف من DB:', err.message);
     }
 
-    // 2. إذا لم يتواجد بالـ DB ننشئ ملفاً جديداً ونحفظ نسخته بالقاعدة
+    // 2. إذا لم يتواجد بالـ DB ننشئ ملفاً جديداً
     const templatePath = path.join(__dirname, 'template.xlsx');
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, userFilePath);
@@ -212,18 +211,34 @@ async function getUserExcelPath(req) {
       xlsx.writeFile(newWb, userFilePath);
     }
 
-    // حفظ النسخة الأولية في قاعدة البيانات
     await syncExcelToDb(username, userFilePath);
   }
 
   return userFilePath;
 }
 
+// 🧠 دالة أذكى لجلب ورقة الإكسل بغض النظر عن المسافات أو حالة الأحرف
 function getSheet(workbook, sheetIdentifier) {
   if (typeof sheetIdentifier === 'number') {
     return workbook.Sheets[workbook.SheetNames[sheetIdentifier]];
   }
-  return workbook.Sheets[sheetIdentifier];
+  
+  if (workbook.Sheets[sheetIdentifier]) {
+    return workbook.Sheets[sheetIdentifier];
+  }
+
+  // البحث الأัจฉري مع تجاهل الفراغات
+  const cleanTarget = sheetIdentifier.trim().toLowerCase();
+  const foundName = workbook.SheetNames.find(
+    name => name.trim().toLowerCase() === cleanTarget
+  );
+
+  if (foundName) {
+    return workbook.Sheets[foundName];
+  }
+
+  // إذا لم يجد الاسم، يرجع أول ورقة متاحة تجنباً لانهيار النظام
+  return workbook.Sheets[workbook.SheetNames[0]];
 }
 
 // =========================================================================
@@ -291,8 +306,9 @@ app.post('/save-report', async (req, res) => {
     const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
 
     let data = [];
-    if (workbook.SheetNames.includes(REPORT_SHEET)) {
-      data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
+    const reportSheet = getSheet(workbook, REPORT_SHEET);
+    if (reportSheet) {
+      data = xlsx.utils.sheet_to_json(reportSheet, { header: 1 });
     } else {
       data.push(header);
     }
@@ -323,13 +339,13 @@ app.get('/get-report-data', async (req, res) => {
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
 
-    let reportData = workbook.SheetNames.includes(REPORT_SHEET) 
-      ? xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET]) 
-      : [];
+    const reportSheet = getSheet(workbook, REPORT_SHEET);
+    let reportData = reportSheet ? xlsx.utils.sheet_to_json(reportSheet) : [];
 
     let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
-    if (workbook.SheetNames.includes(MAIN_INFO_SHEET)) {
-      const infoData = xlsx.utils.sheet_to_json(workbook.Sheets[MAIN_INFO_SHEET], { header: 1 });
+    const infoSheet = getSheet(workbook, MAIN_INFO_SHEET);
+    if (infoSheet) {
+      const infoData = xlsx.utils.sheet_to_json(infoSheet, { header: 1 });
       mainInfo = {
         B1: infoData[0]?.[1] || "",
         B2: infoData[1]?.[1] || "",
@@ -407,7 +423,7 @@ app.get('/get-monitoring-schedule', async (req, res) => {
   try {
     const filePath = await getUserExcelPath(req);
     const workbook = xlsx.readFile(filePath);
-    const worksheet = workbook.Sheets[MONITORING_SHEET];
+    const worksheet = getSheet(workbook, MONITORING_SHEET);
 
     if (!worksheet) return res.json({ success: true, schedule: {} });
 
@@ -443,7 +459,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
     const filePath = await getUserExcelPath(req);
     const workbook = xlsx.readFile(filePath);
 
-    const infoSheet = workbook.Sheets[MAIN_INFO_SHEET];
+    const infoSheet = getSheet(workbook, MAIN_INFO_SHEET);
     let mainInfo = { B1: '', B2: '', B3: '', B4: '' };
 
     if (infoSheet) {
@@ -453,7 +469,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
       mainInfo.B4 = infoSheet['B4'] ? infoSheet['B4'].v : '';
     }
 
-    const worksheet = workbook.Sheets[MONITORING_SHEET];
+    const worksheet = getSheet(workbook, MONITORING_SHEET);
     if (!worksheet) return res.json({ success: true, data: [], mainInfo });
 
     const rawData = xlsx.utils.sheet_to_json(worksheet);
@@ -584,13 +600,19 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
     const uploadedPath = req.file.path;
 
     if (username) {
-      const targetFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(uploadedPath);
+      const userFilePath = path.join(__dirname, 'uploads', `data_${username}.xlsx`);
+      
+      // ⚡ كتابة واستبدال الملف المحلي مباشرة
+      fs.writeFileSync(userFilePath, fileBuffer);
 
+      // 💾 تحديث قاعدة البيانات الدائمة
       await pool.query(
         'UPDATE users SET school_excel_file = $1, excel_data = $2 WHERE username = $3', 
-        [targetFileName, fileBuffer, username]
+        [req.file.filename, fileBuffer, username]
       );
+
+      if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
@@ -667,13 +689,20 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
     if (req.file) {
       const excelFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(req.file.path);
+      const userFilePath = path.join(__dirname, 'uploads', `data_${username}.xlsx`);
 
+      // ⚡ استبدال الملف المحلي على القرص فوراً
+      fs.writeFileSync(userFilePath, fileBuffer);
+
+      // 💾 حفظ الملف بداخل قاعدة البيانات الدائمة
       await pool.query(
         `UPDATE users 
          SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
          WHERE id = $8`,
         [full_name, school_name, region, username, finalPassword, excelFileName, fileBuffer, id]
       );
+
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     } else {
       await pool.query(
         `UPDATE users 
@@ -685,6 +714,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, error: error.message });
   }
 });
