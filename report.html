@@ -78,7 +78,7 @@
                 </thead>
                 <tbody id="tableBody"></tbody>
             </table>
-            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">معاينة التقرير كـ PDF</button>
+            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">طباعة التقرير  </button>
         </div>
 
     </div>
@@ -208,7 +208,7 @@ async function previewPDF() {
     doc.setFontSize(12);
     doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
     doc.text("الإدارة العامة للتعليم بمنطقة" + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-    doc.text("مدرسة" + (mainInfo.B2 || ""), 160, 27, { align: 'center' });
+    doc.text("مدرسة" + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
     doc.line(15, 35, 195, 35);
 
     let currentY = 43;

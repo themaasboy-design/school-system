@@ -68,7 +68,7 @@
                 <h3 style="margin-top: 40px;">توزيع حصص الانتظار</h3>
                 <div class="classes-grid" id="classesContainer"></div>
 
-                <button type="submit">حفظ بيانات الغياب والانتظار</button>
+                <button type="submit">حفظ </button>
             </form>
         </div>
     </div>
@@ -113,13 +113,13 @@ if (result.success) {
     clearAllInputs(); 
     
     // 2️⃣ أظهر رسالة نجاح أنيقة وتختفي لوحدها 🟩
-    showNotification("تم حفظ بيانات الغياب والانتظار بنجاح في ملف الإكسيل!", "success"); 
+    showNotification("تم حفظ بيانات غياب المعلم  بنجاح   !", "success"); 
     
 } else {
     // 3️⃣ أظهر رسالة الخطأ إذا حدث خطأ ما 🟥
     showNotification("خطأ أثناء الحفظ: " + result.error, "error");
 }
-            } catch (err) {  showNotification("فشل الاتصال بالسيفرفر " + result.error, "error"); }
+            } catch (err) {  showNotification("فشل الاتصال بالسيرفر " + result.error, "error"); }
         });
 
         async function loadClasses() {

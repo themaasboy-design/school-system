@@ -211,7 +211,7 @@ async function generateReportPDF() {
         doc.setFontSize(12);
         doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
         doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-        doc.text("مدرسة " + (mainInfo.B2 || ""), 160, 27, { align: 'center' });
+        doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 48, 195, 48);
 
         const addBorder = () => {
