@@ -166,7 +166,7 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (تضمن جلب آخر نسخة دائماً)
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
 async function getUserExcelPath(req) {
   const username = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -181,7 +181,7 @@ async function getUserExcelPath(req) {
 
   const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
-  // 1. إذا كان الملف غير موجود محلياً -> نسترجعه فوراً من قاعدة البيانات
+  // 1. إذا كان الملف غير موجود محلياً (بسبب إعادة تشغيل سيرفر Render) -> نسترجعه فوراً من PostgreSQL
   if (!fs.existsSync(userFilePath)) {
     try {
       const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
@@ -217,28 +217,11 @@ async function getUserExcelPath(req) {
   return userFilePath;
 }
 
-// 🧠 دالة أذكى لجلب ورقة الإكسل بغض النظر عن المسافات أو حالة الأحرف
 function getSheet(workbook, sheetIdentifier) {
   if (typeof sheetIdentifier === 'number') {
     return workbook.Sheets[workbook.SheetNames[sheetIdentifier]];
   }
-  
-  if (workbook.Sheets[sheetIdentifier]) {
-    return workbook.Sheets[sheetIdentifier];
-  }
-
-  // البحث الأัจฉري مع تجاهل الفراغات
-  const cleanTarget = sheetIdentifier.trim().toLowerCase();
-  const foundName = workbook.SheetNames.find(
-    name => name.trim().toLowerCase() === cleanTarget
-  );
-
-  if (foundName) {
-    return workbook.Sheets[foundName];
-  }
-
-  // إذا لم يجد الاسم، يرجع أول ورقة متاحة تجنباً لانهيار النظام
-  return workbook.Sheets[workbook.SheetNames[0]];
+  return workbook.Sheets[sheetIdentifier];
 }
 
 // =========================================================================
@@ -306,9 +289,8 @@ app.post('/save-report', async (req, res) => {
     const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
 
     let data = [];
-    const reportSheet = getSheet(workbook, REPORT_SHEET);
-    if (reportSheet) {
-      data = xlsx.utils.sheet_to_json(reportSheet, { header: 1 });
+    if (workbook.SheetNames.includes(REPORT_SHEET)) {
+      data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
     } else {
       data.push(header);
     }
@@ -339,13 +321,13 @@ app.get('/get-report-data', async (req, res) => {
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
 
-    const reportSheet = getSheet(workbook, REPORT_SHEET);
-    let reportData = reportSheet ? xlsx.utils.sheet_to_json(reportSheet) : [];
+    let reportData = workbook.SheetNames.includes(REPORT_SHEET) 
+      ? xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET]) 
+      : [];
 
     let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
-    const infoSheet = getSheet(workbook, MAIN_INFO_SHEET);
-    if (infoSheet) {
-      const infoData = xlsx.utils.sheet_to_json(infoSheet, { header: 1 });
+    if (workbook.SheetNames.includes(MAIN_INFO_SHEET)) {
+      const infoData = xlsx.utils.sheet_to_json(workbook.Sheets[MAIN_INFO_SHEET], { header: 1 });
       mainInfo = {
         B1: infoData[0]?.[1] || "",
         B2: infoData[1]?.[1] || "",
@@ -423,7 +405,7 @@ app.get('/get-monitoring-schedule', async (req, res) => {
   try {
     const filePath = await getUserExcelPath(req);
     const workbook = xlsx.readFile(filePath);
-    const worksheet = getSheet(workbook, MONITORING_SHEET);
+    const worksheet = workbook.Sheets[MONITORING_SHEET];
 
     if (!worksheet) return res.json({ success: true, schedule: {} });
 
@@ -459,7 +441,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
     const filePath = await getUserExcelPath(req);
     const workbook = xlsx.readFile(filePath);
 
-    const infoSheet = getSheet(workbook, MAIN_INFO_SHEET);
+    const infoSheet = workbook.Sheets[MAIN_INFO_SHEET];
     let mainInfo = { B1: '', B2: '', B3: '', B4: '' };
 
     if (infoSheet) {
@@ -469,7 +451,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
       mainInfo.B4 = infoSheet['B4'] ? infoSheet['B4'].v : '';
     }
 
-    const worksheet = getSheet(workbook, MONITORING_SHEET);
+    const worksheet = workbook.Sheets[MONITORING_SHEET];
     if (!worksheet) return res.json({ success: true, data: [], mainInfo });
 
     const rawData = xlsx.utils.sheet_to_json(worksheet);
@@ -506,7 +488,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
 });
 
 // =========================================================================
-// 📦 رفع الملفات وإنشاء الحسابات
+// 📦 3. إعداد رفع الملفات وإنشاء الحسابات
 // =========================================================================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -536,16 +518,19 @@ app.get('/register', (req, res) => {
   res.sendFile(path.join(__dirname, 'register.html'));
 });
 
-app.post('/register', upload.none(), async (req, res) => {
+// 📌 مسار تسجيل مدرسة جديدة (يدعم رفع ملف الإكسل مباشرة أو إنشاء ملف افتراضي)
+app.post('/register', upload.single('excelFile'), async (req, res) => {
   try {
     const { fullName, region, schoolName, username, password } = req.body;
 
     if (!fullName || !region || !schoolName || !username || !password) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, message: 'يرجى تعبئة جميع الحقول المطلوبة!' });
     }
 
     const checkResult = await pool.query('SELECT username FROM users WHERE username = $1', [username]);
     if (checkResult.rows.length > 0) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل بالفعل، اختر اسماً آخر!' });
     }
 
@@ -554,26 +539,36 @@ app.post('/register', upload.none(), async (req, res) => {
 
     const userExcelFileName = `data_${username}.xlsx`;
     const userExcelPath = path.join(uploadsDir, userExcelFileName);
-    const templatePath = path.join(__dirname, 'template.xlsx');
+    let fileBuffer;
 
-    if (fs.existsSync(templatePath)) {
-      fs.copyFileSync(templatePath, userExcelPath);
-    } else if (fs.existsSync(EXCEL_FILE)) {
-      fs.copyFileSync(EXCEL_FILE, userExcelPath);
+    // إذا رفع الملف أثناء التسجيل
+    if (req.file) {
+      fileBuffer = fs.readFileSync(req.file.path);
+      fs.writeFileSync(userExcelPath, fileBuffer);
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     } else {
-      const newWb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["اليوم"]]), WAITING_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), REPORT_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([[schoolName], [region]]), MAIN_INFO_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), MONITORING_SHEET);
-      xlsx.writeFile(newWb, userExcelPath);
+      // إذا لم يرفع ملفاً (استخدام القالب الافتراضي)
+      const templatePath = path.join(__dirname, 'template.xlsx');
+      if (fs.existsSync(templatePath)) {
+        fs.copyFileSync(templatePath, userExcelPath);
+      } else if (fs.existsSync(EXCEL_FILE)) {
+        fs.copyFileSync(EXCEL_FILE, userExcelPath);
+      } else {
+        const newWb = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["اليوم"]]), WAITING_SHEET);
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), REPORT_SHEET);
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([[schoolName], [region]]), MAIN_INFO_SHEET);
+        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), MONITORING_SHEET);
+        xlsx.writeFile(newWb, userExcelPath);
+      }
+      fileBuffer = fs.readFileSync(userExcelPath);
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    const fileBuffer = fs.readFileSync(userExcelPath);
     
+    // 💾 الإدراج المباشر المؤكد في PostgreSQL
     await pool.query(
       `INSERT INTO users (full_name, region, school_name, username, password, school_excel_file, excel_data) 
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -582,10 +577,12 @@ app.post('/register', upload.none(), async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'تم إنشاء الحساب بنجاح وتجهيز ملف إكسل خاص بمدرستك! يتم توجيهك لصفحة الدخول...'
+      message: 'تم إنشاء الحساب بنجاح وتأمين حفظ البيانات بداخل قاعدة البيانات! يتم توجيهك لصفحة الدخول...'
     });
 
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    console.error("خطأ التسجيل:", error);
     res.status(500).json({ success: false, message: 'حدث خطأ في السيرفر أثناء معالجة الطلب: ' + error.message });
   }
 });
@@ -600,19 +597,13 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
     const uploadedPath = req.file.path;
 
     if (username) {
+      const targetFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(uploadedPath);
-      const userFilePath = path.join(__dirname, 'uploads', `data_${username}.xlsx`);
-      
-      // ⚡ كتابة واستبدال الملف المحلي مباشرة
-      fs.writeFileSync(userFilePath, fileBuffer);
 
-      // 💾 تحديث قاعدة البيانات الدائمة
       await pool.query(
         'UPDATE users SET school_excel_file = $1, excel_data = $2 WHERE username = $3', 
-        [req.file.filename, fileBuffer, username]
+        [targetFileName, fileBuffer, username]
       );
-
-      if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
@@ -626,7 +617,7 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 });
 
 // =========================================================================
-// 🛠️ 3. مسارات لوحة تحكم الأدمن (Admin Routes) مع التحقق الأمني
+// 🛠️ 4. مسارات لوحة تحكم الأدمن (Admin Routes)
 // =========================================================================
 
 function requireAdmin(req, res, next) {
@@ -689,20 +680,13 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
     if (req.file) {
       const excelFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(req.file.path);
-      const userFilePath = path.join(__dirname, 'uploads', `data_${username}.xlsx`);
 
-      // ⚡ استبدال الملف المحلي على القرص فوراً
-      fs.writeFileSync(userFilePath, fileBuffer);
-
-      // 💾 حفظ الملف بداخل قاعدة البيانات الدائمة
       await pool.query(
         `UPDATE users 
          SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
          WHERE id = $8`,
         [full_name, school_name, region, username, finalPassword, excelFileName, fileBuffer, id]
       );
-
-      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     } else {
       await pool.query(
         `UPDATE users 
@@ -714,7 +698,6 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, error: error.message });
   }
 });
