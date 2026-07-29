@@ -518,19 +518,27 @@ app.get('/register', (req, res) => {
   res.sendFile(path.join(__dirname, 'register.html'));
 });
 
-// 📌 مسار تسجيل مدرسة جديدة (يدعم رفع ملف الإكسل مباشرة أو إنشاء ملف افتراضي)
-app.post('/register', upload.single('excelFile'), async (req, res) => {
+// 📌 مسار تسجيل مدرسة جديدة (يدعم استقبال الملف بأي اسم حقل وحفظه بالـ PostgreSQL)
+app.post('/register', upload.any(), async (req, res) => {
+  const cleanFiles = () => {
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(f => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+    } else if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+  };
+
   try {
     const { fullName, region, schoolName, username, password } = req.body;
 
     if (!fullName || !region || !schoolName || !username || !password) {
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      cleanFiles();
       return res.status(400).json({ success: false, message: 'يرجى تعبئة جميع الحقول المطلوبة!' });
     }
 
     const checkResult = await pool.query('SELECT username FROM users WHERE username = $1', [username]);
     if (checkResult.rows.length > 0) {
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      cleanFiles();
       return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل بالفعل، اختر اسماً آخر!' });
     }
 
@@ -541,11 +549,13 @@ app.post('/register', upload.single('excelFile'), async (req, res) => {
     const userExcelPath = path.join(uploadsDir, userExcelFileName);
     let fileBuffer;
 
+    const uploadedFile = (req.files && req.files.length > 0) ? req.files[0] : (req.file || null);
+
     // إذا رفع الملف أثناء التسجيل
-    if (req.file) {
-      fileBuffer = fs.readFileSync(req.file.path);
+    if (uploadedFile) {
+      fileBuffer = fs.readFileSync(uploadedFile.path);
       fs.writeFileSync(userExcelPath, fileBuffer);
-      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
     } else {
       // إذا لم يرفع ملفاً (استخدام القالب الافتراضي)
       const templatePath = path.join(__dirname, 'template.xlsx');
@@ -581,24 +591,34 @@ app.post('/register', upload.single('excelFile'), async (req, res) => {
     });
 
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    cleanFiles();
     console.error("خطأ التسجيل:", error);
     res.status(500).json({ success: false, message: 'حدث خطأ في السيرفر أثناء معالجة الطلب: ' + error.message });
   }
 });
 
 // 📌 مسار تحديث واستبدال ملف الإكسل للمدرسة من صفحة الإعدادات
-app.post('/update-school-excel', upload.single('excelFile'), async (req, res) => {
+app.post('/update-school-excel', upload.any(), async (req, res) => {
+  const cleanFiles = () => {
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(f => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+    } else if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+  };
+
   try {
-    if (!req.file) {
+    const uploadedFile = (req.files && req.files.length > 0) ? req.files[0] : (req.file || null);
+
+    if (!uploadedFile) {
       return res.status(400).json({ success: false, message: "يرجى اختيار ملف الأكسل أولاً!" });
     }
 
     const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
-    const uploadedPath = req.file.path;
+    const uploadedPath = uploadedFile.path;
 
     if (username) {
-      const targetFileName = req.file.filename;
+      const targetFileName = uploadedFile.filename;
       const fileBuffer = fs.readFileSync(uploadedPath);
 
       // 1️⃣ استبدال وتحديث الملف المحلي للمدرسة فوراً حتى تُقرأ البيانات الجديدة مباشره
@@ -622,7 +642,7 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
 
     return res.json({ success: true, message: "تم تحديث واستبدال بيانات المدرسة بنجاح" });
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    cleanFiles();
     console.error("خطأ أثناء تحديث ملف الإكسل:", error);
     return res.status(500).json({ success: false, message: "فشل في معالجة وتحديث الملف: " + error.message });
   }
