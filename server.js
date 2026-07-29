@@ -762,3 +762,11 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+app.get('/check-db', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) FROM users;');
+    res.json({ total_users: result.rows[0].count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
