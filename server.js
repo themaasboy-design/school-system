@@ -587,23 +587,34 @@ app.post('/register', upload.single('excelFile'), async (req, res) => {
   }
 });
 
+// 📌 مسار تحديث واستبدال ملف الإكسل للمدرسة من صفحة الإعدادات
 app.post('/update-school-excel', upload.single('excelFile'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "يرجى اختيار ملف الأكسل أولاً!" });
     }
 
-    const username = req.body.username || req.session?.username;
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
     const uploadedPath = req.file.path;
 
     if (username) {
       const targetFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(uploadedPath);
 
+      // 1️⃣ استبدال وتحديث الملف المحلي للمدرسة فوراً حتى تُقرأ البيانات الجديدة مباشره
+      const uploadsDir = path.join(__dirname, 'uploads');
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
+      fs.writeFileSync(userFilePath, fileBuffer);
+
+      // 2️⃣ تحديث قاعدة البيانات PostgreSQL لضمان عدم ضياع البيانات بعد إعادة تشغيل السيرفر
       await pool.query(
         'UPDATE users SET school_excel_file = $1, excel_data = $2 WHERE username = $3', 
         [targetFileName, fileBuffer, username]
       );
+
+      // 3️⃣ مسح الملف المؤقت المرفوع من multer
+      if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
@@ -612,6 +623,7 @@ app.post('/update-school-excel', upload.single('excelFile'), async (req, res) =>
     return res.json({ success: true, message: "تم تحديث واستبدال بيانات المدرسة بنجاح" });
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    console.error("خطأ أثناء تحديث ملف الإكسل:", error);
     return res.status(500).json({ success: false, message: "فشل في معالجة وتحديث الملف: " + error.message });
   }
 });
@@ -681,12 +693,22 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
       const excelFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(req.file.path);
 
+      // استبدال وتحديث الملف المحلي للمدرسة إن وجد اسم المستخدم
+      if (username) {
+        const uploadsDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
+        fs.writeFileSync(userFilePath, fileBuffer);
+      }
+
       await pool.query(
         `UPDATE users 
          SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
          WHERE id = $8`,
         [full_name, school_name, region, username, finalPassword, excelFileName, fileBuffer, id]
       );
+
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     } else {
       await pool.query(
         `UPDATE users 
@@ -698,6 +720,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, error: error.message });
   }
 });
