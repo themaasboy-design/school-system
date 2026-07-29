@@ -764,9 +764,12 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 app.get('/check-db', async (req, res) => {
   try {
-    const result = await pool.query('SELECT COUNT(*) FROM users;');
-    res.json({ total_users: result.rows[0].count });
+    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
+    res.json({ 
+      success: true, 
+      schools: result.rows 
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
