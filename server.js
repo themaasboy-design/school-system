@@ -63,7 +63,6 @@ async function initDb() {
     console.log("⏳ جاري الاتصال بقاعدة بيانات PostgreSQL...");
     const client = await pool.connect();
     
-    // إنشاء الجدول وتحديثه ليتضمن حفظ ملفات الإكسل (excel_data)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -95,7 +94,7 @@ async function syncExcelToDb(username, filePath) {
   try {
     if (fs.existsSync(filePath)) {
       const fileBuffer = fs.readFileSync(filePath);
-      await pool.query('UPDATE users SET excel_data = $1 WHERE username = $2', [fileBuffer, username]);
+      await pool.query('UPDATE users SET excel_data = $1 WHERE username = $2', [fileBuffer, String(username).trim()]);
       console.log(`💾 تم مزامنة وحفظ ملف الإكسل للمستخدم (${username}) في قاعدة البيانات الدائمة.`);
     }
   } catch (e) {
@@ -108,7 +107,8 @@ app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const cleanUsername = String(username).trim();
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [cleanUsername]);
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
@@ -166,14 +166,15 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة لجلب أحدث ملف من PostgreSQL دائماً)
 async function getUserExcelPath(req) {
-  const username = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
+  const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
-  if (!username) {
+  if (!rawUsername) {
     throw new Error("UNAUTHORIZED: يرجى تسجيل الدخول أولاً للوصول لبيانات المدرسة.");
   }
 
+  const username = String(rawUsername).trim();
   const uploadsDir = path.join(__dirname, 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -181,20 +182,20 @@ async function getUserExcelPath(req) {
 
   const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
-  // 1. إذا كان الملف غير موجود محلياً (بسبب إعادة تشغيل سيرفر Render) -> نسترجعه فوراً من PostgreSQL
-  if (!fs.existsSync(userFilePath)) {
-    try {
-      const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
-      if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
-        fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
-        console.log(`⚡ تم استرجاع ملف الإكسل للمستخدم (${username}) تلقائياً من PostgreSQL!`);
-        return userFilePath;
-      }
-    } catch (err) {
-      console.error('خطأ في استعادة الملف من DB:', err.message);
+  // 1️⃣ جلب أحدث بيانات الإكسل دائماً وأولاً من PostgreSQL إن وجدت
+  try {
+    const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
+    if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
+      fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
+      console.log(`⚡ تم تحديث ومزامنة ملف الإكسل للمستخدم (${username}) مباشرة من PostgreSQL!`);
+      return userFilePath;
     }
+  } catch (err) {
+    console.error('خطأ في استعادة الملف من DB:', err.message);
+  }
 
-    // 2. إذا لم يتواجد بالـ DB ننشئ ملفاً جديداً
+  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد من القالب
+  if (!fs.existsSync(userFilePath)) {
     const templatePath = path.join(__dirname, 'template.xlsx');
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, userFilePath);
@@ -530,13 +531,14 @@ app.post('/register', upload.any(), async (req, res) => {
 
   try {
     const { fullName, region, schoolName, username, password } = req.body;
+    const cleanUsername = String(username).trim();
 
-    if (!fullName || !region || !schoolName || !username || !password) {
+    if (!fullName || !region || !schoolName || !cleanUsername || !password) {
       cleanFiles();
       return res.status(400).json({ success: false, message: 'يرجى تعبئة جميع الحقول المطلوبة!' });
     }
 
-    const checkResult = await pool.query('SELECT username FROM users WHERE username = $1', [username]);
+    const checkResult = await pool.query('SELECT username FROM users WHERE username = $1', [cleanUsername]);
     if (checkResult.rows.length > 0) {
       cleanFiles();
       return res.status(400).json({ success: false, message: 'اسم المستخدم مسجل بالفعل، اختر اسماً آخر!' });
@@ -545,19 +547,17 @@ app.post('/register', upload.any(), async (req, res) => {
     const uploadsDir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-    const userExcelFileName = `data_${username}.xlsx`;
+    const userExcelFileName = `data_${cleanUsername}.xlsx`;
     const userExcelPath = path.join(uploadsDir, userExcelFileName);
     let fileBuffer;
 
     const uploadedFile = (req.files && req.files.length > 0) ? req.files[0] : (req.file || null);
 
-    // إذا رفع الملف أثناء التسجيل
     if (uploadedFile) {
       fileBuffer = fs.readFileSync(uploadedFile.path);
       fs.writeFileSync(userExcelPath, fileBuffer);
       if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
     } else {
-      // إذا لم يرفع ملفاً (استخدام القالب الافتراضي)
       const templatePath = path.join(__dirname, 'template.xlsx');
       if (fs.existsSync(templatePath)) {
         fs.copyFileSync(templatePath, userExcelPath);
@@ -578,11 +578,10 @@ app.post('/register', upload.any(), async (req, res) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     
-    // 💾 الإدراج المباشر المؤكد في PostgreSQL
     await pool.query(
       `INSERT INTO users (full_name, region, school_name, username, password, school_excel_file, excel_data) 
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [fullName, region, schoolName, username, hashedPassword, userExcelFileName, fileBuffer]
+      [fullName, region, schoolName, cleanUsername, hashedPassword, userExcelFileName, fileBuffer]
     );
 
     return res.json({
@@ -614,26 +613,24 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
       return res.status(400).json({ success: false, message: "يرجى اختيار ملف الأكسل أولاً!" });
     }
 
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
+    const rawUsername = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
     const uploadedPath = uploadedFile.path;
 
-    if (username) {
+    if (rawUsername) {
+      const username = String(rawUsername).trim();
       const targetFileName = uploadedFile.filename;
       const fileBuffer = fs.readFileSync(uploadedPath);
 
-      // 1️⃣ استبدال وتحديث الملف المحلي للمدرسة فوراً حتى تُقرأ البيانات الجديدة مباشره
       const uploadsDir = path.join(__dirname, 'uploads');
       if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
       const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
       fs.writeFileSync(userFilePath, fileBuffer);
 
-      // 2️⃣ تحديث قاعدة البيانات PostgreSQL لضمان عدم ضياع البيانات بعد إعادة تشغيل السيرفر
       await pool.query(
         'UPDATE users SET school_excel_file = $1, excel_data = $2 WHERE username = $3', 
         [targetFileName, fileBuffer, username]
       );
 
-      // 3️⃣ مسح الملف المؤقت المرفوع من multer
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
       fs.copyFileSync(uploadedPath, EXCEL_FILE);
@@ -703,6 +700,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
   try {
     const { id } = req.params;
     const { full_name, school_name, region, username, password } = req.body;
+    const cleanUsername = String(username).trim();
 
     let finalPassword = password;
     if (password && !password.startsWith('$2a$') && !password.startsWith('$2b$')) {
@@ -713,11 +711,10 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
       const excelFileName = req.file.filename;
       const fileBuffer = fs.readFileSync(req.file.path);
 
-      // استبدال وتحديث الملف المحلي للمدرسة إن وجد اسم المستخدم
-      if (username) {
+      if (cleanUsername) {
         const uploadsDir = path.join(__dirname, 'uploads');
         if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-        const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
+        const userFilePath = path.join(uploadsDir, `data_${cleanUsername}.xlsx`);
         fs.writeFileSync(userFilePath, fileBuffer);
       }
 
@@ -725,7 +722,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
         `UPDATE users 
          SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
          WHERE id = $8`,
-        [full_name, school_name, region, username, finalPassword, excelFileName, fileBuffer, id]
+        [full_name, school_name, region, cleanUsername, finalPassword, excelFileName, fileBuffer, id]
       );
 
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -734,7 +731,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
         `UPDATE users 
          SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5 
          WHERE id = $6`,
-        [full_name, school_name, region, username, finalPassword, id]
+        [full_name, school_name, region, cleanUsername, finalPassword, id]
       );
     }
 
@@ -755,13 +752,6 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// =========================================================================
-// 🚀 تشغيل السيرفر
-// =========================================================================
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
-});
 app.get('/check-db', async (req, res) => {
   try {
     const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
@@ -772,4 +762,12 @@ app.get('/check-db', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// =========================================================================
+// 🚀 تشغيل السيرفر
+// =========================================================================
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
 });
