@@ -185,19 +185,43 @@
       await fetchScheduleData();
     };
 
-    // 2️⃣ جلب قائمة المعلمين من السيرفر
-    async function fetchTeachers() {
-      try {
-        const res = await fetch('/get-data');
-        const data = await res.json();
-        teachersList = data
-          .map(t => t['الاسم'] || t['اسم المعلم'] || t['المعلم'] || t['name'])
-          .filter(name => name && name.toString().trim() !== '');
-      } catch (e) {
-        console.error("خطأ في جلب المعلمين:", e);
-      }
+   // 2️⃣ جلب قائمة المعلمين من السيرفر بشكل مرن وذكي
+async function fetchTeachers() {
+  try {
+    const res = await fetch('/get-data');
+    const data = await res.json();
+    
+    // طباعة البيانات في Console المتصفح للتأكد منها عند الحاجة
+    console.log("بيانات المعلمين القادمة من السيرفر:", data);
+
+    // التعامل مع شكل البيانات سواء كانت Array مباشرة أو داخل Object
+    let listArray = [];
+    if (Array.isArray(data)) {
+      listArray = data;
+    } else if (data && typeof data === 'object') {
+      listArray = data.teachers || data.data || data.rows || [];
     }
 
+    // استخراج الاسم مهما كان اسم العمود في الإكسل
+    teachersList = listArray.map(t => {
+      if (typeof t === 'string') return t.trim();
+      if (typeof t === 'object' && t !== null) {
+        // 1. البحث عن الأسماء الشائعة للأعمدة
+        const possibleName = t['الاسم'] || t['اسم المعلم'] || t['المعلم'] || t['name'] || t['teacher_name'];
+        if (possibleName) return possibleName.toString().trim();
+
+        // 2. إذا كان اسم العمود مختلفاً، يأخذ أول قيمة نصية بداخل السطر تلقائياً
+        const firstVal = Object.values(t)[0];
+        if (firstVal) return firstVal.toString().trim();
+      }
+      return '';
+    }).filter(name => name && name !== '' && name !== 'undefined');
+
+    console.log("قائمة المعلمين النهائية:", teachersList);
+  } catch (e) {
+    console.error("خطأ في جلب المعلمين:", e);
+  }
+}
     // 3️⃣ توليد الجداول الخمسة للأيام (طابق تماماً صورة الإكسل)
     function buildDaysTables() {
       const container = document.getElementById('tablesContainer');
