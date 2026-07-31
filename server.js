@@ -644,7 +644,119 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
     return res.status(500).json({ success: false, message: "فشل في معالجة وتحديث الملف: " + error.message });
   }
 });
+// =========================================================================
+// 🗓️ مسارات إعداد جدول الانتظار (waiting_setting)
+// =========================================================================
 
+// 1️⃣ جلب جدول الانتظار الكامل لجميع الأيام وعرضه بصفحة waiting_setting
+app.get('/get-waiting-schedule-full', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+    
+    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
+      return res.json({ success: true, schedule: {} });
+    }
+
+    const sheet = getSheet(workbook, WAITING_SHEET);
+    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    let fullSchedule = {};
+
+    daysList.forEach(day => {
+      fullSchedule[day] = [
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""]
+      ];
+
+      let dayIndex = data.findIndex(row => row && row[0] && row[0].toString().includes(day));
+      if (dayIndex !== -1) {
+        for (let r = 0; r < 4; r++) {
+          let row = data[dayIndex + 2 + r];
+          if (row) {
+            for (let c = 0; c < 7; c++) {
+              let val = row[c + 1] !== undefined ? row[c + 1] : "";
+              fullSchedule[day][r][c] = val.toString().trim();
+            }
+          }
+        }
+      }
+    });
+
+    res.json({ success: true, schedule: fullSchedule });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 2️⃣ حفظ جدول يوم محدد في ورقة Waiting_table ومزامنتها بـ PostgreSQL
+app.post('/save-waiting-schedule-day', async (req, res) => {
+  try {
+    const { day, schedule } = req.body;
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    let sheetData = [];
+
+    if (workbook.SheetNames.includes(WAITING_SHEET)) {
+      sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
+    }
+
+    // في حال كانت الورقة جديدة تماماً، نقوم بتجهيز الهيكلية الكاملة للملف
+    if (sheetData.length === 0) {
+      daysList.forEach(d => {
+        sheetData.push([`جدول الانتظار ليوم ${d}`]);
+        sheetData.push(["", "الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"]);
+        for (let i = 1; i <= 4; i++) {
+          sheetData.push([`منتظر ${i}`, "", "", "", "", "", "", ""]);
+        }
+      });
+    }
+
+    let dayIndex = sheetData.findIndex(row => row && row[0] && row[0].toString().includes(day));
+
+    if (dayIndex === -1) {
+      dayIndex = sheetData.length;
+      sheetData.push([`جدول الانتظار ليوم ${day}`]);
+      sheetData.push(["", "الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"]);
+      for (let i = 1; i <= 4; i++) {
+        sheetData.push([`منتظر ${i}`, "", "", "", "", "", "", ""]);
+      }
+    }
+
+    // تحديث أسطر "منتظر 1" إلى "منتظر 4" لليوم المطلوب
+    for (let r = 0; r < 4; r++) {
+      let rowIndex = dayIndex + 2 + r;
+      if (!sheetData[rowIndex]) {
+        sheetData[rowIndex] = [`منتظر ${r + 1}`];
+      }
+      sheetData[rowIndex][0] = `منتظر ${r + 1}`;
+
+      for (let c = 0; c < 7; c++) {
+        let cellVal = (schedule && schedule[r] && schedule[r][c]) ? schedule[r][c] : "";
+        sheetData[rowIndex][c + 1] = cellVal;
+      }
+    }
+
+    const newSheet = xlsx.utils.aoa_to_sheet(sheetData);
+    workbook.Sheets[WAITING_SHEET] = newSheet;
+    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
+      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
+    }
+
+    xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
+    res.json({ success: true, message: "تم الحفظ بنجاح" });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 // =========================================================================
 // 🛠️ 4. مسارات لوحة تحكم الأدمن (Admin Routes)
 // =========================================================================

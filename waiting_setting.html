@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إعداد جدول الانتظار</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #1e3c72;
+      --secondary-color: #2a5298;
+      --accent-color: #28a745;
+      --bg-color: #f8f9fa;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding-bottom: 50px;
+    }
+
+    /* Navbar Styling */
+    .navbar {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    .navbar-brand, .nav-link {
+      color: #fff !important;
+      font-weight: 600;
+    }
+    .nav-link:hover {
+      opacity: 0.85;
+    }
+
+    /* Container & Section Cards */
+    .day-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      padding: 20px;
+      margin-bottom: 30px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .day-title-header {
+      background-color: #e8f5e9;
+      color: #1b5e20;
+      font-weight: bold;
+      font-size: 1.25rem;
+      padding: 10px 15px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 15px;
+      border: 1px solid #c8e6c9;
+    }
+
+    /* Table Styling */
+    .table-waiting {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+    .table-waiting th, .table-waiting td {
+      border: 1px solid #cbd5e1;
+      padding: 8px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .table-waiting th {
+      background-color: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .table-waiting td.waiting-label {
+      background-color: #f8fafc;
+      font-weight: bold;
+      color: #1e293b;
+      width: 100px;
+    }
+
+    .form-select-sm {
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.88rem;
+    }
+    .form-select-sm:focus {
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 0.2rem rgba(42, 82, 152, 0.25);
+    }
+
+    /* Save Button */
+    .btn-save-day {
+      background-color: #28a745;
+      color: white;
+      font-weight: bold;
+      border: none;
+      padding: 8px 30px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-save-day:hover {
+      background-color: #218838;
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    /* Custom Toast Notification */
+    #toastNotification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: none;
+      min-width: 280px;
+      background-color: #28a745;
+      color: white;
+      text-align: center;
+      padding: 12px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-weight: bold;
+      font-size: 1.05rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notification -->
+  <div id="toastNotification">
+    <i class="fas fa-check-circle"></i> تم الحفظ بنجاح
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-school me-2"></i> نظام إدارة المدرسة
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="fas fa-home me-1"></i> الرئيسية</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/waiting_setting.html"><i class="fas fa-calendar-alt me-1"></i> إعداد الانتظار</a></li>
+          <li class="nav-item"><a class="nav-link" href="/monitoring"><i class="fas fa-user-shield me-1"></i> الإشراف</a></li>
+          <li class="nav-item"><a class="nav-link" href="/reportmoni"><i class="fas fa-file-alt me-1"></i> التقارير</a></li>
+        </ul>
+        <button class="btn btn-outline-light btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt me-1"></i> خروج</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Container -->
+  <div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2><i class="fas fa-user-clock text-primary me-2"></i> إعداد جدول الانتظار الأسبوعي</h2>
+      <span class="text-muted fs-6">حدد المعلمين البدلاء لكل حركية ثم اضغط حفظ اليوم</span>
+    </div>
+
+    <!-- Container for Days Tables -->
+    <div id="tablesContainer">
+      <!-- يتم توليد جداول الأيام الخمسة تلقائياً عبر السكريبت -->
+    </div>
+  </div>
+
+  <script>
+    const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    const periods = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
+    let teachersList = [];
+    let currentSchedule = {};
+
+    // 1️⃣ بناء الواجهة فور تحميل الصفحة
+    window.onload = async () => {
+      await fetchTeachers();
+      buildDaysTables();
+      await fetchScheduleData();
+    };
+
+    // 2️⃣ جلب قائمة المعلمين من السيرفر
+    async function fetchTeachers() {
+      try {
+        const res = await fetch('/get-data');
+        const data = await res.json();
+        teachersList = data
+          .map(t => t['الاسم'] || t['اسم المعلم'] || t['المعلم'] || t['name'])
+          .filter(name => name && name.toString().trim() !== '');
+      } catch (e) {
+        console.error("خطأ في جلب المعلمين:", e);
+      }
+    }
+
+    // 3️⃣ توليد الجداول الخمسة للأيام (طابق تماماً صورة الإكسل)
+    function buildDaysTables() {
+      const container = document.getElementById('tablesContainer');
+      container.innerHTML = '';
+
+      days.forEach(day => {
+        let tableHtml = `
+          <div class="day-card" id="card-${day}">
+            <div class="day-title-header">جدول الانتظار ليوم ${day}</div>
+            
+            <div class="table-responsive">
+              <table class="table-waiting">
+                <thead>
+                  <tr>
+                    <th></th>
+                    ${periods.map(p => `<th>${p}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        for (let r = 1; r <= 4; r++) {
+          tableHtml += `
+            <tr>
+              <td class="waiting-label">منتظر ${r}</td>
+              ${periods.map((_, pIdx) => `
+                <td>
+                  <select class="form-select form-select-sm teacher-select" 
+                          data-day="${day}" 
+                          data-row="${r - 1}" 
+                          data-col="${pIdx}">
+                    <option value="">-- اختر --</option>
+                    ${teachersList.map(t => `<option value="${t}">${t}</option>`).join('')}
+                  </select>
+                </td>
+              `).join('')}
+            </tr>
+          `;
+        }
+
+        tableHtml += `
+                </tbody>
+              </table>
+            </div>
+
+            <div class="d-flex justify-content-start">
+              <button class="btn-save-day" onclick="saveDaySchedule('${day}')">
+                <i class="fas fa-save"></i> حفظ جدول ${day}
+              </button>
+            </div>
+          </div>
+        `;
+
+        container.innerHTML += tableHtml;
+      });
+    }
+
+    // 4️⃣ جلب البيانات المحفوظة سابقاً وعرضها بالمربعات (تبقى ظاهرة)
+    async function fetchScheduleData() {
+      try {
+        const res = await fetch('/get-waiting-schedule-full');
+        const result = await res.json();
+
+        if (result.success && result.schedule) {
+          currentSchedule = result.schedule;
+
+          days.forEach(day => {
+            const dayData = currentSchedule[day];
+            if (dayData && Array.isArray(dayData)) {
+              for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 7; c++) {
+                  const val = dayData[r] ? dayData[r][c] : '';
+                  const selectEl = document.querySelector(`.teacher-select[data-day="${day}"][data-row="${r}"][data-col="${c}"]`);
+                  if (selectEl && val) {
+                    selectEl.value = val;
+                  }
+                }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.error("خطأ في استرجاع الجدول المحفوظ:", e);
+      }
+    }
+
+    // 5️⃣ حفظ جدول يوم محدد إلى ورقة Waiting_table
+    async function saveDaySchedule(day) {
+      let dayMatrix = [
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", ""]
+      ];
+
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 7; c++) {
+          const selectEl = document.querySelector(`.teacher-select[data-day="${day}"][data-row="${r}"][data-col="${c}"]`);
+          if (selectEl) {
+            dayMatrix[r][c] = selectEl.value || "";
+          }
+        }
+      }
+
+      try {
+        const response = await fetch('/save-waiting-schedule-day', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ day, schedule: dayMatrix })
+        });
+
+        const resData = await response.json();
+        if (resData.success) {
+          showToast();
+        } else {
+          alert("خطأ أثناء الحفظ: " + resData.error);
+        }
+      } catch (e) {
+        alert("فشل الاتصال بالسيرفر: " + e.message);
+      }
+    }
+
+    // إظهار التنبيه التلقائي بعبارة "تم الحفظ بنجاح"
+    function showToast() {
+      const toast = document.getElementById('toastNotification');
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2500);
+    }
+
+    function logout() {
+      fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/');
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
