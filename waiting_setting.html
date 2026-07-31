@@ -137,26 +137,27 @@
     <i class="fas fa-check-circle"></i> تم الحفظ بنجاح
   </div>
 
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container-fluid px-4">
-      <a class="navbar-brand" href="#">
-        <i class="fas fa-school me-2"></i> نظام إدارة المدرسة
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="fas fa-home me-1"></i> الرئيسية</a></li>
-          <li class="nav-item"><a class="nav-link active" href="/waiting_setting.html"><i class="fas fa-calendar-alt me-1"></i> إعداد الانتظار</a></li>
-          <li class="nav-item"><a class="nav-link" href="/monitoring"><i class="fas fa-user-shield me-1"></i> الإشراف</a></li>
-          <li class="nav-item"><a class="nav-link" href="/reportmoni"><i class="fas fa-file-alt me-1"></i> التقارير</a></li>
-        </ul>
-        <button class="btn btn-outline-light btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt me-1"></i> خروج</button>
-      </div>
+  <nav class="navbar">
+    <h2 id="schoolName">لوحة التحكم</h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+
+    <div class="navbar-links">
+        <a href="waiting_setting.html" style="color: #ffffff;">إعداد جدول الانتظار</a>
+        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
+        <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
+        <a href="/monitoring" style="color: #ffffff;">الإشراف</a>
+        
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">التقارير</a>
+            <div class="dropdown-menu">
+                <a href="report.html">تقرير الغياب</a>
+                <a href="reportmoni.html">تقرير الإشراف</a>
+            </div>
+        </div>
+
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-  </nav>
+</nav>
 
   <!-- Container -->
   <div class="container my-4">
