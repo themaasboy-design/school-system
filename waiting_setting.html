@@ -215,6 +215,24 @@
         .btn-upload-custom:active {
             transform: scale(0.99);
         }
+        /* 1️⃣ التحكم بحجم خط العنوان الرئيسي: "إعداد جدول الانتظار الأسبوعي" */
+.main-page-title {
+  font-size: 36px; /* 👈 غير الرقم هنا للتحكم بحجم خط العنوان الرئيسي */
+  font-weight: bold;
+  color: #222222;
+  margin-bottom: 25px;
+  text-align: center; /* يمكنك تغييرها إلى right إذا أردتها على اليمين */
+}
+
+/* 2️⃣ التحكم بحجم خط عنوان اليوم: "جدول الانتظار ليوم الأحد" */
+.day-title-header {
+  font-size: 22px; /* 👈 غير الرقم هنا للتحكم بحجم خط عنوان اليوم */
+  font-weight: bold;
+  color: #333333;
+  text-align: right; /* محاذاة لليمن طبقاً للصورة */
+  margin-bottom: 12px;
+  padding: 5px 0;
+}
     </style>
 </head>
 <body>
@@ -249,7 +267,7 @@
   <!-- Container -->
   <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2><i class="fas fa-user-clock text-primary me-2"></i> إعداد جدول الانتظار الأسبوعي</h2>
+      <h2 ><i class="fas fa-user-clock text-primary me-2"></i> إعداد جدول الانتظار الأسبوعي</h2>
       <span class="text-muted fs-6">حدد المعلمين البدلاء لكل حركية ثم اضغط حفظ اليوم</span>
     </div>
 
@@ -319,62 +337,62 @@ async function fetchTeachers() {
   }
 }
     // 3️⃣ توليد الجداول الخمسة للأيام (طابق تماماً صورة الإكسل)
-    function buildDaysTables() {
-      const container = document.getElementById('tablesContainer');
-      container.innerHTML = '';
+   function buildDaysTables() {
+  const container = document.getElementById('tablesContainer');
+  container.innerHTML = '';
 
-      days.forEach(day => {
-        let tableHtml = `
-          <div class="day-card" id="card-${day}">
-            <div class="day-title-header">جدول الانتظار ليوم ${day}</div>
-            
-            <div class="table-responsive">
-              <table class="table-waiting">
-                <thead>
-                  <tr>
-                    <th></th>
-                    ${periods.map(p => `<th>${p}</th>`).join('')}
-                  </tr>
-                </thead>
-                <tbody>
-        `;
+  days.forEach(day => {
+    let tableHtml = `
+      <div class="day-card" id="card-${day}">
+        <!-- النص المكتوب بالنص كما في الصورة -->
+        <div class="day-title-header">جدول الانتظار ليوم ${day}</div>
+        
+        <div class="table-responsive">
+          <table class="table-waiting">
+            <thead>
+              <tr>
+                <th></th>
+                ${periods.map(p => `<th>${p}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+    `;
 
-        for (let r = 1; r <= 4; r++) {
-          tableHtml += `
-            <tr>
-              <td class="waiting-label">منتظر ${r}</td>
-              ${periods.map((_, pIdx) => `
-                <td>
-                  <select class="form-select form-select-sm teacher-select" 
-                          data-day="${day}" 
-                          data-row="${r - 1}" 
-                          data-col="${pIdx}">
-                    <option value="">-- اختر --</option>
-                    ${teachersList.map(t => `<option value="${t}">${t}</option>`).join('')}
-                  </select>
-                </td>
-              `).join('')}
-            </tr>
-          `;
-        }
-
-        tableHtml += `
-                </tbody>
-              </table>
-            </div>
-
-            <div class="d-flex justify-content-start">
-              <button class="btn-save-day" onclick="saveDaySchedule('${day}')">
-                <i class="fas fa-save"></i> حفظ جدول ${day}
-              </button>
-            </div>
-          </div>
-        `;
-
-        container.innerHTML += tableHtml;
-      });
+    for (let r = 1; r <= 4; r++) {
+      tableHtml += `
+        <tr>
+          <td class="waiting-label">منتظر ${r}</td>
+          ${periods.map((_, pIdx) => `
+            <td>
+              <select class="form-select form-select-sm teacher-select" 
+                      data-day="${day}" 
+                      data-row="${r - 1}" 
+                      data-col="${pIdx}">
+                <option value="">-- اختر --</option>
+                ${teachersList.map(t => `<option value="${t}">${t}</option>`).join('')}
+              </select>
+            </td>
+          `).join('')}
+        </tr>
+      `;
     }
 
+    tableHtml += `
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-start mt-2">
+          <button class="btn-save-day" onclick="saveDaySchedule('${day}')">
+            <i class="fas fa-save"></i> حفظ جدول ${day}
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML += tableHtml;
+  });
+}
     // 4️⃣ جلب البيانات المحفوظة سابقاً وعرضها بالمربعات (تبقى ظاهرة)
     async function fetchScheduleData() {
       try {
@@ -452,6 +470,18 @@ async function fetchTeachers() {
     function logout() {
       fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/');
     }
+     async function loadSchoolName() {
+        try {
+            const response = await fetch('/get-report-data');
+            const data = await response.json();
+            if (data.mainInfo && data.mainInfo.B2) {
+                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
+            }
+        } catch (e) {
+            console.error("خطأ في جلب اسم المدرسة:", e);
+        }
+    }
+
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
