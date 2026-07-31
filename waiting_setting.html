@@ -185,16 +185,12 @@
       await fetchScheduleData();
     };
 
-   // 2️⃣ جلب قائمة المعلمين من السيرفر بشكل مرن وذكي
+ // 2️⃣ جلب قائمة المعلمين (استهداف العمود الثاني واسم المعلم مباشرة)
 async function fetchTeachers() {
   try {
     const res = await fetch('/get-data');
     const data = await res.json();
     
-    // طباعة البيانات في Console المتصفح للتأكد منها عند الحاجة
-    console.log("بيانات المعلمين القادمة من السيرفر:", data);
-
-    // التعامل مع شكل البيانات سواء كانت Array مباشرة أو داخل Object
     let listArray = [];
     if (Array.isArray(data)) {
       listArray = data;
@@ -202,22 +198,35 @@ async function fetchTeachers() {
       listArray = data.teachers || data.data || data.rows || [];
     }
 
-    // استخراج الاسم مهما كان اسم العمود في الإكسل
     teachersList = listArray.map(t => {
       if (typeof t === 'string') return t.trim();
       if (typeof t === 'object' && t !== null) {
-        // 1. البحث عن الأسماء الشائعة للأعمدة
-        const possibleName = t['الاسم'] || t['اسم المعلم'] || t['المعلم'] || t['name'] || t['teacher_name'];
-        if (possibleName) return possibleName.toString().trim();
-
-        // 2. إذا كان اسم العمود مختلفاً، يأخذ أول قيمة نصية بداخل السطر تلقائياً
-        const firstVal = Object.values(t)[0];
-        if (firstVal) return firstVal.toString().trim();
+        // 1. البحث عن عناوين الأعمدة الشائعة لاسم المعلم
+        let name = t['اسم المعلم'] || t['اسم_المعلم'] || t['الاسم'] || t['المعلم'] || t['teacher_name'] || t['name'];
+        
+        // 2. إذا لم يجد عنوناً مطابقاً، نأخذ القيمة من العمود الثاني (Object.values(t)[1])
+        if (!name) {
+          const values = Object.values(t);
+          // إذا كان السطر يحتوي على أكثر من عمود، العمود الثاني (فهرس 1) هو اسم المعلم
+          if (values.length > 1) {
+            name = values[1];
+          } else {
+            name = values[0];
+          }
+        }
+        
+        if (name) return name.toString().trim();
       }
       return '';
-    }).filter(name => name && name !== '' && name !== 'undefined');
+    }).filter(name => {
+      // 3. فلترة القائمة: استبعاد القيم الفارغة وأرقام الهوية (الأرقام المجردة)
+      return name && name !== '' && name !== 'undefined' && !/^\d+$/.test(name);
+    });
 
-    console.log("قائمة المعلمين النهائية:", teachersList);
+    // إعادة بناء الجداول بالقوائم المحدثة فور جلب الأسماء
+    buildDaysTables();
+    await fetchScheduleData();
+
   } catch (e) {
     console.error("خطأ في جلب المعلمين:", e);
   }
