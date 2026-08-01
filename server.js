@@ -155,7 +155,7 @@ app.post('/logout', (req, res) => {
 });
 
 // =========================================================================
-// ⚙️ إعدادات أسماء الملف والورقات
+// ⚙️ إعدادات أسماء الملف والورقات والدوال المساعدة
 // =========================================================================
 const EXCEL_FILE = path.join(__dirname, 'waiting_data.xlsx');
 
@@ -166,7 +166,27 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة لجلب أحدث ملف من PostgreSQL دائماً)
+// 🛠️ دالة تنظيف وتوحيد النصوص العربية
+function normalizeArabicText(str) {
+  if (!str) return '';
+  return str.toString().trim()
+    .replace(/[أإآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, '');
+}
+
+// 📍 دالة تحديد صف البداية الثابت لكل يوم (تطابق صفوف الإكسل المطلوبة بالكامل)
+function getDayStartRow(dayStr) {
+  const norm = normalizeArabicText(dayStr);
+  if (norm.includes('احد')) return 0;       // صف 1 بالإكسل (Index 0)
+  if (norm.includes('ثنين')) return 6;      // صف 7 بالإكسل (Index 6)
+  if (norm.includes('ثلاثاء')) return 12;   // صف 13 بالإكسل (Index 12)
+  if (norm.includes('اربعاء')) return 18;   // صف 19 بالإكسل (Index 18)
+  if (norm.includes('خميس')) return 24;     // صف 25 بالإكسل (Index 24)
+  return -1;
+}
+
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
 async function getUserExcelPath(req) {
   const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -182,7 +202,6 @@ async function getUserExcelPath(req) {
 
   const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
-  // 1️⃣ جلب أحدث بيانات الإكسل دائماً وأولاً من PostgreSQL إن وجدت
   try {
     const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
@@ -194,7 +213,6 @@ async function getUserExcelPath(req) {
     console.error('خطأ في استعادة الملف من DB:', err.message);
   }
 
-  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد من القالب
   if (!fs.existsSync(userFilePath)) {
     const templatePath = path.join(__dirname, 'template.xlsx');
     if (fs.existsSync(templatePath)) {
@@ -226,7 +244,7 @@ function getSheet(workbook, sheetIdentifier) {
 }
 
 // =========================================================================
-// 📊 مسارات جلب وحفظ البيانات الأساسية
+// 📊 مسارات جلب وحفظ البيانات الأساسية والداشبورد
 // =========================================================================
 
 app.get('/monitoring', (req, res) => {
@@ -255,7 +273,7 @@ app.get('/get-classes', async (req, res) => {
   }
 });
 
-// 📌 [مُعدّل ومُصحّح] جلب معالمي الانتظار للداشبورد بشكل مطابق لصفحة الإعدادات
+// 📌 جلب معالمي الانتظار للداشبورد بناءً على الخريطة الثابتة للصفوف والأعمدة
 app.get('/get-waiting-teachers', async (req, res) => {
   const { day, period } = req.query;
   try {
@@ -264,14 +282,15 @@ app.get('/get-waiting-teachers', async (req, res) => {
     const sheet = getSheet(workbook, WAITING_SHEET);
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    let dayIndex = data.findIndex(row => row && row[0] && row[0].toString().includes(day));
-    if (dayIndex === -1) return res.json({ teachers: [] });
+    const startRow = getDayStartRow(day);
+    if (startRow === -1) return res.json({ teachers: [] });
 
-    const colIndex = parseInt(period); // period 1 -> index 1 (العمود B)
+    const colIndex = parseInt(period) - 1; // الحصة 1 -> Index 0 (العمود A)
     let resultTeachers = [];
 
+    // قراءة الأسطر الأربعة المخصصة لكل يوم من موقعها المباشر
     for (let i = 0; i < 4; i++) {
-      let row = data[dayIndex + 2 + i]; // الأسطر 3 و 4 و 5 و 6
+      let row = data[startRow + 2 + i];
       if (row && row[colIndex] !== undefined && row[colIndex] !== null) {
         let teacherName = row[colIndex].toString().trim();
         if (teacherName !== "") {
@@ -462,11 +481,6 @@ app.get('/get-reportmoni-data', async (req, res) => {
     const rawData = xlsx.utils.sheet_to_json(worksheet);
     let filteredResults = [];
 
-    function normalizeText(str) {
-      if (!str) return '';
-      return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
-    }
-
     const dayTargets = {
       'sun': 'الأحد', 'mon': 'الإثنين', 'tue': 'الثلاثاء', 'wed': 'الأربعاء', 'thu': 'الخميس'
     };
@@ -476,7 +490,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
       const rowTask = row['المهمة'] || row['task'] || '';
       const teacherInDay = targetDayName ? row[targetDayName] : '';
 
-      if (task !== 'all' && normalizeText(rowTask) !== normalizeText(task)) return;
+      if (task !== 'all' && normalizeArabicText(rowTask) !== normalizeArabicText(task)) return;
 
       if (teacherInDay && teacherInDay.toString().trim() !== "") {
         filteredResults.push({
@@ -648,9 +662,10 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 });
 
 // =========================================================================
-// 🗓️ مسارات إعداد جدول الانتظار (waiting_setting)
+// 🗓️ مسارات إعداد جدول الانتظار (waiting_setting) - مواقع صفوف وأعمدة ثابتة
 // =========================================================================
 
+// 1️⃣ جلب جدول الانتظار الكامل للقراءة والصفحة
 app.get('/get-waiting-schedule-full', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
@@ -674,13 +689,14 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
         ["", "", "", "", "", "", ""]
       ];
 
-      let dayIndex = data.findIndex(row => row && row[0] && row[0].toString().includes(day));
-      if (dayIndex !== -1) {
+      const startRow = getDayStartRow(day);
+
+      if (startRow !== -1) {
         for (let r = 0; r < 4; r++) {
-          let row = data[dayIndex + 2 + r];
+          let row = data[startRow + 2 + r];
           if (row) {
             for (let c = 0; c < 7; c++) {
-              let val = row[c + 1] !== undefined ? row[c + 1] : "";
+              let val = row[c] !== undefined ? row[c] : "";
               fullSchedule[day][r][c] = val.toString().trim();
             }
           }
@@ -694,6 +710,7 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
   }
 });
 
+// 2️⃣ حفظ جدول اليوم المحدد مباشرة في الصفوف الثابتة المخصصة له
 app.post('/save-waiting-schedule-day', async (req, res) => {
   try {
     const { day, schedule } = req.body;
@@ -708,37 +725,34 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
       sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
     }
 
-    if (sheetData.length === 0) {
-      daysList.forEach(d => {
-        sheetData.push([`جدول الانتظار ليوم ${d}`]);
-        sheetData.push(["", "الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"]);
-        for (let i = 1; i <= 4; i++) {
-          sheetData.push([`منتظر ${i}`, "", "", "", "", "", "", ""]);
+    // تجهيز وهيكلة الصفوف المحددة لجميع الأيام (من الصف 1 إلى الصف 30)
+    const periodHeaders = ["الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"];
+    
+    daysList.forEach(d => {
+      const sRow = getDayStartRow(d);
+      if (sRow !== -1) {
+        if (!sheetData[sRow]) sheetData[sRow] = [`جدول الانتظار ليوم ${d}`];
+        if (!sheetData[sRow + 1]) sheetData[sRow + 1] = periodHeaders;
+        for (let i = 0; i < 4; i++) {
+          if (!sheetData[sRow + 2 + i]) sheetData[sRow + 2 + i] = ["", "", "", "", "", "", ""];
         }
-      });
-    }
-
-    let dayIndex = sheetData.findIndex(row => row && row[0] && row[0].toString().includes(day));
-
-    if (dayIndex === -1) {
-      dayIndex = sheetData.length;
-      sheetData.push([`جدول الانتظار ليوم ${day}`]);
-      sheetData.push(["", "الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"]);
-      for (let i = 1; i <= 4; i++) {
-        sheetData.push([`منتظر ${i}`, "", "", "", "", "", "", ""]);
       }
-    }
+    });
 
-    for (let r = 0; r < 4; r++) {
-      let rowIndex = dayIndex + 2 + r;
-      if (!sheetData[rowIndex]) {
-        sheetData[rowIndex] = [`منتظر ${r + 1}`];
-      }
-      sheetData[rowIndex][0] = `منتظر ${r + 1}`;
+    // إدراج وحفظ بيانات اليوم في مكانه الثابت والدقيق
+    const startRow = getDayStartRow(day);
 
-      for (let c = 0; c < 7; c++) {
-        let cellVal = (schedule && schedule[r] && schedule[r][c]) ? schedule[r][c] : "";
-        sheetData[rowIndex][c + 1] = cellVal;
+    if (startRow !== -1) {
+      for (let r = 0; r < 4; r++) {
+        let rowIndex = startRow + 2 + r;
+        if (!sheetData[rowIndex]) {
+          sheetData[rowIndex] = [];
+        }
+
+        for (let c = 0; c < 7; c++) {
+          let cellVal = (schedule && schedule[r] && schedule[r][c]) ? schedule[r][c] : "";
+          sheetData[rowIndex][c] = cellVal; // الحفظ يبدأ من العمود A (Index 0)
+        }
       }
     }
 
