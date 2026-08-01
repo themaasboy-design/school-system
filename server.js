@@ -876,32 +876,50 @@ app.get('/check-db', async (req, res) => {
   }
 });
 // Endpoint لتنزيل ملف الإكسل للمدرسة
+const path = require('path');
+const fs = require('fs'); // تأكد من استدعاء fs في أعلى الملف
+
 app.get('/api/admin/download-excel/:id', async (req, res) => {
     try {
         const schoolId = req.params.id;
         
-        // استعلام قاعدة البيانات لجلب مسار الملف واسم المدرسة
+        // ⚠️ تأكد أن pool يطابق اسم متغير قاعدة البيانات لديك في server.js (مثلاً db أو client)
         const result = await pool.query('SELECT excel_path, school_name FROM schools WHERE id = $1', [schoolId]);
         
-        if (result.rows.length === 0 || !result.rows[0].excel_path) {
-            return res.status(404).send('الملف غير موجود لهذه المدرسة.');
+        if (result.rows.length === 0) {
+            return res.status(404).send('المدرسة غير موجودة في قاعدة البيانات.');
         }
 
-        const filePath = result.rows[0].excel_path;
+        const rawPath = result.rows[0].excel_path;
         const schoolName = result.rows[0].school_name || `School_${schoolId}`;
-        
-        // إرسال الملف للتنزيل
-        res.download(filePath, `بيانات_${schoolName}.xlsx`, (err) => {
+
+        if (!rawPath) {
+            return res.status(404).send('لا يوجد ملف إكسل مسجل لهذه المدرسة.');
+        }
+
+        // تحويل المسار إلى مسار مطلق
+        const absolutePath = path.resolve(rawPath);
+        console.log("📁 المسار المطلوب تنزيله:", absolutePath);
+
+        // 1. التأكد من وجود الملف فعلياً على السيرفر
+        if (!fs.existsSync(absolutePath)) {
+            console.error("❌ الملف غير موجود على السيرفر:", absolutePath);
+            return res.status(404).send('عذراً، الملف غير موجود على السيرفر (قد تكون بحاجة لإعادة رفعه من زر التعديل).');
+        }
+
+        // 2. إرسال الملف للمتصفح
+        res.download(absolutePath, `بيانات_${schoolName}.xlsx`, (err) => {
             if (err) {
-                console.error("خطأ أثناء تنزيل الملف:", err);
+                console.error("❌ خطأ أثناء تنزيل الملف:", err);
                 if (!res.headersSent) {
-                    res.status(500).send("تعذر تنزيل الملف");
+                    res.status(500).send("تعذر إرسال الملف");
                 }
             }
         });
+
     } catch (err) {
-        console.error("خطأ في سيرفر التنزيل:", err);
-        res.status(500).send("خطأ في الخادم");
+        console.error("🔥 خطأ في سيرفر التنزيل بالتفصيل:", err);
+        res.status(500).send("خطأ في الخادم: " + err.message);
     }
 });
 // =========================================================================
