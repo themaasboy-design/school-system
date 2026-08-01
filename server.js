@@ -644,6 +644,7 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
     return res.status(500).json({ success: false, message: "فشل في معالجة وتحديث الملف: " + error.message });
   }
 });
+
 // =========================================================================
 // 🗓️ مسارات إعداد جدول الانتظار (waiting_setting)
 // =========================================================================
@@ -757,6 +758,7 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
 // =========================================================================
 // 🛠️ 4. مسارات لوحة تحكم الأدمن (Admin Routes)
 // =========================================================================
@@ -875,53 +877,43 @@ app.get('/check-db', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// Endpoint لتنزيل ملف الإكسل للمدرسة
-const path = require('path');
-const fs = require('fs'); // تأكد من استدعاء fs في أعلى الملف
 
-app.get('/api/admin/download-excel/:id', async (req, res) => {
-    try {
-        const schoolId = req.params.id;
-        
-        // ⚠️ تأكد أن pool يطابق اسم متغير قاعدة البيانات لديك في server.js (مثلاً db أو client)
-        const result = await pool.query('SELECT excel_path, school_name FROM schools WHERE id = $1', [schoolId]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).send('المدرسة غير موجودة في قاعدة البيانات.');
-        }
+// 📥 Endpoint تنزيل ملف الإكسل للمدرسة المحددة مباشرة من قاعدة البيانات PostgreSQL
+app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT school_name, username, school_excel_file, excel_data FROM users WHERE id = $1', [id]);
 
-        const rawPath = result.rows[0].excel_path;
-        const schoolName = result.rows[0].school_name || `School_${schoolId}`;
-
-        if (!rawPath) {
-            return res.status(404).send('لا يوجد ملف إكسل مسجل لهذه المدرسة.');
-        }
-
-        // تحويل المسار إلى مسار مطلق
-        const absolutePath = path.resolve(rawPath);
-        console.log("📁 المسار المطلوب تنزيله:", absolutePath);
-
-        // 1. التأكد من وجود الملف فعلياً على السيرفر
-        if (!fs.existsSync(absolutePath)) {
-            console.error("❌ الملف غير موجود على السيرفر:", absolutePath);
-            return res.status(404).send('عذراً، الملف غير موجود على السيرفر (قد تكون بحاجة لإعادة رفعه من زر التعديل).');
-        }
-
-        // 2. إرسال الملف للمتصفح
-        res.download(absolutePath, `بيانات_${schoolName}.xlsx`, (err) => {
-            if (err) {
-                console.error("❌ خطأ أثناء تنزيل الملف:", err);
-                if (!res.headersSent) {
-                    res.status(500).send("تعذر إرسال الملف");
-                }
-            }
-        });
-
-    } catch (err) {
-        console.error("🔥 خطأ في سيرفر التنزيل بالتفصيل:", err);
-        res.status(500).send("خطأ في الخادم: " + err.message);
+    if (result.rows.length === 0) {
+      return res.status(404).send('المدرسة غير موجودة في قاعدة البيانات.');
     }
+
+    const school = result.rows[0];
+    const fileName = school.school_name ? `بيانات_${school.school_name}.xlsx` : `data_${school.username}.xlsx`;
+
+    // 1️⃣ إرسال الملف مباشرة من الحقل الرقمي (BYTEA) المخزن بداخل قاعدة البيانات
+    if (school.excel_data) {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      return res.send(school.excel_data);
+    }
+
+    // 2️⃣ في حال عدم وجوده بالـ DB، البحث عنه بالمسار المحلي
+    const uploadsDir = path.join(__dirname, 'uploads');
+    const localFilePath = path.join(uploadsDir, `data_${school.username}.xlsx`);
+
+    if (fs.existsSync(localFilePath)) {
+      return res.download(localFilePath, fileName);
+    }
+
+    return res.status(404).send('عذراً، لا يوجد ملف إكسل مسجل لهذه المدرسة.');
+
+  } catch (error) {
+    console.error('خطأ أثناء تنزيل ملف الإكسل:', error);
+    res.status(500).send('حدث خطأ في الخادم أثناء تنزيل الملف: ' + error.message);
+  }
 });
+
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
