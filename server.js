@@ -255,6 +255,7 @@ app.get('/get-classes', async (req, res) => {
   }
 });
 
+// 📌 [مُعدّل ومُصحّح] جلب معالمي الانتظار للداشبورد بشكل مطابق لصفحة الإعدادات
 app.get('/get-waiting-teachers', async (req, res) => {
   const { day, period } = req.query;
   try {
@@ -263,16 +264,19 @@ app.get('/get-waiting-teachers', async (req, res) => {
     const sheet = getSheet(workbook, WAITING_SHEET);
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    let dayIndex = data.findIndex(row => row && row[0] === day);
+    let dayIndex = data.findIndex(row => row && row[0] && row[0].toString().includes(day));
     if (dayIndex === -1) return res.json({ teachers: [] });
 
-    const colIndex = parseInt(period) - 1;
+    const colIndex = parseInt(period); // period 1 -> index 1 (العمود B)
     let resultTeachers = [];
 
-    for (let i = 1; i <= 4; i++) {
-      let row = data[dayIndex + i];
-      if (row && row[colIndex] !== undefined) {
-        resultTeachers.push(row[colIndex]);
+    for (let i = 0; i < 4; i++) {
+      let row = data[dayIndex + 2 + i]; // الأسطر 3 و 4 و 5 و 6
+      if (row && row[colIndex] !== undefined && row[colIndex] !== null) {
+        let teacherName = row[colIndex].toString().trim();
+        if (teacherName !== "") {
+          resultTeachers.push(teacherName);
+        }
       }
     }
     res.json({ teachers: resultTeachers });
@@ -519,7 +523,6 @@ app.get('/register', (req, res) => {
   res.sendFile(path.join(__dirname, 'register.html'));
 });
 
-// 📌 مسار تسجيل مدرسة جديدة (يدعم استقبال الملف بأي اسم حقل وحفظه بالـ PostgreSQL)
 app.post('/register', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -596,7 +599,6 @@ app.post('/register', upload.any(), async (req, res) => {
   }
 });
 
-// 📌 مسار تحديث واستبدال ملف الإكسل للمدرسة من صفحة الإعدادات
 app.post('/update-school-excel', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -649,7 +651,6 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 // 🗓️ مسارات إعداد جدول الانتظار (waiting_setting)
 // =========================================================================
 
-// 1️⃣ جلب جدول الانتظار الكامل لجميع الأيام وعرضه بصفحة waiting_setting
 app.get('/get-waiting-schedule-full', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
@@ -693,7 +694,6 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
   }
 });
 
-// 2️⃣ حفظ جدول يوم محدد في ورقة Waiting_table ومزامنتها بـ PostgreSQL
 app.post('/save-waiting-schedule-day', async (req, res) => {
   try {
     const { day, schedule } = req.body;
@@ -708,7 +708,6 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
       sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
     }
 
-    // في حال كانت الورقة جديدة تماماً، نقوم بتجهيز الهيكلية الكاملة للملف
     if (sheetData.length === 0) {
       daysList.forEach(d => {
         sheetData.push([`جدول الانتظار ليوم ${d}`]);
@@ -730,7 +729,6 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
       }
     }
 
-    // تحديث أسطر "منتظر 1" إلى "منتظر 4" لليوم المطلوب
     for (let r = 0; r < 4; r++) {
       let rowIndex = dayIndex + 2 + r;
       if (!sheetData[rowIndex]) {
@@ -878,7 +876,7 @@ app.get('/check-db', async (req, res) => {
   }
 });
 
-// 📥 Endpoint تنزيل ملف الإكسل للمدرسة المحددة مباشرة من قاعدة البيانات PostgreSQL
+// 📥 تنزيل ملف الإكسل مباشرة للمدرسة من قاعدة البيانات
 app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -891,14 +889,12 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
     const school = result.rows[0];
     const fileName = school.school_name ? `بيانات_${school.school_name}.xlsx` : `data_${school.username}.xlsx`;
 
-    // 1️⃣ إرسال الملف مباشرة من الحقل الرقمي (BYTEA) المخزن بداخل قاعدة البيانات
     if (school.excel_data) {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
       return res.send(school.excel_data);
     }
 
-    // 2️⃣ في حال عدم وجوده بالـ DB، البحث عنه بالمسار المحلي
     const uploadsDir = path.join(__dirname, 'uploads');
     const localFilePath = path.join(uploadsDir, `data_${school.username}.xlsx`);
 
