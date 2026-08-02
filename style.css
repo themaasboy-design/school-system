@@ -395,9 +395,23 @@ button:active { transform: scale(0.98); }
     padding-bottom: 50px !important; /* 👈 خليه مساوي للرقم العلوي لتتنسق العناصر */
     /* ... باقي الأكواد كما هي */
 }
-    .navbar-logo {
-        max-height: 35px;
-    }
+  .navbar {
+    background-color: var(--primary-color);
+    color: white;
+    
+    /* 🎯 حدد الارتفاع الأدنى للشريط هنا مباشرة */
+    min-height: 70px !important; /* يمكنك تجربة 60px أو 100px للتأكد من التغيير */
+    
+    padding: 10px 40px !important; /* تقليل الحشوة لتلائم الارتفاع الجديد */
+    display: flex !important;
+    justify-content: space-between !important; 
+    align-items: center !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    position: relative !important;   
+    top: 0;
+    z-index: 1000;
+    overflow: visible !important;  
+}
 
     #schoolName {
         font-size: 0.95rem !important;
