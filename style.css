@@ -391,8 +391,8 @@ button:active { transform: scale(0.98); }
     background-color: var(--primary-color);
     color: white;
     padding: 15px 40px;
-    padding-top: 30px !important;    /* 👈 قَلِّل هذا الرقم لتصغير الارتفاع أو زِده للتكبير */
-    padding-bottom: 30px !important; /* 👈 خليه مساوي للرقم العلوي لتتنسق العناصر */
+    padding-top: 50px !important;    /* 👈 قَلِّل هذا الرقم لتصغير الارتفاع أو زِده للتكبير */
+    padding-bottom: 50px !important; /* 👈 خليه مساوي للرقم العلوي لتتنسق العناصر */
     /* ... باقي الأكواد كما هي */
 }
     .navbar-logo {
