@@ -218,27 +218,38 @@
     </style>
 </head>
 <body>
-<nav class="navbar">
-    <h2 id="schoolName">لوحة التحكم</h2>
+ <nav class="navbar">
+    <h2 id="schoolName">المدرسة </h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <div class="navbar-links">
+    <!-- 🍔 زر القائمة للجوال -->
+    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- روابط الشريط -->
+    <div class="navbar-links" id="navbarLinks">
+        <a href="index.html">الرئيسية</a>
+        <a href="dashboard.html#">الانتظار</a>
+        <a href="/monitoring">الإشراف</a>
        
-        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
-        <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
-        <a href="/monitoring" style="color: #ffffff;">الإشراف</a>
-         <a href="waiting_setting.html" style="color: #ffffff;">إعداد جدول الانتظار</a>
         <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">التقارير</a>
+            <a href="#" class="dropdown-trigger">التقارير</a>
             <div class="dropdown-menu">
                 <a href="report.html">تقرير الغياب</a>
                 <a href="reportmoni.html">تقرير الإشراف</a>
             </div>
         </div>
-
-        <a href="/login.html" class="logout">تسجيل الخروج</a>
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+            <div class="dropdown-menu">
+                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
+                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+            </div>
+        </div>
+                <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-</nav>
+</nav>>
 
 <!-- 🎯 حاوية الخدمات الثلاث بجانب بعضها بالمنتصف -->
 <div class="container my-5 text-center">
