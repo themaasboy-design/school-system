@@ -342,7 +342,7 @@
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
             <div class="dropdown-menu">
-                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal"> <i class="fas fa-cog"></i> جلب بيانات المدرسة  </a>               
+                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
                  <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
             </div>
         </div>
@@ -559,6 +559,10 @@
     function logout() {
       fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/');
     }
+
+
+
+
 
     async function loadSchoolName() {
       try {
