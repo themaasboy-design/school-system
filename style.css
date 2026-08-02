@@ -33,13 +33,15 @@ body {
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    position: relative !important; /* 👈 ضروري جداً لكي يعرف الشعار أين يتوسط */    top: 0;
+    position: relative !important; /* 👈 ضروري جداً لكي يعرف الشعار أين يتوسط */    
+    top: 0;
     z-index: 1000;
     display: flex !important;
     justify-content: space-between !important; /* يوزع المكونات الثلاثة بالتساوي على أطراف ووسط الشريط */
     align-items: center !important;
     overflow: visible !important;  /* يسمح للشعار بالخروج عن الحدود دون الاختفاء */
 }
+
 .navbar-logo {
     position: absolute !important;
     left: 50% !important;
@@ -52,10 +54,18 @@ body {
     width: auto !important;
     object-fit: contain !important;
     z-index: 9999 !important; /* لجعلها تطفو فوق كل شيء بشكل أنيق */
-
+    pointer-events: none !important; /* 🎯 إضافة: يمنع الشعار من حجب النقرات عن الأزرار القريبة منه */
 }
+
 .navbar h2 { font-size: 22px; margin: 0; font-weight: 700; }
-.navbar-links { display: flex; gap: 15px; align-items: center; }
+
+.navbar-links { 
+    display: flex; 
+    gap: 15px; 
+    align-items: center; 
+    margin-top: 15px !important; /* 🎯 إضافة: تنزيل شريط القوائم لأسفل ليحاذي أسفل الـ Navbar */
+}
+
 .navbar-links a { 
     color: #bdc3c7; 
     text-decoration: none; 
@@ -122,6 +132,7 @@ button {
 
 button:hover { background-color: #219150; }
 button:active { transform: scale(0.98); }
+
 /* حاوية القائمة المنسدلة */
 .dropdown-container {
     position: relative;
@@ -181,6 +192,7 @@ button:active { transform: scale(0.98); }
 .dropdown-container:hover .dropdown-menu {
     display: block;
 }
+
 /* تنسيق النافذة الرئيسية */
 .custom-modal {
   width: 100%;
@@ -329,6 +341,7 @@ button:active { transform: scale(0.98); }
 .btn-submit:active {
   transform: scale(0.99);
 }
+
 /* ==========================================
    📱 تنسيقات الاستجابة مع الشاشات الصغيرة والجوال
    ========================================== */
@@ -372,9 +385,10 @@ button:active { transform: scale(0.98); }
         width: 100% !important;
     }
 }
+
 /* تنسيق زر القائمة للموبايل (مخفي افتراضياً في الشاشات الكبيرة) */
-.menu-toggle {
-    display: none;
+.menu-toggle, #menuToggle {
+    display: none !important; /* 🎯 إضافة: إخفاء الزر تماماً على الكمبيوتر بالشكلين ID و Class */
     background: transparent;
     border: none;
     color: #ffffff;
@@ -399,8 +413,8 @@ button:active { transform: scale(0.98); }
     }
 
     /* إظهار زر القائمة في الجوال */
-    .menu-toggle {
-        display: block;
+    .menu-toggle, #menuToggle {
+        display: block !important;
     }
 
     /* إخفاء القائمة في الجوال حتى يضغط المستخدم على الزر */
@@ -409,7 +423,7 @@ button:active { transform: scale(0.98); }
         width: 100%;
         flex-direction: column;
         gap: 6px !important;
-        margin-top: 10px;
+        margin-top: 10px !important;
         padding-top: 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.15);
     }
