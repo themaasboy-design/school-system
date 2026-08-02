@@ -323,6 +323,9 @@
 </head>
 <body>
 
+ <!-- 🎯 عنصر التنبيه المضاف لمنع الخلل -->
+ <div id="toastNotification">تم الحفظ بنجاح</div>
+
  <nav class="navbar">
     <h2 id="schoolName">المدرسة </h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
@@ -348,13 +351,13 @@
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
             <div class="dropdown-menu">
-                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
-                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
+                <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
             </div>
         </div>
-                <a href="/login.html" class="logout">تسجيل الخروج</a>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-</nav>>
+</nav>
 
   <!-- Container متسع لتجنب التمرير وإتاحة الراحة للجدول -->
   <div class="container-fluid px-lg-5 px-3 my-4">
@@ -552,22 +555,20 @@
       }
     }
 
-    // إظهار التنبيه التلقائي بعبارة "تم الحفظ بنجاح"
+    // 🎯 إظهار التنبيه التلقائي المحدث والآمن
     function showToast() {
       const toast = document.getElementById('toastNotification');
-      toast.style.display = 'block';
-      setTimeout(() => {
-        toast.style.display = 'none';
-      }, 2500);
+      if (toast) {
+        toast.style.display = 'block';
+        setTimeout(() => {
+          toast.style.display = 'none';
+        }, 2500);
+      }
     }
 
     function logout() {
       fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/');
     }
-
-
-
-
 
     async function loadSchoolName() {
       try {
@@ -583,7 +584,7 @@
   </script>
 <script>
     document.getElementById('menuToggle').addEventListener('click', function() {
-    document.getElementById('navbarLinks').classList.toggle('active');
+      document.getElementById('navbarLinks').classList.toggle('active');
     });
 </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
