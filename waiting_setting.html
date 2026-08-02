@@ -323,17 +323,24 @@
 </head>
 <body>
 
- 
-  <nav class="navbar">
+ <nav class="navbar">
     <h2 id="schoolName">المدرسة </h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <div class="navbar-links">
-        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
-        <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
-        <a href="/monitoring" style="color: #ffffff;">الإشراف</a>
+    <!-- 🍔 زر القائمة للجوال -->
+    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- روابط الشريط -->
+    <div class="navbar-links" id="navbarLinks">
+        <a href="index.html">الرئيسية</a>
+        <a href="dashboard.html#">الانتظار</a>
+        <a href="/monitoring">الإشراف</a>
+        <a href="waiting_setting.html">إعداد جدول الانتظار</a>
+        <a href="update_school.html">جلب بيانات المدرسة</a>
         <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">التقارير</a>
+            <a href="#" class="dropdown-trigger">التقارير</a>
             <div class="dropdown-menu">
                 <a href="report.html">تقرير الغياب</a>
                 <a href="reportmoni.html">تقرير الإشراف</a>
@@ -346,10 +353,9 @@
                  <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
             </div>
         </div>
-
-        <a href="/login.html" class="logout">تسجيل الخروج</a>
+                <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-  </nav>
+</nav>>
 
   <!-- Container متسع لتجنب التمرير وإتاحة الراحة للجدول -->
   <div class="container-fluid px-lg-5 px-3 my-4">
@@ -576,7 +582,11 @@
       }
     }
   </script>
-
+<script>
+    document.getElementById('menuToggle').addEventListener('click', function() {
+    document.getElementById('navbarLinks').classList.toggle('active');
+    });
+</script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

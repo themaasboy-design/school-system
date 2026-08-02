@@ -372,3 +372,73 @@ button:active { transform: scale(0.98); }
         width: 100% !important;
     }
 }
+/* تنسيق زر القائمة للموبايل (مخفي افتراضياً في الشاشات الكبيرة) */
+.menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+/* 📱 قواعد الشاشات الصغيرة (الجوال والأجهزة اللوحية - أقل من 768px) */
+@media (max-width: 768px) {
+    .navbar {
+        flex-wrap: wrap; /* يتيح نزول العناصر لسطر جديد عند الفتح */
+        padding: 10px 15px;
+    }
+
+    .navbar-logo {
+        max-height: 35px; /* تصغير حجم الشعار تناسباً مع الجوال */
+    }
+
+    #schoolName {
+        font-size: 0.95rem !important; /* تصغير اسم المدرسة */
+    }
+
+    /* إظهار زر القائمة في الجوال */
+    .menu-toggle {
+        display: block;
+    }
+
+    /* إخفاء القائمة في الجوال حتى يضغط المستخدم على الزر */
+    .navbar-links {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        gap: 6px !important;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* كلاس الفتح عند ضغط الزر */
+    .navbar-links.active {
+        display: flex;
+    }
+
+    .navbar-links a {
+        width: 100%;
+        text-align: center;
+        padding: 8px !important;
+        background-color: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+    }
+
+    /* جعل القوائم المنسدلة تظهر بشكل مدمج في الجوال */
+    .dropdown-container {
+        width: 100%;
+        text-align: center;
+    }
+
+    .dropdown-menu {
+        position: static !important;
+        width: 100%;
+        box-shadow: none;
+        background: rgba(0, 0, 0, 0.2);
+        margin-top: 4px;
+        border-radius: 6px;
+    }
+}
