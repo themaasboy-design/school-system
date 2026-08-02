@@ -27,51 +27,49 @@ body {
     background-color: var(--primary-color);
     color: white;
     padding: 15px 40px;
-    padding-top: 30px !important;    /* يمكنك زيادة هذا الرقم (مثلاً 25px) إذا أردته أكثر ارتفاعاً */
-    padding-bottom: 30px !important; /* تأكد أن الرقمين متساويين ليبقى النص في المنتصف */
+    padding-top: 30px !important;    
+    padding-bottom: 30px !important; 
     display: flex !important;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: space-between !important; 
+    align-items: center !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    position: relative !important; /* 👈 ضروري جداً لكي يعرف الشعار أين يتوسط */    
+    position: relative !important;   
     top: 0;
     z-index: 1000;
-    display: flex !important;
-    justify-content: space-between !important; /* يوزع المكونات الثلاثة بالتساوي على أطراف ووسط الشريط */
-    align-items: center !important;
-    overflow: visible !important;  /* يسمح للشعار بالخروج عن الحدود دون الاختفاء */
+    overflow: visible !important;  
 }
 
 .navbar-logo {
     position: absolute !important;
     left: 50% !important;
     top: 50% !important;
-    transform: translate(-50%, -50%) !important; /* السحر الذي يضعها في السنتر تماماً */
-    
-    /* 📐 كبّر حجم الصورة هنا بالرقم الذي يناسبك، ولن يتحرك الـ navbar بكسل واحد! */
+    transform: translate(-50%, -50%) !important; 
     height: 180px !important; 
-    
     width: auto !important;
     object-fit: contain !important;
-    z-index: 9999 !important; /* لجعلها تطفو فوق كل شيء بشكل أنيق */
-    pointer-events: none !important; /* 🎯 إضافة: يمنع الشعار من حجب النقرات عن الأزرار القريبة منه */
+    z-index: 9999 !important; 
+    pointer-events: none !important; 
 }
 
 .navbar h2 { font-size: 22px; margin: 0; font-weight: 700; }
 
+/* 🎯 التعديل الأساسي: تنزيل القوائم عند مستوى الخط الأصفر تماماً */
 .navbar-links { 
     display: flex; 
-    gap: 15px; 
+    gap: 10px !important; 
     align-items: center; 
-    margin-top: 15px !important; /* 🎯 إضافة: تنزيل شريط القوائم لأسفل ليحاذي أسفل الـ Navbar */
+    align-self: flex-end !important; /* يربط القوائم بالحافة السفلية للـ Navbar */
+    transform: translateY(18px) !important; /* ينزل القوائم بدقة فوق الخط الأصفر مباشرة */
 }
 
 .navbar-links a { 
     color: #bdc3c7; 
     text-decoration: none; 
-    padding: 8px 15px; 
+    padding: 6px 10px !important; 
     border-radius: 5px; 
     font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap !important;
     transition: all 0.3s ease; 
 }
 .navbar-links a:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
@@ -122,11 +120,10 @@ button {
     margin-top: 30px; cursor: pointer; font-size: 18px; 
     font-weight: bold; font-family: inherit; 
     transition: background 0.3s, transform 0.1s; 
-    /* 🎯 جعل الزر بمقاس حجم النص تماماً */
 
-    width: fit-content !important;   /* يأخذ العرض الخاص بالنص فقط دون أي زيادة */
-    padding: 6px 6px !important;     /* مسافة خفيفة جداً حول النص لراحة العين (يمكنك جعلها 0 إذا أردت) */
-    white-space: nowrap !important;  /* يمنع انقسام النص على سطرين */
+    width: fit-content !important;   
+    padding: 6px 6px !important;     
+    white-space: nowrap !important;  
     display: inline-block !important;
 }
 
@@ -139,8 +136,7 @@ button:active { transform: scale(0.98); }
     display: inline-block;
 }
 
-/* ⚡ التعديل الجديد لحل مشكلة اختفاء القائمة عند الحركة ⚡ */
-
+/* القائمة المنسدلة */
 .dropdown-menu {
     display: none;
     position: absolute;
@@ -151,44 +147,41 @@ button:active { transform: scale(0.98); }
     border-radius: 6px;
     top: 100%;
     right: 0;
-    margin-top: 2px; /* 👈 تم تقليل المسافة جداً لتلتصق الفأرة بالقائمة فوراً */
+    margin-top: 2px;
     padding: 0;
 }
 
-/* 💡 الحيلة الذكية: جسر غير مرئي يربط زر التقارير بالقائمة لمنع الاختفاء نهائياً */
+/* جسر لمنع اختفاء القائمة */
 .dropdown-menu::before {
     content: "";
     position: absolute;
-    top: -10px; /* يمد منطقة استشعار الماوس للأعلى */
+    top: -10px;
     left: 0;
     right: 0;
     height: 10px;
-    background: transparent; /* شفاف تماماً لا يراه المستخدم */
+    background: transparent;
 }
 
 /* روابط القائمة المنسدلة من الداخل */
 .dropdown-menu a {
-    color: #2c3e50 !important; /* لون النص */
+    color: #2c3e50 !important;
     padding: 12px 16px !important;
     text-decoration: none;
     display: block;
-    border-bottom: 1px solid #f1f1f1 !important; /* خط خفيف بين الروابط */
+    border-bottom: 1px solid #f1f1f1 !important;
     font-size: 0.95rem;
     transition: background 0.3s;
 }
 
-/* إزالة الخط السفلي من آخر رابط في القائمة */
 .dropdown-menu a:last-child {
     border-bottom: none !important;
 }
 
-/* تغيير لون الرابط عند المرور عليه بالفأرة */
 .dropdown-menu a:hover {
     background-color: #f8f9fa;
-    color: #3498db !important; /* يتغير للون الأزرق */
+    color: #3498db !important;
 }
 
-/* السحر هنا: إظهار القائمة عند تمرير الماوس أو اللمس */
 .dropdown-container:hover .dropdown-menu {
     display: block;
 }
@@ -346,7 +339,6 @@ button:active { transform: scale(0.98); }
    📱 تنسيقات الاستجابة مع الشاشات الصغيرة والجوال
    ========================================== */
 @media (max-width: 768px) {
-    /* تصغير العناوين والمسافات لتناسب الجوال */
     h2 {
         font-size: 1.25rem !important;
     }
@@ -356,26 +348,22 @@ button:active { transform: scale(0.98); }
         padding-right: 10px !important;
     }
 
-    /* جعل كروت الأدوات والجدول تأخذ العرض الكامل مع مساحات مريحة */
     .main-card, .summary-card {
         padding: 15px !important;
         margin-bottom: 15px;
     }
 
-    /* جعل الجدول يسحب أفقياً بسلاسة إذا كان أعرض من الشاشة */
     .table-responsive {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
 
-    /* ضبط خطوط الجدول لتكون واضحة ومقروءة على الشاشات الصغيرة */
     .table th, .table td {
         font-size: 10px !important;
         padding: 4px 2px !important;
-        white-space: nowrap; /* يمنع انكسار الكلمات بشكل مشوه */
+        white-space: nowrap;
     }
 
-    /* جعل الأزرار في الأسفل تترتب تحت بعضها على الجوال */
     .summary-card .d-flex {
         flex-direction: column !important;
         gap: 10px !important;
@@ -386,9 +374,9 @@ button:active { transform: scale(0.98); }
     }
 }
 
-/* تنسيق زر القائمة للموبايل (مخفي افتراضياً في الشاشات الكبيرة) */
+/* تنسيق زر القائمة للموبايل */
 .menu-toggle, #menuToggle {
-    display: none !important; /* 🎯 إضافة: إخفاء الزر تماماً على الكمبيوتر بالشكلين ID و Class */
+    display: none !important;
     background: transparent;
     border: none;
     color: #ffffff;
@@ -397,38 +385,37 @@ button:active { transform: scale(0.98); }
     padding: 4px 8px;
 }
 
-/* 📱 قواعد الشاشات الصغيرة (الجوال والأجهزة اللوحية - أقل من 768px) */
+/* 📱 قواعد الشاشات الصغيرة */
 @media (max-width: 768px) {
     .navbar {
-        flex-wrap: wrap; /* يتيح نزول العناصر لسطر جديد عند الفتح */
+        flex-wrap: wrap;
         padding: 10px 15px;
     }
 
     .navbar-logo {
-        max-height: 35px; /* تصغير حجم الشعار تناسباً مع الجوال */
+        max-height: 35px;
     }
 
     #schoolName {
-        font-size: 0.95rem !important; /* تصغير اسم المدرسة */
+        font-size: 0.95rem !important;
     }
 
-    /* إظهار زر القائمة في الجوال */
     .menu-toggle, #menuToggle {
         display: block !important;
     }
 
-    /* إخفاء القائمة في الجوال حتى يضغط المستخدم على الزر */
     .navbar-links {
         display: none;
         width: 100%;
         flex-direction: column;
         gap: 6px !important;
         margin-top: 10px !important;
+        transform: none !important; /* إلغاء التنزيل على الجوال لتبقى منظمة رأسيّاً */
+        align-self: stretch !important;
         padding-top: 10px;
         border-top: 1px solid rgba(255, 255, 255, 0.15);
     }
 
-    /* كلاس الفتح عند ضغط الزر */
     .navbar-links.active {
         display: flex;
     }
@@ -441,7 +428,6 @@ button:active { transform: scale(0.98); }
         border-radius: 6px;
     }
 
-    /* جعل القوائم المنسدلة تظهر بشكل مدمج في الجوال */
     .dropdown-container {
         width: 100%;
         text-align: center;
