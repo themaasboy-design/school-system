@@ -70,7 +70,7 @@
             background: #ffffff;
             padding: 25px;
             border-radius: 12px;
-            max-width: 600px;
+            max-width: 650px;
             width: 90%;
             max-height: 85vh;
             overflow-y: auto;
@@ -104,6 +104,15 @@
         }
         .btn-wa-send:hover {
             background-color: #1eb954;
+        }
+        .phone-badge {
+            font-size: 0.8rem;
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #475569;
+            direction: ltr;
+            display: inline-block;
         }
     </style>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -173,7 +182,6 @@
         <!-- حاوية النتائج -->
         <div class="card" id="reportResult" style="margin-top: 30px; display: none;">
             
-            <!-- سيتم هنا عرض جدول مستقل لكل معلم غائب تلقائياً -->
             <div id="tablesContainer"></div>
 
             <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
@@ -192,47 +200,66 @@
     <div id="whatsappModal" class="modal-overlay">
         <div class="modal-box">
             <h4 style="margin-top:0; color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                <i class="fab fa-whatsapp text-success"></i> إرسال رسائل التكليف عبر الواتساب
+                <i class="fab fa-whatsapp text-success"></i> إرسال رسائل التكليف مباشرة لكل معلم
             </h4>
             <div id="whatsappList"></div>
             <div style="text-align: left; margin-top: 20px;">
-                <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px;">إغلاق</button>
+                <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px; border:none; color:white; border-radius:6px; cursor:pointer;">إغلاق</button>
             </div>
         </div>
     </div>
 
     <script>
-        // متغير عالمي لحفظ بيانات التقرير الحالي
         let currentFilteredReportData = [];
+        let teachersPhoneMap = {}; // خارطة لحفظ أرقام الجوال لكل معلم
+
+        // دالة تنظيف رقم الجوال وتحويله للصيغة الدولية (966)
+        function formatPhoneToInternational(phoneStr) {
+            if (!phoneStr) return '';
+            let cleaned = phoneStr.toString().trim();
+            // تحويل الأرقام العربية إلى إنجليزية
+            cleaned = cleaned.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+            cleaned = cleaned.replace(/\D/g, ''); // إزالة أي رموز غير رقمية
+
+            if (cleaned.startsWith('05')) {
+                cleaned = '966' + cleaned.substring(1);
+            } else if (cleaned.startsWith('5') && cleaned.length === 9) {
+                cleaned = '966' + cleaned;
+            }
+            return cleaned;
+        }
 
         async function generateReport() {
             const selectedDay = document.getElementById('reportDay').value;
-            
-            // 1. جلب قيمة التاريخ الهجري من الحقل
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
             let selectedDate = dateInput ? dateInput.value : '';
 
-            // 2. تحويل الأرقام العربية إلى أرقام إنجليزية لضمان المطابقة
             if (selectedDate) {
-                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٥٦٧٨٩'.indexOf(d));
-            }
-
-            const displayElement = document.getElementById('selectedDateDisplay') || document.getElementById('reportDateText');
-            if (displayElement) {
-                displayElement.innerText = selectedDate;
+                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
             }
 
             try {
                 const res = await fetch('/get-report-data');
                 const data = await res.json();
                 
-                // 3. تصفية البيانات بمطابقة التاريخ واليوم
+                // تجميع واستخراج أرقام الجوال من ورقة البيانات/الخيارات إن وجدت
+                teachersPhoneMap = {};
+                if (data.teacherList && Array.isArray(data.teacherList)) {
+                    data.teacherList.forEach(t => {
+                        const name = t['اسم المعلم'] || t[0] || t[1];
+                        const phone = t['رقم الجوال'] || t['الجوال'] || t[2]; // العمود الثالث
+                        if (name && phone) {
+                            teachersPhoneMap[name.trim()] = formatPhoneToInternational(phone);
+                        }
+                    });
+                }
+
                 const filteredData = (data.teachers || []).filter(item => {
                     const vals = Object.values(item);
                     return vals[0] === selectedDate && vals[1] === selectedDay;
                 });
 
-                currentFilteredReportData = filteredData; // حفظ التصفية للواتساب
+                currentFilteredReportData = filteredData;
 
                 if (filteredData.length === 0) { 
                     showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
@@ -243,12 +270,10 @@
                 const container = document.getElementById('tablesContainer');
                 container.innerHTML = "";
 
-                // فهارس الفصول والمعلمين البدلاء من حصة 1 إلى 7
                 const classCols = [3, 5, 7, 9, 11, 13, 15];
                 const subCols   = [4, 6, 8, 10, 12, 14, 16];
                 const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
 
-                // 4. إنشاء جدول مستقل لكل معلم غائب
                 filteredData.forEach(row => { 
                     const vals = Object.values(row);
                     const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---';
@@ -258,6 +283,12 @@
                     for (let i = 0; i < 7; i++) {
                         const className  = vals[classCols[i]] || '---';
                         const subTeacher = vals[subCols[i]] || '---';
+
+                        // تخزين رقم الجوال لو كان موجوداً بالصف نفسه
+                        const rowPhone = row['الجوال'] || row['رقم الجوال'] || vals[17] || '';
+                        if (subTeacher !== '---' && rowPhone) {
+                            teachersPhoneMap[subTeacher.trim()] = formatPhoneToInternational(rowPhone);
+                        }
 
                         if (className !== '---' || subTeacher !== '---') {
                             rowsHtml += `
@@ -304,7 +335,7 @@
             }
         }
 
-        // 📲 دالة فتح قائمة إرسال رسائل الواتساب
+        // 📲 دالة إرسال رسائل الواتساب المباشرة لكل معلم بديل
         function sendWhatsAppMessages() {
             if (!currentFilteredReportData || currentFilteredReportData.length === 0) {
                 showNotification("🔍 لا توجد بيانات مسجلة لإرسالها", "error");
@@ -319,7 +350,6 @@
             const subCols   = [4, 6, 8, 10, 12, 14, 16];
             const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
 
-            // تجميع التكليفات حسب المعلم البديل
             const substituteMap = {};
 
             currentFilteredReportData.forEach(row => {
@@ -350,14 +380,15 @@
                 return;
             }
 
-            // بناء القائمة داخل النافذة المنبثقة
             const listContainer = document.getElementById('whatsappList');
             listContainer.innerHTML = '';
 
             subNames.forEach(subName => {
                 const tasks = substituteMap[subName];
                 
-                // صياغة نص الرسالة
+                // البحث عن رقم الجوال المخزن لهذا المعلم
+                const phone = teachersPhoneMap[subName] || '';
+
                 let msg = `السلام عليكم ورحمة الله وبركاته\n`;
                 msg += `أخي المعلم المكرم: *${subName}*\n`;
                 msg += `نود إحاطتك بتكليفك بحصص الانتظار ليوم *${day}* الموافق *${date}* هـ كالتالي:\n\n`;
@@ -369,16 +400,21 @@
                 msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
 
                 const encodedMsg = encodeURIComponent(msg);
-                const waUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
+                
+                // بناء رابط الواتساب المباشر بالرقم
+                const waUrl = phone 
+                    ? `https://wa.me/${phone}?text=${encodedMsg}` 
+                    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
 
                 listContainer.innerHTML += `
                     <div class="wa-teacher-item">
                         <div>
                             <strong>👨‍🏫 ${subName}</strong> 
-                            <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة انتظار)</span>
+                            <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة)</span>
+                            ${phone ? `<br><span class="phone-badge">📱 +${phone}</span>` : `<br><span style="color:#e74c3c; font-size:0.75rem;">لم يتم العثور على الرقم</span>`}
                         </div>
                         <a href="${waUrl}" target="_blank" class="btn-wa-send">
-                            <i class="fab fa-whatsapp"></i> إرسال عبر الواتساب
+                            <i class="fab fa-whatsapp"></i> إرسال المحادثة مباشرة
                         </a>
                     </div>
                 `;
@@ -428,7 +464,6 @@
                 return;
             }
 
-            // تحميل خط Noto Sans Arabic
             const fontData = await fetch('NotoSansArabic-Regular.ttf')
               .then(res => res.arrayBuffer());
 
@@ -467,12 +502,10 @@
                     currentY = 15;
                 }
 
-                // 1️⃣ طباعة النص
                 doc.setFontSize(10.5);
                 doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
                 doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
 
-                // 2️⃣ تجهيز بيانات جدول الحصص
                 const tableBody = [];
                 for (let i = 0; i < 7; i++) {
                     tableBody.push([
@@ -484,7 +517,6 @@
                     ]);
                 }
 
-                // 3️⃣ رسم جدول الحصص
                 doc.autoTable({
                     startY: currentY + 10,
                     head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
@@ -498,18 +530,15 @@
                 currentY = doc.lastAutoTable.finalY + 12;
             });
 
-            // إضافة التذييل
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
                 doc.setFont("Noto");
                 doc.setFontSize(11);
                 
-                // مدير المدرسة
                 doc.text("مدير المدرسة", 40, 279, { align: 'center' });
                 doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
                 
-                // وكيل المدرسة
                 doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
                 doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
             }
