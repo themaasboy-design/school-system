@@ -6,6 +6,9 @@
     <title>تقرير الانتظار</title>
     <link rel="stylesheet" href="style.css">
     
+    <!-- Font Awesome للأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
@@ -50,6 +53,57 @@
         }
         .report-table tbody tr:nth-child(even) {
             background-color: #f8fafc;
+        }
+
+        /* تنسيقات نافذة الواتساب المنبثقة */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 99999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .wa-teacher-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .btn-wa-send {
+            background-color: #25D366;
+            color: white !important;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+        }
+        .btn-wa-send:hover {
+            background-color: #1eb954;
         }
     </style>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -122,12 +176,35 @@
             <!-- سيتم هنا عرض جدول مستقل لكل معلم غائب تلقائياً -->
             <div id="tablesContainer"></div>
 
-            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c; margin-top: 15px;">طباعة التقرير </button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">
+                    <i class="fas fa-file-pdf"></i> طباعة التقرير (PDF)
+                </button>
+                <button type="button" onclick="sendWhatsAppMessages()" style="background-color: #25D366; color: white;">
+                    <i class="fab fa-whatsapp"></i> إرسال رسائل واتساب للمعلمين البدلاء
+                </button>
+            </div>
         </div>
 
     </div>
 
+    <!-- نافذة منبثقة لإرسال رسائل الواتساب -->
+    <div id="whatsappModal" class="modal-overlay">
+        <div class="modal-box">
+            <h4 style="margin-top:0; color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                <i class="fab fa-whatsapp text-success"></i> إرسال رسائل التكليف عبر الواتساب
+            </h4>
+            <div id="whatsappList"></div>
+            <div style="text-align: left; margin-top: 20px;">
+                <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px;">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // متغير عالمي لحفظ بيانات التقرير الحالي
+        let currentFilteredReportData = [];
+
         async function generateReport() {
             const selectedDay = document.getElementById('reportDay').value;
             
@@ -137,7 +214,7 @@
 
             // 2. تحويل الأرقام العربية إلى أرقام إنجليزية لضمان المطابقة
             if (selectedDate) {
-                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٥٦٧٨٩'.indexOf(d));
             }
 
             const displayElement = document.getElementById('selectedDateDisplay') || document.getElementById('reportDateText');
@@ -154,6 +231,8 @@
                     const vals = Object.values(item);
                     return vals[0] === selectedDate && vals[1] === selectedDay;
                 });
+
+                currentFilteredReportData = filteredData; // حفظ التصفية للواتساب
 
                 if (filteredData.length === 0) { 
                     showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
@@ -180,7 +259,6 @@
                         const className  = vals[classCols[i]] || '---';
                         const subTeacher = vals[subCols[i]] || '---';
 
-                        // إضافة الصف فقط إذا كان هناك فصل أو معلم بديل محدد
                         if (className !== '---' || subTeacher !== '---') {
                             rowsHtml += `
                                 <tr>
@@ -192,7 +270,6 @@
                         }
                     }
 
-                    // في حال عدم وجود حصص محددة إطلاقاً
                     if (!rowsHtml) {
                         rowsHtml = `<tr><td colspan="3">لا توجد حصص مسندة لهذا المعلم</td></tr>`;
                     }
@@ -225,6 +302,93 @@
                 console.error("خطأ في جلب البيانات:", error);
                 showNotification("❌ حدث خطأ أثناء جلب البيانات من السيرفر", "error");
             }
+        }
+
+        // 📲 دالة فتح قائمة إرسال رسائل الواتساب
+        function sendWhatsAppMessages() {
+            if (!currentFilteredReportData || currentFilteredReportData.length === 0) {
+                showNotification("🔍 لا توجد بيانات مسجلة لإرسالها", "error");
+                return;
+            }
+
+            const day = document.getElementById('reportDay').value;
+            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+            const date = dateInput ? dateInput.value.trim() : '';
+
+            const classCols = [3, 5, 7, 9, 11, 13, 15];
+            const subCols   = [4, 6, 8, 10, 12, 14, 16];
+            const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
+
+            // تجميع التكليفات حسب المعلم البديل
+            const substituteMap = {};
+
+            currentFilteredReportData.forEach(row => {
+                const vals = Object.values(row);
+                const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---';
+
+                for (let i = 0; i < 7; i++) {
+                    const subTeacher = vals[subCols[i]];
+                    const className  = vals[classCols[i]] || '---';
+
+                    if (subTeacher && subTeacher.trim() !== '' && subTeacher !== '---') {
+                        const name = subTeacher.trim();
+                        if (!substituteMap[name]) {
+                            substituteMap[name] = [];
+                        }
+                        substituteMap[name].push({
+                            period: periodNames[i],
+                            className: className,
+                            absentTeacher: absentTeacher
+                        });
+                    }
+                }
+            });
+
+            const subNames = Object.keys(substituteMap);
+            if (subNames.length === 0) {
+                showNotification("⚠️ لا يوجد معلمون بدلاء محددون في هذا التقرير", "error");
+                return;
+            }
+
+            // بناء القائمة داخل النافذة المنبثقة
+            const listContainer = document.getElementById('whatsappList');
+            listContainer.innerHTML = '';
+
+            subNames.forEach(subName => {
+                const tasks = substituteMap[subName];
+                
+                // صياغة نص الرسالة
+                let msg = `السلام عليكم ورحمة الله وبركاته\n`;
+                msg += `أخي المعلم المكرم: *${subName}*\n`;
+                msg += `نود إحاطتك بتكليفك بحصص الانتظار ليوم *${day}* الموافق *${date}* هـ كالتالي:\n\n`;
+
+                tasks.forEach(t => {
+                    msg += `🔹 *${t.period}* | الفصل: *${t.className}* (بدلاً عن المعلم: ${t.absentTeacher})\n`;
+                });
+
+                msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
+
+                const encodedMsg = encodeURIComponent(msg);
+                const waUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
+
+                listContainer.innerHTML += `
+                    <div class="wa-teacher-item">
+                        <div>
+                            <strong>👨‍🏫 ${subName}</strong> 
+                            <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة انتظار)</span>
+                        </div>
+                        <a href="${waUrl}" target="_blank" class="btn-wa-send">
+                            <i class="fab fa-whatsapp"></i> إرسال عبر الواتساب
+                        </a>
+                    </div>
+                `;
+            });
+
+            document.getElementById('whatsappModal').style.display = 'flex';
+        }
+
+        function closeWhatsAppModal() {
+            document.getElementById('whatsappModal').style.display = 'none';
         }
 
         async function previewPDF() {
