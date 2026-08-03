@@ -16,43 +16,42 @@
     </style>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </head>
 <body>
 
-   <nav class="navbar">
-    <h2 id="schoolName">المدرسة </h2>
-    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+    <nav class="navbar">
+        <h2 id="schoolName">المدرسة </h2>
+        <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <!-- 🍔 زر القائمة للجوال -->
-    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
-        <i class="fas fa-bars"></i>
-    </button>
+        <!-- 🍔 زر القائمة للجوال -->
+        <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+            <i class="fas fa-bars"></i>
+        </button>
 
-    <!-- روابط الشريط -->
-    <div class="navbar-links" id="navbarLinks">
-        <a href="index.html">الرئيسية</a>
-        <a href="dashboard.html#">الانتظار</a>
-        <a href="/monitoring">الإشراف</a>
-       
-        <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger">التقارير</a>
-            <div class="dropdown-menu">
-                <a href="report.html">تقرير الغياب</a>
-                <a href="reportmoni.html">تقرير الإشراف</a>
+        <!-- روابط الشريط -->
+        <div class="navbar-links" id="navbarLinks">
+            <a href="index.html">الرئيسية</a>
+            <a href="dashboard.html#">الانتظار</a>
+            <a href="/monitoring">الإشراف</a>
+           
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger">التقارير</a>
+                <div class="dropdown-menu">
+                    <a href="report.html">تقرير الغياب</a>
+                    <a href="reportmoni.html">تقرير الإشراف</a>
+                </div>
             </div>
-        </div>
-        <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
-            <div class="dropdown-menu">
-                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
-                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+                <div class="dropdown-menu">
+                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
+                    <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                </div>
             </div>
+            <a href="/login.html" class="logout">تسجيل الخروج</a>
         </div>
-                <a href="/login.html" class="logout">تسجيل الخروج</a>
-    </div>
-</nav>>
-
+    </nav>
 
     <div class="main-container">
         
@@ -73,7 +72,8 @@
                     </div>
                     <div class="form-group" style="position: relative;">
                         <label>التاريخ (الهجري):</label>
-                        <input type="text" id="hijriDate" class="form-control" placeholder="اختر التاريخ الهجري" autocomplete="off" required>                    </div>
+                        <input type="text" id="hijriDate" class="form-control" placeholder="اختر التاريخ الهجري" autocomplete="off" required>
+                    </div>
                 </div>
                 <button type="button" onclick="generateReport()">عرض التقرير</button>
             </form>
@@ -83,215 +83,210 @@
             <table id="resultTable" style="display: none;">
                 <thead>
                     <tr>
-                        <th>أسماء المعلمين الغائبين</th>
+                        <th>اسم المعلم الغائب</th>
+                        <th>الفصل</th>
+                        <th>اسم المعلم البديل</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
             </table>
-            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">طباعة التقرير  </button>
+            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">طباعة التقرير </button>
         </div>
 
     </div>
 
     <script>
         async function generateReport() {
-    const selectedDay = document.getElementById('reportDay').value;
-    
-    // 1. جلب قيمة التاريخ الهجري من الحقل (سواء كان id هو hijriDate أو reportDate)
-    const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-    let selectedDate = dateInput ? dateInput.value : '';
+            const selectedDay = document.getElementById('reportDay').value;
+            
+            // 1. جلب قيمة التاريخ الهجري من الحقل
+            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+            let selectedDate = dateInput ? dateInput.value : '';
 
-    // 2. تحويل الأرقام العربية إلى أرقام إنجليزية لضمان المطابقة مع الإكسيل
-    if (selectedDate) {
-        selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-    }
+            // 2. تحويل الأرقام العربية إلى أرقام إنجليزية لضمان المطابقة مع الإكسيل
+            if (selectedDate) {
+                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+            }
 
-    const res = await fetch('/get-report-data');
-    const data = await res.json();
-    
-    // تم التعديل هنا لقراءة data.teachers
-    const filteredData = data.teachers.filter(item => {
-        const vals = Object.values(item);
-        return vals[0] === selectedDate && vals[1] === selectedDay;
-    });
+            // 3. طباعة التاريخ في عنوان التقرير على الشاشة إذا وجد
+            const displayElement = document.getElementById('selectedDateDisplay') || document.getElementById('reportDateText');
+            if (displayElement) {
+                displayElement.innerText = selectedDate;
+            }
 
-    if (filteredData.length === 0) { showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); return; }
-    
-    const body = document.getElementById('tableBody');
-    body.innerHTML = "";
-    filteredData.forEach(row => { body.innerHTML += `<tr><td>${Object.values(row)[2] || '---'}</td></tr>`; });
-    
-    document.getElementById('resultTable').style.display = 'table';
-    document.getElementById('reportResult').style.display = 'block';
-}
+            try {
+                const res = await fetch('/get-report-data');
+                const data = await res.json();
+                
+                // 4. تصفية البيانات بمطابقة التاريخ الهجري واليوم
+                const filteredData = (data.teachers || []).filter(item => {
+                    const vals = Object.values(item);
+                    return vals[0] === selectedDate && vals[1] === selectedDay;
+                });
 
- async function generateReport() {
-    const selectedDay = document.getElementById('reportDay').value;
-    
-    // 1. جلب قيمة التاريخ الهجري من الحقل
-    const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-    let selectedDate = dateInput ? dateInput.value : '';
+                if (filteredData.length === 0) { 
+                    showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
+                    document.getElementById('resultTable').style.display = 'none';
+                    document.getElementById('reportResult').style.display = 'none';
+                    return; 
+                }
+                
+                // 5. بناء أسطر الجدول بالتنسيق الثلاثي المطلوب
+                const body = document.getElementById('tableBody');
+                body.innerHTML = "";
+                
+                filteredData.forEach(row => { 
+                    const vals = Object.values(row);
+                    
+                    const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---'; // العمود الأول
+                    const className     = row['الفصل'] || row['الصف'] || vals[3] || '---';              // العمود الثاني
+                    const subTeacher    = row['المعلم البديل'] || row['البديل'] || vals[4] || '---';     // العمود الثالث
 
-    // 2. تحويل الأرقام لضمان مطابقتها للإكسيل (1448/01/28)
-    if (selectedDate) {
-        selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-    }
+                    body.innerHTML += `
+                        <tr>
+                            <td>${absentTeacher}</td>
+                            <td>${className}</td>
+                            <td>${subTeacher}</td>
+                        </tr>
+                    `; 
+                });
+                
+                document.getElementById('resultTable').style.display = 'table';
+                document.getElementById('reportResult').style.display = 'block';
+            } catch (error) {
+                console.error("خطأ في جلب البيانات:", error);
+                showNotification("❌ حدث خطأ أثناء جلب البيانات من السيرفر", "error");
+            }
+        }
 
-    // 3. طباعة التاريخ في عنوان التقرير على الشاشة (إذا كان لديك عنصر لعرضه)
-    const displayElement = document.getElementById('selectedDateDisplay') || document.getElementById('reportDateText');
-    if (displayElement) {
-        displayElement.innerText = selectedDate;
-    }
+        async function previewPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
 
-    const res = await fetch('/get-report-data');
-    const data = await res.json();
-    
-    // تصفية البيانات بمطابقة التاريخ الهجري واليوم
-    const filteredData = data.teachers.filter(item => {
-        const vals = Object.values(item);
-        return vals[0] === selectedDate && vals[1] === selectedDay;
-    });
-
-    if (filteredData.length === 0) { 
-       
-        showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
-        return; 
-    }
-    
-    const body = document.getElementById('tableBody');
-    body.innerHTML = "";
-    filteredData.forEach(row => { 
-        body.innerHTML += `<tr><td>${Object.values(row)[2] || '---'}</td></tr>`; 
-    });
-    
-    document.getElementById('resultTable').style.display = 'table';
-    document.getElementById('reportResult').style.display = 'block';
-}
-async function previewPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-
-    const addBorder = () => {
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.5);
-        doc.rect(5, 5, 200, 287);
-    };
-    addBorder();
-    
-    // جلب اليوم والتاريخ كنصوص مباشرة
-    const dayElement = document.getElementById('reportDay');
-    const day = dayElement ? dayElement.value : '';
-
-    const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-    let date = dateInput ? dateInput.value.trim() : '';
-
-    // معالجة الفواصل (/) لضمان ظهور التاريخ بشكل مرتب
-    if (date) {
-        date = date.replace(/\//g, ' - ');
-    }   
-
-    const res = await fetch('/get-report-data');
-    const fullResponse = await res.json();
-    const allData = fullResponse.teachers;
-    const mainInfo = fullResponse.mainInfo;
-    const rows = Array.from(document.querySelectorAll('#tableBody td'));
-
-    // تحميل خط Noto Sans Arabic
-    const fontData = await fetch('NotoSansArabic-Regular.ttf')
-      .then(res => res.arrayBuffer());
-
-    const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
-
-    doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-    doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-    doc.setFont("Noto", "normal");
-    
-    const img = new Image();
-    img.src = 'logo.png';
-    await img.decode();
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width; canvas.height = img.height;
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    const imgData = canvas.toDataURL('image/png');
-
-    doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
-    doc.setFontSize(12);
-    doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-    doc.text("الإدارة العامة للتعليم بمنطقة" + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-    doc.text("مدرسة" + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
-    doc.line(15, 35, 195, 35);
-
-    let currentY = 43;
-    const classCols = [3, 5, 7, 9, 11, 13, 15];
-    const subCols = [4, 6, 8, 10, 12, 14, 16];
-
-    rows.forEach((td) => {
-        const teacherName = td.innerText;
-        const teacherData = allData.find(item => Object.values(item)[2] === teacherName);
-
-        if (currentY > 220) {
-            doc.addPage();
+            const addBorder = () => {
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.rect(5, 5, 200, 287);
+            };
             addBorder();
-            currentY = 15;
+            
+            // جلب اليوم والتاريخ كنصوص مباشرة
+            const dayElement = document.getElementById('reportDay');
+            const day = dayElement ? dayElement.value : '';
+
+            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+            let date = dateInput ? dateInput.value.trim() : '';
+
+            // معالجة الفواصل (/) لضمان ظهور التاريخ بشكل مرتب
+            if (date) {
+                date = date.replace(/\//g, ' - ');
+            }   
+
+            const res = await fetch('/get-report-data');
+            const fullResponse = await res.json();
+            const allData = fullResponse.teachers;
+            const mainInfo = fullResponse.mainInfo;
+
+            // تحديد الخلايا الخاصة بأسماء المعلمين الغائبين فقط من العمود الأول
+            const rows = Array.from(document.querySelectorAll('#tableBody tr td:first-child'));
+
+            // تحميل خط Noto Sans Arabic
+            const fontData = await fetch('NotoSansArabic-Regular.ttf')
+              .then(res => res.arrayBuffer());
+
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+            
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+            doc.setFontSize(12);
+            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+            doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+            doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+            doc.line(15, 35, 195, 35);
+
+            let currentY = 43;
+            const classCols = [3, 5, 7, 9, 11, 13, 15];
+            const subCols = [4, 6, 8, 10, 12, 14, 16];
+
+            rows.forEach((td) => {
+                const teacherName = td.innerText;
+                const teacherData = allData.find(item => Object.values(item)[2] === teacherName);
+
+                if (currentY > 220) {
+                    doc.addPage();
+                    addBorder();
+                    currentY = 15;
+                }
+
+                // 1️⃣ طباعة النص محاذياً لليمن تماماً
+                doc.setFontSize(10.5);
+                doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
+                doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
+
+                // 2️⃣ تجهيز بيانات جدول الحصص
+                const tableBody = [];
+                for (let i = 0; i < 7; i++) {
+                    tableBody.push([
+                        '', '', 
+                        teacherData ? Object.values(teacherData)[subCols[i]] || '' : '', 
+                        '', 
+                        teacherData ? Object.values(teacherData)[classCols[i]] || '' : '', 
+                        (i + 1).toString()
+                    ]);
+                }
+
+                // 3️⃣ رسم جدول الحصص تحت النص مباشرة
+                doc.autoTable({
+                    startY: currentY + 10,
+                    head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
+                    body: tableBody,
+                    theme: 'grid',
+                    columnStyles: { 0: {cellWidth: 25}, 1: {cellWidth: 25}, 2: {cellWidth: 60}, 3: {cellWidth: 20}, 4: {cellWidth: 20}, 5: {cellWidth: 20} },
+                    styles: {font: 'Noto', halign: 'center', cellPadding: 2, minCellHeight: 6, fontSize: 9, textColor: 0},
+                    headStyles: {fillColor: [44, 62, 80], textColor: 255, font: 'Noto', fontSize: 9, cellPadding: 1, minCellHeight: 5} 
+                });
+
+                currentY = doc.lastAutoTable.finalY + 12;
+            });
+
+            // إضافة التذييل
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFont("Noto");
+                doc.setFontSize(11);
+                
+                // مدير المدرسة
+                doc.text("مدير المدرسة", 40, 279, { align: 'center' });
+                doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
+                
+                // وكيل المدرسة
+                doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
+                doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+            }
+
+            // 1️⃣ تنظيف اسم الملف من أي رموز قد تسبب مشكلة في التسمية
+            const safeDay = day ? day.trim() : 'اليوم';
+            const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
+            
+            // 2️⃣ صياغة اسم الملف
+            const fileName = `جدول انتظار ${safeDay} ${safeDate}.pdf`;
+
+            // 3️⃣ تنزيل الملف مباشرة بالاسم المخصص
+            doc.save(fileName);
         }
 
-        // 1️⃣ طباعة النص محاذياً لليمن تماماً
-        doc.setFontSize(10.5);
-        doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
-        doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
-
-        // 2️⃣ تجهيز بيانات جدول الحصص
-        const tableBody = [];
-        for (let i = 0; i < 7; i++) {
-            tableBody.push([
-                '', '', 
-                teacherData ? Object.values(teacherData)[subCols[i]] || '' : '', 
-                '', 
-                teacherData ? Object.values(teacherData)[classCols[i]] || '' : '', 
-                (i + 1).toString()
-            ]);
-        }
-
-        // 3️⃣ رسم جدول الحصص تحت النص مباشرة
-        doc.autoTable({
-            startY: currentY + 10,
-            head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
-            body: tableBody,
-            theme: 'grid',
-            columnStyles: { 0: {cellWidth: 25}, 1: {cellWidth: 25}, 2: {cellWidth: 60}, 3: {cellWidth: 20}, 4: {cellWidth: 20}, 5: {cellWidth: 20} },
-            styles: {font: 'Noto', halign: 'center', cellPadding: 2, minCellHeight: 6, fontSize: 9, textColor: 0},
-            headStyles: {fillColor: [44, 62, 80], textColor: 255, font: 'Noto', fontSize: 9, cellPadding: 1, minCellHeight: 5} 
-        });
-
-        currentY = doc.lastAutoTable.finalY + 12;
-    });
-
-    // إضافة التذييل
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFont("Noto");
-        doc.setFontSize(11);
-        
-        // مدير المدرسة
-        doc.text("مدير المدرسة", 40, 279, { align: 'center' });
-        doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
-        
-        // وكيل المدرسة
-        doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
-        doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
-    }
-
-    // 1️⃣ تنظيف اسم الملف من أي رموز قد تسبب مشكلة في التسمية
-    const safeDay = day ? day.trim() : 'اليوم';
-    const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
-    
-    // 2️⃣ صياغة اسم الملف (مثال: جدول_التكليف_الأحد_1448-01-28.pdf)
-    const fileName = `جدول انتظار${safeDay} ${safeDate}.pdf`;
-
-    // 3️⃣ تنزيل الملف مباشرة بالاسم المخصص
-    doc.save(fileName);
-}
         async function loadSchoolName() {
             try {
                 const response = await fetch('/get-report-data');
@@ -308,41 +303,43 @@ async function previewPDF() {
             loadSchoolName(); // تفعيل جلب اسم المدرسة فقط
         });
     </script>
+    
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 
-<script>
-    // تفعيل التقويم الهجري عند تحميل الصفحة
-    $(document).ready(function () {
-        $("#hijriDate").hijriDatePicker({
-            hijri: true,
-            showSwitcher: false,
-            format: 'iYYYY/iMM/iDD',
-            hijriFormat: 'iYYYY/iMM/iDD',
-            locale: 'ar-sa'
+    <script>
+        // تفعيل التقويم الهجري عند تحميل الصفحة
+        $(document).ready(function () {
+            $("#hijriDate").hijriDatePicker({
+                hijri: true,
+                showSwitcher: false,
+                format: 'iYYYY/iMM/iDD',
+                hijriFormat: 'iYYYY/iMM/iDD',
+                locale: 'ar-sa'
+            });
         });
-    });
-    // دالة مخصصة لإظهار تنبيهات Toast أنيقة في صفحة التقارير
-function showNotification(message, type = 'success') {
-    Toastify({
-        text: message,
-        duration: 3000,          // تختفي تلقائياً بعد 3 ثوانٍ
-        gravity: "top",          // تظهر من أعلى الشاشة
-        position: "right",       // في جهة اليمين (مناسب للعربية)
-        stopOnFocus: true,       
-        style: {
-            background: type === 'success' 
-                ? "linear-gradient(to left, #2ecc71, #27ae60)" // أخضر للنجاح
-                : "linear-gradient(to left, #e74c3c, #c0392b)", // أحمر للأخطاء
-            borderRadius: "8px",
-            fontSize: "15px",
-            direction: "rtl",    // محاذاة النص من اليمين لليسار
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+
+        // دالة مخصصة لإظهار تنبيهات Toast أنيقة في صفحة التقارير
+        function showNotification(message, type = 'success') {
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                stopOnFocus: true,
+                style: {
+                    background: type === 'success' 
+                        ? "linear-gradient(to left, #2ecc71, #27ae60)" 
+                        : "linear-gradient(to left, #e74c3c, #c0392b)",
+                    borderRadius: "8px",
+                    fontSize: "15px",
+                    direction: "rtl",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+                }
+            }).showToast();
         }
-    }).showToast();
-}
-</script>
+    </script>
 </body>
 </html>
