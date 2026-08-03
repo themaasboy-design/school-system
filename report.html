@@ -21,28 +21,38 @@
 <body>
 
    <nav class="navbar">
-    <h2 id="schoolName">لوحة التحكم</h2>
-        <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+    <h2 id="schoolName">المدرسة </h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <div class="navbar-links">
-        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
-        <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
-        <a href="/monitoring" style="color: #ffffff;"> الإشراف </a>
-        
-        <!-- 🎯 تم دمج وتغليف زر التقارير وقائمته هنا داخل الحاوية المشتركة بنجاح -->
+    <!-- 🍔 زر القائمة للجوال -->
+    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- روابط الشريط -->
+    <div class="navbar-links" id="navbarLinks">
+        <a href="index.html">الرئيسية</a>
+        <a href="dashboard.html#">الانتظار</a>
+        <a href="/monitoring">الإشراف</a>
+       
         <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;"> التقارير </a>
-                 <div class="dropdown-menu">
-                     <a href="report.html">تقرير الغياب</a>
-                     <a href="reportmoni.html">تقرير الإشراف</a>
-                <!-- يمكنك إضافة المزيد من التقارير هنا مستقبلاً -->
-                </div>
+            <a href="#" class="dropdown-trigger">التقارير</a>
+            <div class="dropdown-menu">
+                <a href="report.html">تقرير الغياب</a>
+                <a href="reportmoni.html">تقرير الإشراف</a>
+            </div>
         </div>
-
-        
-        <a href="/login.html" class="logout">تسجيل الخروج</a>
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+            <div class="dropdown-menu">
+                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
+                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+            </div>
+        </div>
+                <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-</nav>
+</nav>>
+
 
     <div class="main-container">
         
@@ -248,7 +258,7 @@ async function previewPDF() {
             head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
             body: tableBody,
             theme: 'grid',
-            columnStyles: { 0: {cellWidth: 35}, 1: {cellWidth: 25}, 2: {cellWidth: 40}, 3: {cellWidth: 30}, 4: {cellWidth: 30}, 5: {cellWidth: 20} },
+            columnStyles: { 0: {cellWidth: 25}, 1: {cellWidth: 25}, 2: {cellWidth: 80}, 3: {cellWidth: 20}, 4: {cellWidth: 20}, 5: {cellWidth: 10} },
             styles: {font: 'Noto', halign: 'center', cellPadding: 2, minCellHeight: 6, fontSize: 9, textColor: 0},
             headStyles: {fillColor: [44, 62, 80], textColor: 255, font: 'Noto', fontSize: 9, cellPadding: 1, minCellHeight: 5} 
         });
