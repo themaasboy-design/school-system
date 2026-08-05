@@ -12,6 +12,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     
     <style>
         .teacher-report-card {
@@ -92,7 +94,7 @@
             background-color: #25D366;
             color: white !important;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
@@ -100,11 +102,21 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
         }
-        .btn-wa-send:hover {
-            background-color: #1eb954;
+        .btn-wa-copy {
+            background-color: #475569;
+            color: white !important;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.88rem;
         }
+        .btn-wa-send:hover { background-color: #1eb954; }
+        .btn-wa-copy:hover { background-color: #334155; }
+
         .phone-badge {
             font-size: 0.8rem;
             background: #e2e8f0;
@@ -114,9 +126,21 @@
             direction: ltr;
             display: inline-block;
         }
+        
+        /* تفعيل استجابة قائمة الجوال */
+        @media (max-width: 768px) {
+            .navbar-links.active {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                left: 0;
+                background-color: #2c3e50;
+                padding: 15px;
+            }
+        }
     </style>
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </head>
 <body>
 
@@ -145,7 +169,7 @@
             <div class="dropdown-container">
                 <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
                 <div class="dropdown-menu">
-                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
+                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>                   
                     <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
                 </div>
             </div>
@@ -209,19 +233,25 @@
         </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
+
     <script>
         let currentFilteredReportData = [];
-        let teachersPhoneMap = {}; // خارطة لحفظ أرقام الجوال لكل معلم
+        let teachersPhoneMap = {}; 
 
-        // دالة تنظيف رقم الجوال وتحويله للصيغة الدولية (966)
+        // تنظيف وحفظ أرقام الهواتف بصيغة دولية مرنة
         function formatPhoneToInternational(phoneStr) {
             if (!phoneStr) return '';
             let cleaned = phoneStr.toString().trim();
-            // تحويل الأرقام العربية إلى إنجليزية
             cleaned = cleaned.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-            cleaned = cleaned.replace(/\D/g, ''); // إزالة أي رموز غير رقمية
+            cleaned = cleaned.replace(/\D/g, ''); 
 
-            if (cleaned.startsWith('05')) {
+            if (cleaned.startsWith('00966')) {
+                cleaned = cleaned.substring(2);
+            } else if (cleaned.startsWith('05')) {
                 cleaned = '966' + cleaned.substring(1);
             } else if (cleaned.startsWith('5') && cleaned.length === 9) {
                 cleaned = '966' + cleaned;
@@ -234,20 +264,22 @@
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
             let selectedDate = dateInput ? dateInput.value : '';
 
-            if (selectedDate) {
-                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+            if (!selectedDay || !selectedDate) {
+                showNotification("⚠️ يرجى اختيار اليوم والتاريخ أولاً", "error");
+                return;
             }
+
+            selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
 
             try {
                 const res = await fetch('/get-report-data');
                 const data = await res.json();
                 
-                // تجميع واستخراج أرقام الجوال من ورقة البيانات/الخيارات إن وجدت
                 teachersPhoneMap = {};
                 if (data.teacherList && Array.isArray(data.teacherList)) {
                     data.teacherList.forEach(t => {
                         const name = t['اسم المعلم'] || t[0] || t[1];
-                        const phone = t['رقم الجوال'] || t['الجوال'] || t[2]; // العمود الثالث
+                        const phone = t['رقم الجوال'] || t['الجوال'] || t[2];
                         if (name && phone) {
                             teachersPhoneMap[name.trim()] = formatPhoneToInternational(phone);
                         }
@@ -284,7 +316,6 @@
                         const className  = vals[classCols[i]] || '---';
                         const subTeacher = vals[subCols[i]] || '---';
 
-                        // تخزين رقم الجوال لو كان موجوداً بالصف نفسه
                         const rowPhone = row['الجوال'] || row['رقم الجوال'] || vals[17] || '';
                         if (subTeacher !== '---' && rowPhone) {
                             teachersPhoneMap[subTeacher.trim()] = formatPhoneToInternational(rowPhone);
@@ -335,7 +366,6 @@
             }
         }
 
-        // 📲 دالة إرسال رسائل الواتساب المباشرة لكل معلم بديل
         function sendWhatsAppMessages() {
             if (!currentFilteredReportData || currentFilteredReportData.length === 0) {
                 showNotification("🔍 لا توجد بيانات مسجلة لإرسالها", "error");
@@ -383,10 +413,8 @@
             const listContainer = document.getElementById('whatsappList');
             listContainer.innerHTML = '';
 
-            subNames.forEach(subName => {
+            subNames.forEach((subName, idx) => {
                 const tasks = substituteMap[subName];
-                
-                // البحث عن رقم الجوال المخزن لهذا المعلم
                 const phone = teachersPhoneMap[subName] || '';
 
                 let msg = `السلام عليكم ورحمة الله وبركاته\n`;
@@ -400,8 +428,6 @@
                 msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
 
                 const encodedMsg = encodeURIComponent(msg);
-                
-                // بناء رابط الواتساب المباشر بالرقم
                 const waUrl = phone 
                     ? `https://wa.me/${phone}?text=${encodedMsg}` 
                     : `https://api.whatsapp.com/send?text=${encodedMsg}`;
@@ -413,14 +439,26 @@
                             <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة)</span>
                             ${phone ? `<br><span class="phone-badge">📱 +${phone}</span>` : `<br><span style="color:#e74c3c; font-size:0.75rem;">لم يتم العثور على الرقم</span>`}
                         </div>
-                        <a href="${waUrl}" target="_blank" class="btn-wa-send">
-                            <i class="fab fa-whatsapp"></i> إرسال المحادثة مباشرة
-                        </a>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-wa-copy" onclick="copyTextMessage(\`${encodeURIComponent(msg)}\`)">
+                                <i class="fas fa-copy"></i> نسخ
+                            </button>
+                            <a href="${waUrl}" target="_blank" class="btn-wa-send">
+                                <i class="fab fa-whatsapp"></i> إرسال المحادثة
+                            </a>
+                        </div>
                     </div>
                 `;
             });
 
             document.getElementById('whatsappModal').style.display = 'flex';
+        }
+
+        function copyTextMessage(encodedStr) {
+            const text = decodeURIComponent(encodedStr);
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification("📋 تم نسخ نص التكليف بنجاح");
+            });
         }
 
         function closeWhatsAppModal() {
@@ -444,9 +482,7 @@
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
             let date = dateInput ? dateInput.value.trim() : '';
 
-            if (date) {
-                date = date.replace(/\//g, ' - ');
-            }   
+            if (date) date = date.replace(/\//g, ' - ');
 
             const res = await fetch('/get-report-data');
             const fullResponse = await res.json();
@@ -464,24 +500,30 @@
                 return;
             }
 
-            const fontData = await fetch('NotoSansArabic-Regular.ttf')
-              .then(res => res.arrayBuffer());
+            try {
+                const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+                const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
 
-            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
-
-            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-            doc.setFont("Noto", "normal");
+                doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+                doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+                doc.setFont("Noto", "normal");
+            } catch (e) {
+                console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+            }
             
-            const img = new Image();
-            img.src = 'logo.png';
-            await img.decode();
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width; canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            const imgData = canvas.toDataURL('image/png');
+            try {
+                const img = new Image();
+                img.src = 'logo.png';
+                await img.decode();
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const imgData = canvas.toDataURL('image/png');
+                doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+            } catch(e) {
+                console.warn("لم يتم العثور على صورة الشعار logo.png");
+            }
 
-            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
             doc.setFontSize(12);
             doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
             doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
@@ -533,7 +575,6 @@
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
-                doc.setFont("Noto");
                 doc.setFontSize(11);
                 
                 doc.text("مدير المدرسة", 40, 279, { align: 'center' });
@@ -562,18 +603,13 @@
             }
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            loadSchoolName();
-        });
-    </script>
-    
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
-
-    <script>
         $(document).ready(function () {
+            // 🍔 تفعيل زر القائمة للجوال
+            $("#menuToggle").on("click", function () {
+                $("#navbarLinks").toggleClass("active");
+            });
+
+            // تهيئة منتقي التاريخ الهجري
             $("#hijriDate").hijriDatePicker({
                 hijri: true,
                 showSwitcher: false,
@@ -581,6 +617,8 @@
                 hijriFormat: 'iYYYY/iMM/iDD',
                 locale: 'ar-sa'
             });
+
+            loadSchoolName();
         });
 
         function showNotification(message, type = 'success') {

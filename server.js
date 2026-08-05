@@ -897,37 +897,28 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
     const result = await pool.query('SELECT school_name, username, school_excel_file, excel_data FROM users WHERE id = $1', [id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).send('المدرسة غير موجودة في قاعدة البيانات.');
+      return res.status(404).json({ success: false, message: 'المدرسة غير موجودة' });
     }
 
     const school = result.rows[0];
-    const fileName = school.school_name ? `بيانات_${school.school_name}.xlsx` : `data_${school.username}.xlsx`;
-
-    if (school.excel_data) {
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
-      return res.send(school.excel_data);
+    if (!school.excel_data) {
+      return res.status(404).json({ success: false, message: 'لا يوجد ملف إكسل مخزن لهذه المدرسة' });
     }
 
-    const uploadsDir = path.join(__dirname, 'uploads');
-    const localFilePath = path.join(uploadsDir, `data_${school.username}.xlsx`);
+    const fileName = school.school_excel_file || `data_${school.username}.xlsx`;
 
-    if (fs.existsSync(localFilePath)) {
-      return res.download(localFilePath, fileName);
-    }
-
-    return res.status(404).send('عذراً، لا يوجد ملف إكسل مسجل لهذه المدرسة.');
-
-  } catch (error) {
-    console.error('خطأ أثناء تنزيل ملف الإكسل:', error);
-    res.status(500).send('حدث خطأ في الخادم أثناء تنزيل الملف: ' + error.message);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    return res.send(school.excel_data);
+  } catch (err) {
+    console.error('خطأ في تنزيل ملف الإكسل:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // =========================================================================
-// 🚀 تشغيل السيرفر
+// 🚀 5. تشغيل السيرفر
 // =========================================================================
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 السيرفر يعمل بنجاح على المنفذ ${PORT}`);
 });
