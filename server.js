@@ -915,7 +915,79 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode');
 
+// 🤖 1. إعداد عميل الواتساب بداخل السيرفر
+const waClient = new Client({
+  authStrategy: new LocalAuth({ dataPath: './whatsapp-session' }),
+  puppeteer: {
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] // متوافق مع استضافة Render
+  }
+});
+
+let qrCodeImageUrl = '';
+let isWaReady = false;
+
+waClient.on('qr', (qr) => {
+  console.log('⚡ تم توليد رمز QR للواتساب');
+  qrcode.toDataURL(qr, (err, url) => {
+    qrCodeImageUrl = url;
+  });
+});
+
+waClient.on('ready', () => {
+  console.log('✅ تم ربط حساب الواتساب وجاهز للإرسال في الخلفية!');
+  isWaReady = true;
+  qrCodeImageUrl = '';
+});
+
+waClient.initialize();
+
+// 📱 2. مسار عرض QR Code لربط واتساب المدرسة لأول مرة
+app.get('/whatsapp/qr', (req, res) => {
+  if (isWaReady) return res.send('<h2 style="color:green;text-align:center;">✅ الواتساب متصل بالفعل ومستعد للإرسال!</h2>');
+  if (!qrCodeImageUrl) return res.send('<h2 style="color:orange;text-align:center;">⏳ جاري تحضير الرمز... قم بتحديث الصفحة بعد 5 ثوانٍ</h2>');
+  res.send(`
+    <div style="text-align:center; padding: 20px;">
+      <h2>امسح الرمز من تطبيق الواتساب بجوالك لربطه بالموقع:</h2>
+      <img src="${qrCodeImageUrl}" style="width: 250px;" />
+    </div>
+  `);
+});
+
+// 🚀 3. مسار الإرسال الفوري في الخلفية (زر بنقرة واحدة)
+app.post('/api/send-whatsapp', async (req, res) => {
+  if (!isWaReady) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'الواتساب غير متصل! يرجى الدخول لصفحة /whatsapp/qr ومسح الرمز أولاً.' 
+    });
+  }
+
+  const { phone, message } = req.body;
+
+  if (!phone || !message) {
+    return res.status(400).json({ success: false, message: 'يرجى تزويد رقم الهاتف ونص الرسالة' });
+  }
+
+  try {
+    // تنظيف الرقم وإضافة مفتاح الدولة (مثال: 966xxxxxxxx)
+    let cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('05')) {
+      cleanPhone = '966' + cleanPhone.substring(1);
+    }
+    const chatId = `${cleanPhone}@c.us`;
+
+    // الإرسال في الخلفية
+    await waClient.sendMessage(chatId, message);
+
+    res.json({ success: true, message: 'تم إرسال الرسالة في الخلفية بنجاح!' });
+  } catch (error) {
+    console.error('❌ خطأ أثناء إرسال الواتساب:', error);
+    res.status(500).json({ success: false, error: 'فشل الإرسال: ' + error.message });
+  }
+});
 // =========================================================================
 // 🚀 5. تشغيل السيرفر
 // =========================================================================

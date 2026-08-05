@@ -104,6 +104,19 @@
             gap: 6px;
             font-size: 0.88rem;
         }
+        .btn-auto-send {
+            background-color: #0d6efd;
+            color: white !important;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.88rem;
+        }
         .btn-wa-copy {
             background-color: #475569;
             color: white !important;
@@ -115,6 +128,7 @@
             font-size: 0.88rem;
         }
         .btn-wa-send:hover { background-color: #1eb954; }
+        .btn-auto-send:hover { background-color: #0b5ed7; }
         .btn-wa-copy:hover { background-color: #334155; }
 
         .phone-badge {
@@ -127,7 +141,6 @@
             display: inline-block;
         }
         
-        /* تفعيل استجابة قائمة الجوال */
         @media (max-width: 768px) {
             .navbar-links.active {
                 display: flex;
@@ -148,17 +161,15 @@
         <h2 id="schoolName">المدرسة </h2>
         <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-        <!-- 🍔 زر القائمة للجوال -->
         <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
             <i class="fas fa-bars"></i>
         </button>
 
-        <!-- روابط الشريط -->
         <div class="navbar-links" id="navbarLinks">
             <a href="index.html">الرئيسية</a>
             <a href="dashboard.html#">الانتظار</a>
             <a href="/monitoring">الإشراف</a>
-           
+            
             <div class="dropdown-container">
                 <a href="#" class="dropdown-trigger">التقارير</a>
                 <div class="dropdown-menu">
@@ -203,7 +214,6 @@
             </form>
         </div>
 
-        <!-- حاوية النتائج -->
         <div class="card" id="reportResult" style="margin-top: 30px; display: none;">
             
             <div id="tablesContainer"></div>
@@ -226,6 +236,12 @@
             <h4 style="margin-top:0; color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
                 <i class="fab fa-whatsapp text-success"></i> إرسال رسائل التكليف مباشرة لكل معلم
             </h4>
+            
+            <!-- زر إرسال جماعي تلقائي -->
+            <button type="button" id="btnSendAllAuto" onclick="sendAllAuto()" style="width: 100%; background-color: #0d6efd; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
+                <i class="fas fa-paper-plane"></i> إرسال التكليفات للجميع تلقائياً (في الخلفية)
+            </button>
+
             <div id="whatsappList"></div>
             <div style="text-align: left; margin-top: 20px;">
                 <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px; border:none; color:white; border-radius:6px; cursor:pointer;">إغلاق</button>
@@ -242,7 +258,6 @@
         let currentFilteredReportData = [];
         let teachersPhoneMap = {}; 
 
-        // تنظيف وحفظ أرقام الهواتف بصيغة دولية مرنة
         function formatPhoneToInternational(phoneStr) {
             if (!phoneStr) return '';
             let cleaned = phoneStr.toString().trim();
@@ -439,12 +454,15 @@
                             <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة)</span>
                             ${phone ? `<br><span class="phone-badge">📱 +${phone}</span>` : `<br><span style="color:#e74c3c; font-size:0.75rem;">لم يتم العثور على الرقم</span>`}
                         </div>
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn-wa-copy" onclick="copyTextMessage(\`${encodeURIComponent(msg)}\`)">
+                        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                            <button class="btn-auto-send" onclick="sendSingleAuto('${phone}', '${encodedMsg}', this)">
+                                <i class="fas fa-paper-plane"></i> إرسال تلقائي
+                            </button>
+                            <button class="btn-wa-copy" onclick="copyTextMessage('${encodedMsg}')">
                                 <i class="fas fa-copy"></i> نسخ
                             </button>
                             <a href="${waUrl}" target="_blank" class="btn-wa-send">
-                                <i class="fab fa-whatsapp"></i> إرسال المحادثة
+                                <i class="fab fa-whatsapp"></i> واتساب Web
                             </a>
                         </div>
                     </div>
@@ -452,6 +470,64 @@
             });
 
             document.getElementById('whatsappModal').style.display = 'flex';
+        }
+
+        // إرسال فردي في الخلفية للسيرفر
+        async function sendSingleAuto(phone, encodedMsg, btnElement) {
+            if (!phone) {
+                showNotification("⚠️ لا يوجد رقم جوال مسجل لهذا المعلم", "error");
+                return;
+            }
+
+            const originalText = btnElement.innerHTML;
+            btnElement.disabled = true;
+            btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...`;
+
+            try {
+                const res = await fetch('/send-whatsapp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        phone: phone, 
+                        message: decodeURIComponent(encodedMsg) 
+                    })
+                });
+
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    btnElement.style.backgroundColor = '#16a34a';
+                    btnElement.innerHTML = `<i class="fas fa-check"></i> تم الإرسال`;
+                    showNotification(`✅ تم إرسال الرسالة بنجاح إلى الرقم +${phone}`);
+                } else {
+                    throw new Error(result.error || 'فشل في إرسال الرسالة');
+                }
+            } catch (err) {
+                btnElement.disabled = false;
+                btnElement.innerHTML = originalText;
+                showNotification(`❌ خطأ: ${err.message}`, "error");
+            }
+        }
+
+        // إرسال تلقائي جماعي لجميع المعلمين في القائمة
+        async function sendAllAuto() {
+            const autoButtons = document.querySelectorAll('.btn-auto-send');
+            if (autoButtons.length === 0) return;
+
+            const mainBtn = document.getElementById('btnSendAllAuto');
+            mainBtn.disabled = true;
+            mainBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري إرسال التكليفات للجميع...`;
+
+            for (let btn of autoButtons) {
+                if (!btn.disabled) {
+                    await btn.click();
+                    // تأخير ثانية ونصف بين كل رسالة لحماية السيرفر وتجنب الحظر
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+
+            mainBtn.disabled = false;
+            mainBtn.innerHTML = `<i class="fas fa-check-circle"></i> اكتمل إرسال جميع التكليفات`;
         }
 
         function copyTextMessage(encodedStr) {
@@ -604,12 +680,10 @@
         }
 
         $(document).ready(function () {
-            // 🍔 تفعيل زر القائمة للجوال
             $("#menuToggle").on("click", function () {
                 $("#navbarLinks").toggleClass("active");
             });
 
-            // تهيئة منتقي التاريخ الهجري
             $("#hijriDate").hijriDatePicker({
                 hijri: true,
                 showSwitcher: false,
