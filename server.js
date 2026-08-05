@@ -1,3 +1,25 @@
+process.env.PUPPETEER_CACHE_DIR = require('path').join(__dirname, '.cache');
+
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const puppeteer = require('puppeteer');
+const qrcode = require('qrcode');
+
+const waClient = new Client({
+  authStrategy: new LocalAuth({ dataPath: './whatsapp-session' }),
+  puppeteer: {
+    headless: true,
+    executablePath: puppeteer.executablePath(),
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
+  }
+});
 // =========================================================================
 // 📦 1. استدعاء المكتبات وإعداد التطبيق
 // =========================================================================
@@ -1018,6 +1040,7 @@ const handleSendWhatsApp = async (req, res) => {
 
 app.post('/send-whatsapp', handleSendWhatsApp);
 app.post('/api/send-whatsapp', handleSendWhatsApp);
+
 // =========================================================================
 // 🚀const { Client, LocalAuth } = require('whatsapp-web.js'); 5. تشغيل السيرفر
 // =========================================================================
