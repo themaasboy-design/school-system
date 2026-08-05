@@ -916,13 +916,24 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
   }
 });
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const puppeteer = require('puppeteer');
 const qrcode = require('qrcode');
 
-// 🤖 1. إعداد عميل الواتساب بداخل السيرفر
+// 🤖 1. إعداد عميل الواتساب بداخل السيرفر (محدث ومحسن للعمل على Render)
 const waClient = new Client({
   authStrategy: new LocalAuth({ dataPath: './whatsapp-session' }),
   puppeteer: {
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] // متوافق مع استضافة Render
+    headless: true,
+    executablePath: puppeteer.executablePath(),
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
   }
 });
 
@@ -932,7 +943,7 @@ let isWaReady = false;
 waClient.on('qr', (qr) => {
   console.log('⚡ تم توليد رمز QR للواتساب');
   qrcode.toDataURL(qr, (err, url) => {
-    qrCodeImageUrl = url;
+    if (!err) qrCodeImageUrl = url;
   });
 });
 
@@ -942,22 +953,37 @@ waClient.on('ready', () => {
   qrCodeImageUrl = '';
 });
 
+waClient.on('auth_failure', (msg) => {
+  console.error('❌ فشل مصادقة الواتساب:', msg);
+  isWaReady = false;
+});
+
+waClient.on('disconnected', (reason) => {
+  console.log('⚠️ تم فصل اتصال الواتساب:', reason);
+  isWaReady = false;
+  waClient.initialize(); // إعادة المحاولة تلقائياً
+});
+
 waClient.initialize();
 
-// 📱 2. مسار عرض QR Code لربط واتساب المدرسة لأول مرة
+// 📱 2. مسار عرض QR Code لربط واتساب المدرسة
 app.get('/whatsapp/qr', (req, res) => {
-  if (isWaReady) return res.send('<h2 style="color:green;text-align:center;">✅ الواتساب متصل بالفعل ومستعد للإرسال!</h2>');
-  if (!qrCodeImageUrl) return res.send('<h2 style="color:orange;text-align:center;">⏳ جاري تحضير الرمز... قم بتحديث الصفحة بعد 5 ثوانٍ</h2>');
+  if (isWaReady) {
+    return res.send('<h2 style="color:green;text-align:center;font-family:sans-serif;margin-top:50px;">✅ الواتساب متصل بالفعل ومستعد للإرسال!</h2>');
+  }
+  if (!qrCodeImageUrl) {
+    return res.send('<h2 style="color:orange;text-align:center;font-family:sans-serif;margin-top:50px;">⏳ جاري تحضير الرمز... قم بتحديث الصفحة بعد 5 ثوانٍ</h2>');
+  }
   res.send(`
-    <div style="text-align:center; padding: 20px;">
+    <div style="text-align:center; padding: 30px; font-family:sans-serif;">
       <h2>امسح الرمز من تطبيق الواتساب بجوالك لربطه بالموقع:</h2>
-      <img src="${qrCodeImageUrl}" style="width: 250px;" />
+      <img src="${qrCodeImageUrl}" style="width: 260px; border: 1px solid #ccc; padding: 10px; border-radius: 10px;" />
     </div>
   `);
 });
 
-// 🚀 3. مسار الإرسال الفوري في الخلفية (زر بنقرة واحدة)
-app.post('/api/send-whatsapp', async (req, res) => {
+// 🚀 3. مسار الإرسال الفوري (تم دعم المسارين /send-whatsapp و /api/send-whatsapp لتجنب أي خطأ)
+const handleSendWhatsApp = async (req, res) => {
   if (!isWaReady) {
     return res.status(400).json({ 
       success: false, 
@@ -972,14 +998,15 @@ app.post('/api/send-whatsapp', async (req, res) => {
   }
 
   try {
-    // تنظيف الرقم وإضافة مفتاح الدولة (مثال: 966xxxxxxxx)
-    let cleanPhone = phone.replace(/[^0-9]/g, '');
+    let cleanPhone = phone.toString().replace(/[^0-9]/g, '');
     if (cleanPhone.startsWith('05')) {
       cleanPhone = '966' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('5') && cleanPhone.length === 9) {
+      cleanPhone = '966' + cleanPhone;
     }
+
     const chatId = `${cleanPhone}@c.us`;
 
-    // الإرسال في الخلفية
     await waClient.sendMessage(chatId, message);
 
     res.json({ success: true, message: 'تم إرسال الرسالة في الخلفية بنجاح!' });
@@ -987,9 +1014,12 @@ app.post('/api/send-whatsapp', async (req, res) => {
     console.error('❌ خطأ أثناء إرسال الواتساب:', error);
     res.status(500).json({ success: false, error: 'فشل الإرسال: ' + error.message });
   }
-});
+};
+
+app.post('/send-whatsapp', handleSendWhatsApp);
+app.post('/api/send-whatsapp', handleSendWhatsApp);
 // =========================================================================
-// 🚀 5. تشغيل السيرفر
+// 🚀const { Client, LocalAuth } = require('whatsapp-web.js'); 5. تشغيل السيرفر
 // =========================================================================
 app.listen(PORT, () => {
   console.log(`🚀 السيرفر يعمل بنجاح على المنفذ ${PORT}`);
