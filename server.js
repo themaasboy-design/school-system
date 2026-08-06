@@ -996,6 +996,28 @@ function initSchoolWhatsApp(username) {
   client.initialize();
 }
 
+// 🔌 بدء تهيئة واتساب المدرسة (يُستدعى من زر الربط في الواجهة)
+app.post('/api/whatsapp/connect', (req, res) => {
+  const username = req.session?.username;
+  if (!username) return res.status(401).json({ success: false, message: 'يرجى تسجيل الدخول أولاً' });
+
+  if (!schoolWaClients[username]?.client) {
+    initSchoolWhatsApp(username);
+  }
+  res.json({ success: true, message: 'جاري تهيئة الواتساب...' });
+});
+
+// 🖼️ جلب صورة QR بصيغة JSON (للواجهة)
+app.get('/whatsapp/qr-image', (req, res) => {
+  const username = req.session?.username;
+  if (!username) return res.status(401).json({ error: 'غير مصرح' });
+
+  const state = schoolWaClients[username];
+  if (state?.isReady) return res.json({ connected: true, qr: null });
+  if (state?.qrData)  return res.json({ connected: false, qr: state.qrData });
+  res.json({ connected: false, qr: null });
+});
+
 // 📡 عرض QR أو حالة الاتصال
 app.get('/whatsapp/qr', async (req, res) => {
   const username = req.session?.username;

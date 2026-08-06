@@ -65,31 +65,21 @@
             font-size: 1.1rem !important; 
             margin-bottom: 15px !important;
         }
-
-        /* 2. تصغير نصوص التعليمات */
         .form-label, label {
             font-size: 0.85rem !important;
             font-weight: 600;
         }
-
-        /* 3. تصغير الخط داخل القوائم المنسدلة */
         .form-select {
             font-size: 0.85rem !important;
             padding: 6px 12px !important;
         }
-
-        /* 4. تصغير عناوين الجدول */
         .table th {
             font-size: 0.9rem !important;
             padding: 8px !important;
         }
-
-        /* 5. تصغير أسماء المعلمين والنصوص داخل خلايا الجدول */
         .table td {
             font-size: 0.85rem !important;
         }
-
-        /* 6. كتل الجدول */
         .table td div, .table td span {
             font-size: 0.85rem !important;
             padding: 4px 8px !important;
@@ -97,22 +87,18 @@
         .table tbody td div, .table tbody td {
             font-size: 12px !important;
         }
-
-        /* 🎯 تنسيق جديد لحاوية الصور لضمان التأثير والمظهر المتناسق */
         .services-cards-container a {
             transition: transform 0.2s ease-in-out;
             display: inline-block;
         }
         .services-cards-container a:hover {
-            transform: translateY(-5px); /* تأثير ارتفاع بسيط عند مرور الماوس */
+            transform: translateY(-5px);
         }
         .services-cards-container img {
-            max-width: 280px; /* يمكنك تكبير أو تصغير العرض حسب رغبتك */
+            max-width: 280px;
             width: 100%;
             height: auto;
         }
-
-        /* 🎨 التنسيق الجديد الحديث لنافذة تحديث بيانات المدرسة */
         .modal-content-custom {
             border-radius: 16px;
             overflow: hidden;
@@ -215,6 +201,60 @@
         .btn-upload-custom:active {
             transform: scale(0.99);
         }
+
+        /* ===== تنسيق قسم الواتساب ===== */
+        #whatsapp-section {
+            max-width: 400px;
+            margin: 30px auto;
+            padding: 24px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-top: 5px solid #25d366;
+            text-align: center;
+            font-family: sans-serif;
+        }
+        #whatsapp-section h5 {
+            color: #1a1a2e;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        #btn-wa-connect {
+            background: linear-gradient(to left, #25d366, #128c7e);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 28px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        #btn-wa-connect:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        #wa-qr-container {
+            display: none;
+            margin-top: 16px;
+        }
+        #wa-qr-container p {
+            font-size: 0.85rem;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        #wa-qr-img {
+            width: 220px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+        }
+        #wa-status-msg {
+            margin-top: 14px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -243,13 +283,13 @@
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
             <div class="dropdown-menu">
-                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
-                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                <a class="nav-link" href="updata_school.html">جلب بيانات المدرسة</a>               
+                <a href="waiting_setting.html">إعداد جدول الانتظار</a>
             </div>
         </div>
-                <a href="/login.html" class="logout">تسجيل الخروج</a>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-</nav>>
+</nav>
 
 <!-- 🎯 حاوية الخدمات الثلاث بجانب بعضها بالمنتصف -->
 <div class="container my-5 text-center">
@@ -273,20 +313,19 @@
     </div>
 </div>
 
-<!-- Modal تحديث الملف بتنسيق وأداء عصري رائع -->
+<!-- Modal تحديث الملف -->
 <div class="modal fade" id="updateExcelModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content modal-content-custom">
       
       <div class="modal-header-custom">
         <h6 class="modal-title" id="updateModalLabel">تحديث بيانات المدرسة</h6>
-        <button type="button" class="btn-close btn-close-white " data-bs-dismiss="modal" aria-label="إغلاق"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
       </div>
 
       <div class="modal-body p-4">
         <form id="updateExcelForm">
           
-          <!-- منطقة السحب والإفلات -->
           <label for="excelFileInput" class="drop-zone" id="dropZone">
             <div class="drop-zone-content">
               <div class="upload-icon">
@@ -303,7 +342,6 @@
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" required style="display: none;">
           </label>
 
-          <!-- شريط عرض اسم الملف المختار -->
           <div id="fileSelectedInfo" class="file-info-box" style="display: none;">
             <span>📊</span>
             <span id="fileNameText" class="file-name">filename.xlsx</span>
@@ -321,14 +359,32 @@
   </div>
 </div>
 
+<!-- ===== قسم ربط الواتساب ===== -->
+<div id="whatsapp-section">
+    <h5>📱 ربط واتساب المدرسة</h5>
+    <button id="btn-wa-connect" onclick="connectWhatsApp()">ربط واتساب المدرسة</button>
+    <div id="wa-qr-container">
+        <p>افتح واتساب ← النقاط الثلاث ← الأجهزة المرتبطة ← ربط جهاز</p>
+        <img id="wa-qr-img" src="" alt="QR Code" />
+    </div>
+    <div id="wa-status-msg"></div>
+</div>
+
+<!-- مكتبة التنبيهات الخارجية -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 
-// 🎯 التفاعل مع منطقة السحب والإفلات وعرض الملف المختار
-const fileInput = document.getElementById('excelFileInput');
-const fileInfoBox = document.getElementById('fileSelectedInfo');
-const fileNameText = document.getElementById('fileNameText');
+// =============================================
+// 📁 رفع ملف الإكسل
+// =============================================
+const fileInput     = document.getElementById('excelFileInput');
+const fileInfoBox   = document.getElementById('fileSelectedInfo');
+const fileNameText  = document.getElementById('fileNameText');
 const removeFileBtn = document.getElementById('removeFileBtn');
-const dropZone = document.getElementById('dropZone');
+const dropZone      = document.getElementById('dropZone');
 
 if (fileInput) {
     fileInput.addEventListener('change', function() {
@@ -378,13 +434,11 @@ document.getElementById('updateExcelForm').addEventListener('submit', async func
     e.preventDefault();
 
     const file = fileInput.files[0];
-
     if (!file) {
         Toastify({ text: "يرجى اختيار ملف الأكسل أولاً", style: { background: "#e74c3c" } }).showToast();
         return;
     }
 
-    // إعداد البيانات لإرسالها
     const formData = new FormData();
     formData.append('excelFile', file);
 
@@ -402,23 +456,18 @@ document.getElementById('updateExcelForm').addEventListener('submit', async func
 
         if (response.ok) {
             Toastify({ 
-                text: "تم  تحديث البيانات بنجاح!", 
+                text: "تم تحديث البيانات بنجاح!", 
                 style: { background: "#2bc48a" } 
             }).showToast();
             
-            // إغلاق النافذة المنبثقة
             const modalElement = document.getElementById('updateExcelModal');
             const modal = bootstrap.Modal.getInstance(modalElement);
             if (modal) modal.hide();
             
-            // إعادة تصفير مدخل الملف ومربع الاسم
             fileInput.value = '';
             fileInfoBox.style.display = 'none';
             
-            // 🎯 إعادة تحميل الصفحة فوراً لعرض البيانات الجديدة بعد ثانية واحدة
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            setTimeout(() => { window.location.reload(); }, 1000);
         } else {
             Toastify({ text: result.message || "حدث خطأ أثناء رفع الملف", style: { background: "#e74c3c" } }).showToast();
         }
@@ -431,60 +480,119 @@ document.getElementById('updateExcelForm').addEventListener('submit', async func
     }
 });
 
-    async function loadSchoolName() {
-        try {
-            const response = await fetch('/get-report-data');
-            const data = await response.json();
-            if (data.mainInfo && data.mainInfo.B2) {
-                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
-            }
-        } catch (e) {
-            console.error("خطأ في جلب اسم المدرسة:", e);
+// =============================================
+// 📛 جلب اسم المدرسة
+// =============================================
+async function loadSchoolName() {
+    try {
+        const response = await fetch('/get-report-data');
+        const data = await response.json();
+        if (data.mainInfo && data.mainInfo.B2) {
+            document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
         }
+    } catch (e) {
+        console.error("خطأ في جلب اسم المدرسة:", e);
     }
+}
 
-    document.addEventListener("DOMContentLoaded", () => {
-        loadSchoolName();
-    });
-</script>
-
-<!-- مكتبة التنبيهات الخارجية -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-<!-- 🎯 أضف ملف جافاسكريبت Bootstrap هنا -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <div id="whatsapp-section">
-  <button onclick="connectWhatsApp()">ربط واتساب المدرسة</button>
-  <div id="qr-container" style="display:none">
-    <p>امسح الكود بهاتفك من واتساب ← الأجهزة المرتبطة</p>
-    <img id="qr-image" src="" />
-  </div>
-  <div id="status-msg"></div>
-</div>
-
-<script>
-const schoolId = '<%= schoolId %>'; // من الجلسة
+// =============================================
+// 📱 واتساب — كل مدرسة برقمها الخاص
+// =============================================
+let waCheckInterval = null;
 
 async function connectWhatsApp() {
-  await fetch(`/api/whatsapp/connect/${schoolId}`);
-  checkQR();
-}
+    const btn = document.getElementById('btn-wa-connect');
+    const statusMsg = document.getElementById('wa-status-msg');
 
-async function checkQR() {
-  const interval = setInterval(async () => {
-    const res = await fetch(`/api/whatsapp/qr/${schoolId}`);
-    const data = await res.json();
+    btn.disabled = true;
+    btn.textContent = '⏳ جاري التهيئة...';
+    statusMsg.innerHTML = '';
 
-    if (data.status === 'qr_ready') {
-      document.getElementById('qr-container').style.display = 'block';
-      document.getElementById('qr-image').src = data.qr;
-    } else if (data.status === 'connected') {
-      clearInterval(interval);
-      document.getElementById('qr-container').style.display = 'none';
-      document.getElementById('status-msg').innerHTML = '✅ واتساب متصل بنجاح!';
+    try {
+        // بدء تهيئة الواتساب في السيرفر
+        const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+        const data = await res.json();
+
+        if (!res.ok) {
+            statusMsg.innerHTML = `<span style="color:red">❌ ${data.message || 'حدث خطأ'}</span>`;
+            btn.disabled = false;
+            btn.textContent = 'إعادة المحاولة';
+            return;
+        }
+
+        statusMsg.innerHTML = '<span style="color:orange">⏳ جاري تحضير رمز QR...</span>';
+
+        // بدء فحص الحالة كل 3 ثوانٍ
+        if (waCheckInterval) clearInterval(waCheckInterval);
+        waCheckInterval = setInterval(checkWaStatus, 3000);
+
+    } catch (e) {
+        statusMsg.innerHTML = '<span style="color:red">❌ تعذر الاتصال بالسيرفر</span>';
+        btn.disabled = false;
+        btn.textContent = 'إعادة المحاولة';
     }
-  }, 2000);
 }
+
+async function checkWaStatus() {
+    try {
+        const res = await fetch('/api/whatsapp/status');
+        const data = await res.json();
+
+        const btn       = document.getElementById('btn-wa-connect');
+        const statusMsg = document.getElementById('wa-status-msg');
+        const qrBox     = document.getElementById('wa-qr-container');
+        const qrImg     = document.getElementById('wa-qr-img');
+
+        if (data.connected) {
+            // ✅ متصل — أوقف الفحص وأظهر رسالة النجاح
+            clearInterval(waCheckInterval);
+            waCheckInterval = null;
+            qrBox.style.display = 'none';
+            statusMsg.innerHTML = '<span style="color:#25d366">✅ واتساب متصل بنجاح! يمكنك الآن إرسال رسائل للمعلمين.</span>';
+            btn.textContent = '✅ متصل';
+            btn.style.background = '#25d366';
+
+        } else if (data.hasQr) {
+            // 📷 QR جاهز — اجلبه وأظهره
+            const qrRes  = await fetch('/whatsapp/qr-image');
+            const qrData = await qrRes.json();
+            if (qrData.qr) {
+                qrImg.src = qrData.qr;
+                qrBox.style.display = 'block';
+                statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
+            }
+        }
+        // إذا لم يكن متصلاً ولا يوجد QR بعد، استمر في الانتظار
+
+    } catch (e) {
+        console.error('خطأ في فحص حالة الواتساب:', e);
+    }
+}
+
+// =============================================
+// 🚀 تشغيل عند تحميل الصفحة
+// =============================================
+document.addEventListener('DOMContentLoaded', async () => {
+    loadSchoolName();
+
+    // فحص إذا كان الواتساب متصلاً مسبقاً
+    try {
+        const res  = await fetch('/api/whatsapp/status');
+        const data = await res.json();
+
+        if (data.connected) {
+            document.getElementById('wa-status-msg').innerHTML =
+                '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
+            const btn = document.getElementById('btn-wa-connect');
+            btn.textContent = '✅ متصل';
+            btn.style.background = '#25d366';
+            btn.disabled = true;
+        }
+    } catch (e) {
+        // لا بأس، سيظهر الزر فارغاً
+    }
+});
+
 </script>
 </body>
 </html>
