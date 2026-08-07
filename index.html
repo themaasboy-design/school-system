@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام توزيع الإشراف اليومي - الرئيسية</title>
+    <title> الرئيسية</title>
     
     <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
@@ -325,7 +325,26 @@ async function connectWhatsApp() {
 
 async function checkWaStatus() {
     try {
-        const res = await fetch('/api/whatsapp/status');
+        // جلب اسم المستخدم المحفوظ في المتصفح لإرساله مع الطلب
+        const username = localStorage.getItem('username') || ''; 
+
+        const res = await fetch('/api/whatsapp/status', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-username': username
+            },
+            credentials: 'include'
+        });
+
+        // حماية الواجهة من الانهيار إذا كان السيرفر يرجع 401 أو 502
+        if (!res.ok) {
+            if (res.status === 401) {
+                console.warn('جلسة التوثيق غير صالحة أو تحتاج تسجيل دخول');
+            }
+            return;
+        }
+
         const data = await res.json();
 
         const btn       = document.getElementById('btn-wa-connect');
@@ -334,20 +353,28 @@ async function checkWaStatus() {
         const qrImg     = document.getElementById('wa-qr-img');
 
         if (data.connected) {
-            clearInterval(waCheckInterval);
-            waCheckInterval = null;
-            qrBox.style.display = 'none';
-            statusMsg.innerHTML = '<span style="color:#25d366">✅ واتساب متصل بنجاح! يمكنك الآن إرسال رسائل للمعلمين.</span>';
-            btn.textContent = '✅ متصل';
-            btn.style.background = '#25d366';
-
+            if (typeof waCheckInterval !== 'undefined' && waCheckInterval) {
+                clearInterval(waCheckInterval);
+            }
+            if (qrBox) qrBox.style.display = 'none';
+            if (statusMsg) statusMsg.innerHTML = '<span style="color:#25d366">✅ واتساب متصل بنجاح!</span>';
+            if (btn) {
+                btn.textContent = '✅ متصل';
+                btn.style.background = '#25d366';
+            }
         } else if (data.hasQr) {
-            const qrRes  = await fetch('/whatsapp/qr-image');
-            const qrData = await qrRes.json();
-            if (qrData.qr) {
-                qrImg.src = qrData.qr;
-                qrBox.style.display = 'block';
-                statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
+            const qrRes = await fetch('/api/whatsapp/qr-image', {
+                headers: { 'x-username': username },
+                credentials: 'include'
+            });
+
+            if (qrRes.ok) {
+                const qrData = await qrRes.json();
+                if (qrData && qrData.qr && qrImg && qrBox) {
+                    qrImg.src = qrData.qr;
+                    qrBox.style.display = 'block';
+                    if (statusMsg) statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
+                }
             }
         }
     } catch (e) {

@@ -4,6 +4,7 @@
 process.env.PUPPETEER_CACHE_DIR = require('path').join(__dirname, '.cache');
 
 const express = require('express');
+const cors = require('cors'); // 👈 تم إضافة مكتبة CORS
 const path = require('path');
 const fs = require('fs');
 const xlsx = require('xlsx');
@@ -18,6 +19,13 @@ const qrcode = require('qrcode');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 🌐 إعداد CORS للتعامل مع التوثيق المتقاطع
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -42,14 +50,16 @@ app.use(express.static(__dirname, { index: false }));
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🎯 إعداد الجلسات (Session)
+// 🎯 إعداد الجلسات (Session) - تم تحديث الكوكيز لتجاوز قيود المتصفح
 app.use(session({
   secret: 'school_management_secret_key_2026',
   resave: false,
   saveUninitialized: false,
   cookie: { 
     maxAge: 24 * 60 * 60 * 1000,
-    httpOnly: true 
+    httpOnly: true,
+    sameSite: 'none', // 👈 لتجاوز منع التتبع بالكوكيز
+    secure: true     // 👈 مطلوب مع sameSite: 'none' على Render (HTTPS)
   }
 }));
 
@@ -898,289 +908,14 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
 
 app.get('/check-db', async (req, res) => {
   try {
-    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
-    res.json({ 
-      success: true, 
-      schools: result.rows 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 📥 تنزيل ملف الإكسل مباشرة للمدرسة من قاعدة البيانات
-app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT school_name, username, school_excel_file, excel_data FROM users WHERE id = $1', [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'المدرسة غير موجودة' });
-    }
-
-    const school = result.rows[0];
-    if (!school.excel_data) {
-      return res.status(404).json({ success: false, message: 'لا يوجد ملف إكسل مخزن لهذه المدرسة' });
-    }
-
-    const fileName = school.school_excel_file || `data_${school.username}.xlsx`;
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-    return res.send(school.excel_data);
-  } catch (err) {
-    console.error('خطأ في تنزيل ملف الإكسل:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// =========================================================================
-// 📱 5. واتساب - كل مدرسة برقمها الخاص
-// =========================================================================
-
-// تخزين جلسات الواتساب لكل مدرسة { username: { client, isReady, qrData } }
-const schoolWaClients = {};
-
-function getPuppeteerConfig() {
-  return {
-    headless: true,
-    executablePath: puppeteer.executablePath(),
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ]
-  };
-}
-
-// 🔗 تهيئة عميل واتساب لمدرسة معينة
-function initSchoolWhatsApp(username) {
-  if (schoolWaClients[username]?.client) {
-    return; // الجلسة موجودة مسبقاً
-  }
-
-  const client = new Client({
-    authStrategy: new LocalAuth({
-      clientId: `school_${username}`,
-      dataPath: './whatsapp-sessions'
-    }),
-    puppeteer: getPuppeteerConfig()
-  });
-
-  schoolWaClients[username] = {
-    client,
-    isReady: false,
-    qrData: null
-  };
-
-  client.on('qr', async (qr) => {
-    console.log(`📱 QR جاهز للمدرسة: ${username}`);
-    try {
-      schoolWaClients[username].qrData = await qrcode.toDataURL(qr);
-      schoolWaClients[username].isReady = false;
-    } catch (e) {
-      console.error('خطأ في توليد QR:', e.message);
-    }
-  });
-
-  client.on('ready', () => {
-    console.log(`✅ واتساب المدرسة "${username}" متصل!`);
-    schoolWaClients[username].isReady = true;
-    schoolWaClients[username].qrData = null;
-  });
-
-  client.on('auth_failure', () => {
-    console.error(`❌ فشل مصادقة واتساب المدرسة: ${username}`);
-    schoolWaClients[username].isReady = false;
-  });
-
-  client.on('disconnected', () => {
-    console.log(`⚠️ انقطع اتصال واتساب المدرسة: ${username}`);
-    schoolWaClients[username].isReady = false;
-    schoolWaClients[username].client = null;
-    // إعادة تهيئة تلقائية بعد 10 ثوانٍ
-    setTimeout(() => initSchoolWhatsApp(username), 10000);
-  });
-
-  client.initialize();
-}
-
-// 🔌 بدء تهيئة واتساب المدرسة (يُستدعى من زر الربط في الواجهة)
-app.post('/api/whatsapp/connect', (req, res) => {
-  const username = req.session?.username;
-  if (!username) return res.status(401).json({ success: false, message: 'يرجى تسجيل الدخول أولاً' });
-
-  if (!schoolWaClients[username]?.client) {
-    initSchoolWhatsApp(username);
-  }
-  res.json({ success: true, message: 'جاري تهيئة الواتساب...' });
-});
-
-// 🖼️ جلب صورة QR بصيغة JSON (للواجهة)
-app.get('/whatsapp/qr-image', (req, res) => {
-  const username = req.session?.username;
-  if (!username) return res.status(401).json({ error: 'غير مصرح' });
-
-  const state = schoolWaClients[username];
-  if (state?.isReady) return res.json({ connected: true, qr: null });
-  if (state?.qrData)  return res.json({ connected: false, qr: state.qrData });
-  res.json({ connected: false, qr: null });
-});
-
-// 📡 عرض QR أو حالة الاتصال
-app.get('/whatsapp/qr', async (req, res) => {
-  const username = req.session?.username;
-  if (!username) {
-    return res.status(401).send('<h3 style="color:red;text-align:center;font-family:sans-serif;margin-top:50px">يرجى تسجيل الدخول أولاً</h3>');
-  }
-
-  // تهيئة العميل إذا لم يكن موجوداً
-  if (!schoolWaClients[username]?.client) {
-    initSchoolWhatsApp(username);
-  }
-
-  const state = schoolWaClients[username];
-
-  if (state?.isReady) {
-    return res.send(`
-      <div style="text-align:center;padding:40px;font-family:sans-serif;direction:rtl">
-        <h2 style="color:green">✅ الواتساب متصل ومستعد للإرسال!</h2>
-        <p>رقم الواتساب المرتبط بمدرستك جاهز لإرسال الرسائل للمعلمين.</p>
-      </div>
-    `);
-  }
-
-  if (state?.qrData) {
-    return res.send(`
-      <div style="text-align:center;padding:30px;font-family:sans-serif;direction:rtl">
-        <h2>📱 امسح الرمز بتطبيق واتساب</h2>
-        <p>افتح واتساب ← النقاط الثلاث ← الأجهزة المرتبطة ← ربط جهاز</p>
-        <img src="${state.qrData}" style="width:260px;border:1px solid #ccc;padding:10px;border-radius:10px" />
-        <p style="color:orange">⏳ سيتم تحديث الصفحة تلقائياً...</p>
-        <script>setTimeout(() => location.reload(), 5000);</script>
-      </div>
-    `);
-  }
-
-  return res.send(`
-    <div style="text-align:center;padding:40px;font-family:sans-serif;direction:rtl">
-      <h2 style="color:orange">⏳ جاري تحضير الرمز...</h2>
-      <p>انتظر 10 ثوانٍ ثم حدّث الصفحة</p>
-      <script>setTimeout(() => location.reload(), 8000);</script>
-    </div>
-  `);
-});
-
-// 📊 جلب حالة اتصال واتساب المدرسة (للواجهة)
-app.get('/api/whatsapp/status', (req, res) => {
-  const username = req.session?.username;
-  if (!username) return res.status(401).json({ error: 'غير مصرح' });
-
-  const state = schoolWaClients[username];
-  res.json({
-    connected: state?.isReady || false,
-    hasQr: !!state?.qrData,
-    initialized: !!state?.client
-  });
-});
-
-// 🚀 إرسال رسالة لرقم محدد
-const handleSendWhatsApp = async (req, res) => {
-  const username = req.session?.username;
-  if (!username) return res.status(401).json({ success: false, message: 'يرجى تسجيل الدخول' });
-
-  const state = schoolWaClients[username];
-  if (!state?.isReady) {
-    return res.status(400).json({
-      success: false,
-      message: 'واتساب مدرستك غير متصل! اذهب لصفحة /whatsapp/qr لربطه أولاً.'
-    });
-  }
-
-  const { phone, message } = req.body;
-  if (!phone || !message) {
-    return res.status(400).json({ success: false, message: 'يرجى إدخال رقم الهاتف والرسالة' });
-  }
-
-  try {
-    let cleanPhone = phone.toString().replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('05')) {
-      cleanPhone = '966' + cleanPhone.substring(1);
-    } else if (cleanPhone.startsWith('5') && cleanPhone.length === 9) {
-      cleanPhone = '966' + cleanPhone;
-    }
-
-    await state.client.sendMessage(`${cleanPhone}@c.us`, message);
-    res.json({ success: true, message: 'تم إرسال الرسالة بنجاح!' });
+    const result = await pool.query('SELECT NOW()');
+    res.json({ success: true, dbTime: result.rows[0].now });
   } catch (error) {
-    console.error('❌ خطأ في الإرسال:', error);
-    res.status(500).json({ success: false, error: 'فشل الإرسال: ' + error.message });
-  }
-};
-
-app.post('/send-whatsapp', handleSendWhatsApp);
-app.post('/api/send-whatsapp', handleSendWhatsApp);
-
-// 📢 إرسال رسالة لجميع معلمي المدرسة (من ملف الإكسل)
-// ⚠️ تأكد من رقم عمود الهاتف في ملف الإكسل الخاص بك (0 = العمود الأول، 1 = الثاني، 2 = الثالث...)
-const PHONE_COLUMN_INDEX = 2; // عدّل هذا الرقم حسب موقع عمود الهاتف في ملفك
-
-app.post('/api/whatsapp/send-all', async (req, res) => {
-  const username = req.session?.username;
-  if (!username) return res.status(401).json({ success: false, message: 'غير مصرح' });
-
-  const state = schoolWaClients[username];
-  if (!state?.isReady) {
-    return res.status(400).json({ success: false, message: 'واتساب غير متصل! اذهب لصفحة /whatsapp/qr أولاً.' });
-  }
-
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ success: false, message: 'يرجى إدخال نص الرسالة' });
-
-  try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, TEACHERS_SHEET);
-    const teachers = xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1); // تخطي رأس الجدول
-
-    const results = [];
-    for (const row of teachers) {
-      const phone = row[PHONE_COLUMN_INDEX];
-      const name  = row[1] || 'غير معروف';
-
-      if (!phone) continue;
-
-      try {
-        let cleanPhone = phone.toString().replace(/[^0-9]/g, '');
-        if (cleanPhone.startsWith('05')) {
-          cleanPhone = '966' + cleanPhone.substring(1);
-        } else if (cleanPhone.startsWith('5') && cleanPhone.length === 9) {
-          cleanPhone = '966' + cleanPhone;
-        }
-
-        await state.client.sendMessage(`${cleanPhone}@c.us`, message);
-        results.push({ name, phone, status: '✅ تم الإرسال' });
-
-        // انتظار ثانية ونصف بين كل رسالة لتجنب الحظر
-        await new Promise(r => setTimeout(r, 1500));
-      } catch (e) {
-        results.push({ name, phone, status: '❌ فشل: ' + e.message });
-      }
-    }
-
-    res.json({ success: true, results });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// =========================================================================
-// 🚀 6. تشغيل السيرفر
-// =========================================================================
+// 🚀 تشغيل السيرفر
 app.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل بنجاح على المنفذ ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
