@@ -960,8 +960,16 @@ app.get('/api/whatsapp/status', (req, res) => {
     success: true,
     connected: isWhatsappConnected,
     status: whatsappStatus,
+    hasQr: !!qrCodeData,      // ✅ إضافة hasQr الذي تتوقعه الواجهة
     qrCode: qrCodeData
   });
+});
+
+// 🖼️ مسار جلب صورة QR بصيغة JSON (كان ناقصاً)
+app.get('/api/whatsapp/qr-image', (req, res) => {
+  if (isWhatsappConnected) return res.json({ connected: true, qr: null });
+  if (qrCodeData)          return res.json({ connected: false, qr: qrCodeData });
+  res.json({ connected: false, qr: null });
 });
 
 app.post('/api/whatsapp/connect', async (req, res) => {

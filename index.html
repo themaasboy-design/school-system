@@ -288,26 +288,22 @@ async function loadSchoolName() {
 }
 
 // =============================================
-// 📱 واتساب — ربط الجلسة
+// 📱 واتساب — ربط الجلسة (نسخة مصححة)
 // =============================================
 let waCheckInterval = null;
 
 async function connectWhatsApp() {
-    const btn = document.getElementById('btn-wa-connect');
+    const btn       = document.getElementById('btn-wa-connect');
     const statusMsg = document.getElementById('wa-status-msg');
-    const username = localStorage.getItem('username') || '';
 
     btn.disabled = true;
     btn.textContent = '⏳ جاري التهيئة...';
     statusMsg.innerHTML = '';
 
     try {
-        const res = await fetch('/api/whatsapp/connect', { 
+        const res  = await fetch('/api/whatsapp/connect', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-username': username
-            },
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
         });
         const data = await res.json();
@@ -319,8 +315,13 @@ async function connectWhatsApp() {
             return;
         }
 
-        statusMsg.innerHTML = '<span style="color:orange">⏳ جاري تحضير رمز QR...</span>';
+        // إذا كان متصلاً مسبقاً
+        if (data.connected) {
+            setConnectedUI();
+            return;
+        }
 
+        statusMsg.innerHTML = '<span style="color:orange">⏳ جاري تحضير رمز QR...</span>';
         if (waCheckInterval) clearInterval(waCheckInterval);
         waCheckInterval = setInterval(checkWaStatus, 3000);
 
@@ -331,60 +332,41 @@ async function connectWhatsApp() {
     }
 }
 
+function setConnectedUI() {
+    if (waCheckInterval) { clearInterval(waCheckInterval); waCheckInterval = null; }
+    const btn       = document.getElementById('btn-wa-connect');
+    const statusMsg = document.getElementById('wa-status-msg');
+    const qrBox     = document.getElementById('wa-qr-container');
+    if (qrBox)     qrBox.style.display = 'none';
+    if (statusMsg) statusMsg.innerHTML = '<span style="color:#25d366">✅ واتساب متصل بنجاح! يمكنك إرسال رسائل للمعلمين.</span>';
+    if (btn)       { btn.textContent = '✅ متصل'; btn.style.background = '#25d366'; btn.disabled = true; }
+}
+
 async function checkWaStatus() {
     try {
-        // جلب اسم المستخدم المحفوظ في المتصفح لإرساله مع الطلب
-        const username = localStorage.getItem('username') || ''; 
+        const res = await fetch('/api/whatsapp/status', { credentials: 'include' });
+        if (!res.ok) return;
 
-        const res = await fetch('/api/whatsapp/status', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-username': username
-            },
-            credentials: 'include'
-        });
-
-        // حماية الواجهة من الانهيار إذا كان السيرفر يرجع 401 أو 502
-        if (!res.ok) {
-            if (res.status === 401) {
-                console.warn('جلسة التوثيق غير صالحة أو تحتاج تسجيل دخول');
-            }
-            return;
-        }
-
-        const data = await res.json();
-
-        const btn       = document.getElementById('btn-wa-connect');
+        const data   = await res.json();
+        const qrBox  = document.getElementById('wa-qr-container');
+        const qrImg  = document.getElementById('wa-qr-img');
         const statusMsg = document.getElementById('wa-status-msg');
-        const qrBox     = document.getElementById('wa-qr-container');
-        const qrImg     = document.getElementById('wa-qr-img');
 
         if (data.connected) {
-            if (typeof waCheckInterval !== 'undefined' && waCheckInterval) {
-                clearInterval(waCheckInterval);
-            }
-            if (qrBox) qrBox.style.display = 'none';
-            if (statusMsg) statusMsg.innerHTML = '<span style="color:#25d366">✅ واتساب متصل بنجاح!</span>';
-            if (btn) {
-                btn.textContent = '✅ متصل';
-                btn.style.background = '#25d366';
-            }
-        } else if (data.hasQr) {
-            const qrRes = await fetch('/api/whatsapp/qr-image', {
-                headers: { 'x-username': username },
-                credentials: 'include'
-            });
+            // ✅ متصل
+            setConnectedUI();
 
-            if (qrRes.ok) {
-                const qrData = await qrRes.json();
-                if (qrData && qrData.qr && qrImg && qrBox) {
-                    qrImg.src = qrData.qr;
-                    qrBox.style.display = 'block';
-                    if (statusMsg) statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
-                }
-            }
+        } else if (data.hasQr && data.qrCode) {
+            // 📷 QR جاهز — السيرفر يرجعه مباشرة في status
+            if (qrImg)  qrImg.src = data.qrCode;
+            if (qrBox)  qrBox.style.display = 'block';
+            if (statusMsg) statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
+
+        } else {
+            // لا يزال يتهيأ
+            if (statusMsg) statusMsg.innerHTML = '<span style="color:orange">⏳ جاري تحضير رمز QR...</span>';
         }
+
     } catch (e) {
         console.error('خطأ في فحص حالة الواتساب:', e);
     }
@@ -393,26 +375,15 @@ async function checkWaStatus() {
 document.addEventListener('DOMContentLoaded', async () => {
     loadSchoolName();
 
+    // فحص حالة الواتساب عند تحميل الصفحة
     try {
-        const username = localStorage.getItem('username') || '';
-        const res  = await fetch('/api/whatsapp/status', {
-            headers: { 'x-username': username },
-            credentials: 'include'
-        });
+        const res = await fetch('/api/whatsapp/status', { credentials: 'include' });
         if (res.ok) {
             const data = await res.json();
-            if (data.connected) {
-                document.getElementById('wa-status-msg').innerHTML = '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
-                const btn = document.getElementById('btn-wa-connect');
-                if (btn) {
-                    btn.textContent = '✅ متصل';
-                    btn.style.background = '#25d366';
-                    btn.disabled = true;
-                }
-            }
+            if (data.connected) setConnectedUI();
         }
     } catch (e) {
-        // الاتصال الأولي صامت
+        // صامت — لا بأس
     }
 });
 </script>
