@@ -227,7 +227,7 @@
             }
         }
 
-        async function previewPDF() {
+async function previewPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -262,13 +262,15 @@
         return;
     }
 
-    // ✅ تحميل خط Cairo بصيغة TTF (تعمل مع btoa بشكل صحيح)
+    // ✅ تحميل خط Cairo TTF الحقيقي من GitHub (يدعم Unicode بالكامل)
     try {
-        const fontResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/cairo@5.0.8/files/cairo-arabic-400-normal.woff2');
-        const fontBuffer   = await fontResponse.arrayBuffer();
-        const fontBytes    = new Uint8Array(fontBuffer);
+        const fontResponse = await fetch(
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/Cairo%5Bslnt%2Cwght%5D.ttf'
+        );
+        const fontBuffer = await fontResponse.arrayBuffer();
+        const fontBytes  = new Uint8Array(fontBuffer);
 
-        // تحويل آمن يدعم Unicode
+        // تحويل آمن بدون خطأ unicode
         let binary = '';
         const chunkSize = 8192;
         for (let i = 0; i < fontBytes.length; i += chunkSize) {
@@ -276,11 +278,12 @@
         }
         const fontBase64 = btoa(binary);
 
-        doc.addFileToVFS("Cairo-Regular.ttf", fontBase64);
-        doc.addFont("Cairo-Regular.ttf", "Cairo", "normal");
+        doc.addFileToVFS("Cairo.ttf", fontBase64);
+        doc.addFont("Cairo.ttf", "Cairo", "normal");
         doc.setFont("Cairo", "normal");
+        console.log("✅ تم تحميل خط Cairo بنجاح");
     } catch (e) {
-        console.warn("تعذر تحميل خط Cairo، سيتم استخدام الخط الافتراضي", e);
+        console.warn("تعذر تحميل خط Cairo:", e);
     }
 
     // ✅ إضافة الشعار
