@@ -1,278 +1,80 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <title>الرئيسية</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام توزيع الإشراف اليومي - الرئيسية</title>
     
-    <title>نظام توزيع الإشراف اليومي</title>
     <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-    <!-- Toastify CSS للرسائل التنبيهية الأنيقة -->
+    <!-- FontAwesome للأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Toastify CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
+    
     <style>
-        .navbar-custom {
-            background-color: #2c3e50;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .navbar-custom .navbar-brand, .navbar-custom .nav-link {
-            color: #ffffff !important;
-        }
-        .navbar-custom .nav-link:hover {
-            color: #2bc48a !important;
-        }
-        .main-card {
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-top: 6px solid #0d6efd;
-        }
-        .checkbox-container {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        .teacher-item {
-            padding: 8px 12px;
-            border-radius: 6px;
-            transition: background 0.2s;
-        }
-        .teacher-item:hover {
-            background-color: #e9ecef;
-        }
-        .summary-card {
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-top: 6px solid #2bc48a;
-        }
-        .btn-save {
-            background-image: linear-gradient(to left, #2ecc71, #27ae60);
-            border: none;
-            padding: 12px 40px;
-            font-size: 18px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
-        }
-        .cursor-pointer {
-            cursor: pointer;
-        }
-        .card h5 {
-            font-size: 1.1rem !important; 
-            margin-bottom: 15px !important;
-        }
-        .form-label, label {
-            font-size: 0.85rem !important;
-            font-weight: 600;
-        }
-        .form-select {
-            font-size: 0.85rem !important;
-            padding: 6px 12px !important;
-        }
-        .table th {
-            font-size: 0.9rem !important;
-            padding: 8px !important;
-        }
-        .table td {
-            font-size: 0.85rem !important;
-        }
-        .table td div, .table td span {
-            font-size: 0.85rem !important;
-            padding: 4px 8px !important;
-        }
-        .table tbody td div, .table tbody td {
-            font-size: 12px !important;
-        }
-        .services-cards-container a {
-            transition: transform 0.2s ease-in-out;
-            display: inline-block;
-        }
-        .services-cards-container a:hover {
-            transform: translateY(-5px);
-        }
-        .services-cards-container img {
-            max-width: 280px;
-            width: 100%;
-            height: auto;
-        }
-        .modal-content-custom {
-            border-radius: 16px;
-            overflow: hidden;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-        }
-        .modal-header-custom {
-            background: linear-gradient(135deg, #1e40af, #3b82f6);
-            color: #ffffff;
-            padding: 14px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .modal-header-custom .modal-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            margin: 0;
-        }
-        .drop-zone {
-            display: block;
-            border: 2px dashed #cbd5e1;
-            border-radius: 12px;
-            padding: 24px 16px;
-            text-align: center;
-            background-color: #f8fafc;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            margin-bottom: 12px;
-        }
-        .drop-zone:hover, .drop-zone.dragover {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
-        }
-        .upload-icon {
-            color: #3b82f6;
-            margin-bottom: 8px;
-        }
-        .drop-title {
-            margin: 0 0 4px 0;
-            font-size: 0.9rem;
-            color: #334155;
-            font-weight: 500;
-        }
-        .drop-title span {
-            color: #2563eb;
-            text-decoration: underline;
-            font-weight: 600;
-        }
-        .drop-hint {
-            margin: 0;
-            font-size: 0.78rem;
-            color: #94a3b8;
-        }
-        .file-info-box {
-            margin-bottom: 15px;
-            padding: 10px 14px;
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #166534;
-            font-size: 0.85rem;
-        }
-        .file-name {
-            flex-grow: 1;
-            margin: 0 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-weight: 500;
-        }
-        .remove-file {
-            cursor: pointer;
-            font-size: 1.2rem;
-            color: #dc2626;
-            font-weight: bold;
-            line-height: 1;
-        }
-        .btn-upload-custom {
-            background-color: #10b981;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 10px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-        }
-        .btn-upload-custom:hover {
-            background-color: #059669;
-            color: white;
-        }
-        .btn-upload-custom:active {
-            transform: scale(0.99);
-        }
-
-        /* ===== تنسيق قسم الواتساب ===== */
-        #whatsapp-section {
-            max-width: 400px;
-            margin: 30px auto;
-            padding: 24px;
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-top: 5px solid #25d366;
-            text-align: center;
-            font-family: sans-serif;
-        }
-        #whatsapp-section h5 {
-            color: #1a1a2e;
-            font-size: 1rem;
-            font-weight: 700;
-            margin-bottom: 16px;
-        }
-        #btn-wa-connect {
-            background: linear-gradient(to left, #25d366, #128c7e);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 10px 28px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        #btn-wa-connect:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        #wa-qr-container {
-            display: none;
-            margin-top: 16px;
-        }
-        #wa-qr-container p {
-            font-size: 0.85rem;
-            color: #555;
-            margin-bottom: 10px;
-        }
-        #wa-qr-img {
-            width: 220px;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 8px;
-        }
-        #wa-status-msg {
-            margin-top: 14px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
+        .navbar-custom { background-color: #2c3e50; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .navbar-custom .navbar-brand, .navbar-custom .nav-link { color: #ffffff !important; }
+        .navbar-custom .nav-link:hover { color: #2bc48a !important; }
+        .main-card { background: #ffffff; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #0d6efd; }
+        .checkbox-container { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; max-height: 250px; overflow-y: auto; }
+        .teacher-item { padding: 8px 12px; border-radius: 6px; transition: background 0.2s; }
+        .teacher-item:hover { background-color: #e9ecef; }
+        .summary-card { background: #ffffff; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #2bc48a; }
+        .btn-save { background-image: linear-gradient(to left, #2ecc71, #27ae60); border: none; padding: 12px 40px; font-size: 18px; border-radius: 8px; box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3); }
+        .cursor-pointer { cursor: pointer; }
+        .card h5 { font-size: 1.1rem !important; margin-bottom: 15px !important; }
+        .form-label, label { font-size: 0.85rem !important; font-weight: 600; }
+        .form-select { font-size: 0.85rem !important; padding: 6px 12px !important; }
+        .table th { font-size: 0.9rem !important; padding: 8px !important; }
+        .table td { font-size: 0.85rem !important; }
+        .table td div, .table td span { font-size: 0.85rem !important; padding: 4px 8px !important; }
+        .table tbody td div, .table tbody td { font-size: 12px !important; }
+        .services-cards-container a { transition: transform 0.2s ease-in-out; display: inline-block; }
+        .services-cards-container a:hover { transform: translateY(-5px); }
+        .services-cards-container img { max-width: 280px; width: 100%; height: auto; }
+        .modal-content-custom { border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); }
+        .modal-header-custom { background: linear-gradient(135deg, #1e40af, #3b82f6); color: #ffffff; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .modal-header-custom .modal-title { font-size: 1.05rem; font-weight: 600; margin: 0; }
+        .drop-zone { display: block; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px 16px; text-align: center; background-color: #f8fafc; cursor: pointer; transition: all 0.25s ease; margin-bottom: 12px; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: #3b82f6; background-color: #eff6ff; }
+        .upload-icon { color: #3b82f6; margin-bottom: 8px; }
+        .drop-title { margin: 0 0 4px 0; font-size: 0.9rem; color: #334155; font-weight: 500; }
+        .drop-title span { color: #2563eb; text-decoration: underline; font-weight: 600; }
+        .drop-hint { margin: 0; font-size: 0.78rem; color: #94a3b8; }
+        .file-info-box { margin-bottom: 15px; padding: 10px 14px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; color: #166534; font-size: 0.85rem; }
+        .file-name { flex-grow: 1; margin: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .remove-file { cursor: pointer; font-size: 1.2rem; color: #dc2626; font-weight: bold; line-height: 1; }
+        .btn-upload-custom { background-color: #10b981; color: white; border: none; border-radius: 10px; padding: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.2s ease, transform 0.1s ease; }
+        .btn-upload-custom:hover { background-color: #059669; color: white; }
+        .btn-upload-custom:active { transform: scale(0.99); }
+        
+        #whatsapp-section { max-width: 400px; margin: 30px auto; padding: 24px; background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 5px solid #25d366; text-align: center; font-family: sans-serif; }
+        #whatsapp-section h5 { color: #1a1a2e; font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+        #btn-wa-connect { background: linear-gradient(to left, #25d366, #128c7e); color: white; border: none; border-radius: 10px; padding: 10px 28px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        #btn-wa-connect:disabled { opacity: 0.6; cursor: not-allowed; }
+        #wa-qr-container { display: none; margin-top: 16px; }
+        #wa-qr-container p { font-size: 0.85rem; color: #555; margin-bottom: 10px; }
+        #wa-qr-img { width: 220px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; }
+        #wa-status-msg { margin-top: 14px; font-size: 0.9rem; font-weight: 600; }
     </style>
 </head>
 <body>
- <nav class="navbar">
-    <h2 id="schoolName">المدرسة </h2>
+
+<nav class="navbar">
+    <h2 id="schoolName">المدرسة</h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <!-- 🍔 زر القائمة للجوال -->
     <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
         <i class="fas fa-bars"></i>
     </button>
 
-    <!-- روابط الشريط -->
     <div class="navbar-links" id="navbarLinks">
         <a href="index.html">الرئيسية</a>
         <a href="dashboard.html#">الانتظار</a>
         <a href="/monitoring">الإشراف</a>
-       
+        
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger">التقارير</a>
             <div class="dropdown-menu">
@@ -291,33 +93,23 @@
     </div>
 </nav>
 
-<!-- 🎯 حاوية الخدمات الثلاث بجانب بعضها بالمنتصف -->
 <div class="container my-5 text-center">
     <div class="d-flex justify-content-center align-items-center flex-wrap gap-4 services-cards-container">
-        
-        <!-- 1️⃣ الانتظار -->
         <a href="dashboard.html#">
             <img src="/waiting.png" alt="الانتظار" class="img-fluid rounded shadow-sm">
         </a>
-        
-        <!-- 2️⃣ الإشراف -->
         <a href="/monitoring">
             <img src="/moni.png" alt="الإشراف" class="img-fluid rounded shadow-sm">
         </a>
-        
-        <!-- 3️⃣ الإعدادات -->
         <a href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal" style="color: #ffffff;">
             <img src="/settings.png" alt="الإعدادات" class="img-fluid rounded shadow-sm">
         </a>
-
     </div>
 </div>
 
-<!-- Modal تحديث الملف -->
 <div class="modal fade" id="updateExcelModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content modal-content-custom">
-      
       <div class="modal-header-custom">
         <h6 class="modal-title" id="updateModalLabel">تحديث بيانات المدرسة</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
@@ -325,7 +117,6 @@
 
       <div class="modal-body p-4">
         <form id="updateExcelForm">
-          
           <label for="excelFileInput" class="drop-zone" id="dropZone">
             <div class="drop-zone-content">
               <div class="upload-icon">
@@ -354,12 +145,10 @@
           </button>
         </form>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ===== قسم ربط الواتساب ===== -->
 <div id="whatsapp-section">
     <h5>📱 ربط واتساب المدرسة</h5>
     <button id="btn-wa-connect" onclick="connectWhatsApp()">ربط واتساب المدرسة</button>
@@ -370,12 +159,20 @@
     <div id="wa-status-msg"></div>
 </div>
 
-<!-- مكتبة التنبيهات الخارجية -->
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+// =============================================
+// 📱 قائمة الجوال Navigation Toggle
+// =============================================
+const menuToggle = document.getElementById('menuToggle');
+const navbarLinks = document.getElementById('navbarLinks');
+if (menuToggle && navbarLinks) {
+    menuToggle.addEventListener('click', () => {
+        navbarLinks.classList.toggle('active');
+    });
+}
 
 // =============================================
 // 📁 رفع ملف الإكسل
@@ -455,18 +252,13 @@ document.getElementById('updateExcelForm').addEventListener('submit', async func
         const result = await response.json();
 
         if (response.ok) {
-            Toastify({ 
-                text: "تم تحديث البيانات بنجاح!", 
-                style: { background: "#2bc48a" } 
-            }).showToast();
-            
+            Toastify({ text: "تم تحديث البيانات بنجاح!", style: { background: "#2bc48a" } }).showToast();
             const modalElement = document.getElementById('updateExcelModal');
             const modal = bootstrap.Modal.getInstance(modalElement);
             if (modal) modal.hide();
             
             fileInput.value = '';
             fileInfoBox.style.display = 'none';
-            
             setTimeout(() => { window.location.reload(); }, 1000);
         } else {
             Toastify({ text: result.message || "حدث خطأ أثناء رفع الملف", style: { background: "#e74c3c" } }).showToast();
@@ -496,7 +288,7 @@ async function loadSchoolName() {
 }
 
 // =============================================
-// 📱 واتساب — كل مدرسة برقمها الخاص
+// 📱 واتساب — ربط الجلسة
 // =============================================
 let waCheckInterval = null;
 
@@ -509,7 +301,6 @@ async function connectWhatsApp() {
     statusMsg.innerHTML = '';
 
     try {
-        // بدء تهيئة الواتساب في السيرفر
         const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
         const data = await res.json();
 
@@ -522,7 +313,6 @@ async function connectWhatsApp() {
 
         statusMsg.innerHTML = '<span style="color:orange">⏳ جاري تحضير رمز QR...</span>';
 
-        // بدء فحص الحالة كل 3 ثوانٍ
         if (waCheckInterval) clearInterval(waCheckInterval);
         waCheckInterval = setInterval(checkWaStatus, 3000);
 
@@ -544,7 +334,6 @@ async function checkWaStatus() {
         const qrImg     = document.getElementById('wa-qr-img');
 
         if (data.connected) {
-            // ✅ متصل — أوقف الفحص وأظهر رسالة النجاح
             clearInterval(waCheckInterval);
             waCheckInterval = null;
             qrBox.style.display = 'none';
@@ -553,7 +342,6 @@ async function checkWaStatus() {
             btn.style.background = '#25d366';
 
         } else if (data.hasQr) {
-            // 📷 QR جاهز — اجلبه وأظهره
             const qrRes  = await fetch('/whatsapp/qr-image');
             const qrData = await qrRes.json();
             if (qrData.qr) {
@@ -562,37 +350,29 @@ async function checkWaStatus() {
                 statusMsg.innerHTML = '<span style="color:orange">⏳ في انتظار مسح الرمز...</span>';
             }
         }
-        // إذا لم يكن متصلاً ولا يوجد QR بعد، استمر في الانتظار
-
     } catch (e) {
         console.error('خطأ في فحص حالة الواتساب:', e);
     }
 }
 
-// =============================================
-// 🚀 تشغيل عند تحميل الصفحة
-// =============================================
 document.addEventListener('DOMContentLoaded', async () => {
     loadSchoolName();
 
-    // فحص إذا كان الواتساب متصلاً مسبقاً
     try {
         const res  = await fetch('/api/whatsapp/status');
         const data = await res.json();
 
         if (data.connected) {
-            document.getElementById('wa-status-msg').innerHTML =
-                '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
+            document.getElementById('wa-status-msg').innerHTML = '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
             const btn = document.getElementById('btn-wa-connect');
             btn.textContent = '✅ متصل';
             btn.style.background = '#25d366';
             btn.disabled = true;
         }
     } catch (e) {
-        // لا بأس، سيظهر الزر فارغاً
+        // الاتصال الأولي صامت
     }
 });
-
 </script>
 </body>
 </html>
