@@ -1,10 +1,7 @@
 // =========================================================================
 // 📦 1. استدعاء المكتبات وإعداد التطبيق
 // =========================================================================
-process.env.PUPPETEER_CACHE_DIR = require('path').join(__dirname, '.cache');
-
 const express = require('express');
-const cors = require('cors'); // 👈 تم إضافة مكتبة CORS
 const path = require('path');
 const fs = require('fs');
 const xlsx = require('xlsx');
@@ -13,39 +10,9 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const session = require('express-session');
 const { Pool } = require('pg');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const puppeteer = require('puppeteer');
-const qrcode = require('qrcode');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// 🌐 إعداد CORS للتعامل مع التوثيق المتقاطع
-app.use(cors({
-    origin: true,
-    credentials: true
-}));
-
-// 💬 متغيرات تتبع حالة الواتساب
-let qrCodeData = '';
-let isWhatsappConnected = false;
-let whatsappStatus = 'DISCONNECTED';
-
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--single-process',
-            '--no-zygote',
-            '--disable-gpu',
-            '--disable-accelerated-2d-canvas'
-        ]
-    }
-});
 
 // 🏠 توجيه الزائر عند فتح الرابط الرئيسي إلى صفحة تسجيل الدخول مباشرة
 app.get('/', (req, res) => {
@@ -57,16 +24,14 @@ app.use(express.static(__dirname, { index: false }));
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🎯 إعداد الجلسات (Session) - تم تحديث الكوكيز لتجاوز قيود المتصفح
+// 🎯 إعداد الجلسات (Session)
 app.use(session({
   secret: 'school_management_secret_key_2026',
   resave: false,
   saveUninitialized: false,
   cookie: { 
     maxAge: 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'none', // 👈 لتجاوز منع التتبع بالكوكيز
-    secure: true     // 👈 مطلوب مع sameSite: 'none' على Render (HTTPS)
+    httpOnly: true 
   }
 }));
 
@@ -190,7 +155,7 @@ app.post('/logout', (req, res) => {
 });
 
 // =========================================================================
-// ⚙️ إعدادات أسماء الملف والورقات والدوال المساعدة
+// ⚙️ إعدادات أسماء الملف والورقات
 // =========================================================================
 const EXCEL_FILE = path.join(__dirname, 'waiting_data.xlsx');
 
@@ -201,27 +166,7 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تنظيف وتوحيد النصوص العربية
-function normalizeArabicText(str) {
-  if (!str) return '';
-  return str.toString().trim()
-    .replace(/[أإآا]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/\s+/g, '');
-}
-
-// 📍 دالة تحديد صف البداية الثابت لكل يوم (تطابق صفوف الإكسل المطلوبة بالكامل)
-function getDayStartRow(dayStr) {
-  const norm = normalizeArabicText(dayStr);
-  if (norm.includes('احد')) return 0;       // صف 1 بالإكسل (Index 0)
-  if (norm.includes('ثنين')) return 6;      // صف 7 بالإكسل (Index 6)
-  if (norm.includes('ثلاثاء')) return 12;   // صف 13 بالإكسل (Index 12)
-  if (norm.includes('اربعاء')) return 18;   // صف 19 بالإكسل (Index 18)
-  if (norm.includes('خميس')) return 24;     // صف 25 بالإكسل (Index 24)
-  return -1;
-}
-
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة لجلب أحدث ملف من PostgreSQL دائماً)
 async function getUserExcelPath(req) {
   const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -237,6 +182,7 @@ async function getUserExcelPath(req) {
 
   const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
 
+  // 1️⃣ جلب أحدث بيانات الإكسل دائماً وأولاً من PostgreSQL إن وجدت
   try {
     const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
@@ -248,6 +194,7 @@ async function getUserExcelPath(req) {
     console.error('خطأ في استعادة الملف من DB:', err.message);
   }
 
+  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد من القالب
   if (!fs.existsSync(userFilePath)) {
     const templatePath = path.join(__dirname, 'template.xlsx');
     if (fs.existsSync(templatePath)) {
@@ -279,7 +226,7 @@ function getSheet(workbook, sheetIdentifier) {
 }
 
 // =========================================================================
-// 📊 مسارات جلب وحفظ البيانات الأساسية والداشبورد
+// 📊 مسارات جلب وحفظ البيانات الأساسية
 // =========================================================================
 
 app.get('/monitoring', (req, res) => {
@@ -308,7 +255,6 @@ app.get('/get-classes', async (req, res) => {
   }
 });
 
-// 📌 جلب معلمي الانتظار للداشبورد بناءً على الخريطة الثابتة للصفوف والأعمدة
 app.get('/get-waiting-teachers', async (req, res) => {
   const { day, period } = req.query;
   try {
@@ -317,20 +263,16 @@ app.get('/get-waiting-teachers', async (req, res) => {
     const sheet = getSheet(workbook, WAITING_SHEET);
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    const startRow = getDayStartRow(day);
-    if (startRow === -1) return res.json({ teachers: [] });
+    let dayIndex = data.findIndex(row => row && row[0] === day);
+    if (dayIndex === -1) return res.json({ teachers: [] });
 
-    const colIndex = parseInt(period) - 1; // الحصة 1 -> Index 0 (العمود A)
+    const colIndex = parseInt(period) - 1;
     let resultTeachers = [];
 
-    // قراءة الأسطر الأربعة المخصصة لكل يوم من موقعها المباشر
-    for (let i = 0; i < 4; i++) {
-      let row = data[startRow + 2 + i];
-      if (row && row[colIndex] !== undefined && row[colIndex] !== null) {
-        let teacherName = row[colIndex].toString().trim();
-        if (teacherName !== "") {
-          resultTeachers.push(teacherName);
-        }
+    for (let i = 1; i <= 4; i++) {
+      let row = data[dayIndex + i];
+      if (row && row[colIndex] !== undefined) {
+        resultTeachers.push(row[colIndex]);
       }
     }
     res.json({ teachers: resultTeachers });
@@ -516,6 +458,11 @@ app.get('/get-reportmoni-data', async (req, res) => {
     const rawData = xlsx.utils.sheet_to_json(worksheet);
     let filteredResults = [];
 
+    function normalizeText(str) {
+      if (!str) return '';
+      return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
+    }
+
     const dayTargets = {
       'sun': 'الأحد', 'mon': 'الإثنين', 'tue': 'الثلاثاء', 'wed': 'الأربعاء', 'thu': 'الخميس'
     };
@@ -525,7 +472,7 @@ app.get('/get-reportmoni-data', async (req, res) => {
       const rowTask = row['المهمة'] || row['task'] || '';
       const teacherInDay = targetDayName ? row[targetDayName] : '';
 
-      if (task !== 'all' && normalizeArabicText(rowTask) !== normalizeArabicText(task)) return;
+      if (task !== 'all' && normalizeText(rowTask) !== normalizeText(task)) return;
 
       if (teacherInDay && teacherInDay.toString().trim() !== "") {
         filteredResults.push({
@@ -572,6 +519,7 @@ app.get('/register', (req, res) => {
   res.sendFile(path.join(__dirname, 'register.html'));
 });
 
+// 📌 مسار تسجيل مدرسة جديدة (يدعم استقبال الملف بأي اسم حقل وحفظه بالـ PostgreSQL)
 app.post('/register', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -648,6 +596,7 @@ app.post('/register', upload.any(), async (req, res) => {
   }
 });
 
+// 📌 مسار تحديث واستبدال ملف الإكسل للمدرسة من صفحة الإعدادات
 app.post('/update-school-excel', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -693,116 +642,6 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
     cleanFiles();
     console.error("خطأ أثناء تحديث ملف الإكسل:", error);
     return res.status(500).json({ success: false, message: "فشل في معالجة وتحديث الملف: " + error.message });
-  }
-});
-
-// =========================================================================
-// 🗓️ مسارات إعداد جدول الانتظار (waiting_setting) - مواقع صفوف وأعمدة ثابتة
-// =========================================================================
-
-// 1️⃣ جلب جدول الانتظار الكامل للقراءة والصفحة
-app.get('/get-waiting-schedule-full', async (req, res) => {
-  try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    
-    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
-      return res.json({ success: true, schedule: {} });
-    }
-
-    const sheet = getSheet(workbook, WAITING_SHEET);
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-
-    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-    let fullSchedule = {};
-
-    daysList.forEach(day => {
-      fullSchedule[day] = [
-        ["", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", ""],
-        ["", "", "", "", "", "", ""]
-      ];
-
-      const startRow = getDayStartRow(day);
-
-      if (startRow !== -1) {
-        for (let r = 0; r < 4; r++) {
-          let row = data[startRow + 2 + r];
-          if (row) {
-            for (let c = 0; c < 7; c++) {
-              let val = row[c] !== undefined ? row[c] : "";
-              fullSchedule[day][r][c] = val.toString().trim();
-            }
-          }
-        }
-      }
-    });
-
-    res.json({ success: true, schedule: fullSchedule });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// 2️⃣ حفظ جدول اليوم المحدد مباشرة في الصفوف الثابتة المخصصة له
-app.post('/save-waiting-schedule-day', async (req, res) => {
-  try {
-    const { day, schedule } = req.body;
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-
-    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-    let sheetData = [];
-
-    if (workbook.SheetNames.includes(WAITING_SHEET)) {
-      sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
-    }
-
-    // تجهيز وهيكلة الصفوف المحددة لجميع الأيام (من الصف 1 إلى الصف 30)
-    const periodHeaders = ["الحصة الأولى", "الحصة الثانية", "الحصة الثالثة", "الحصة الرابعة", "الحصة الخامسة", "الحصة السادسة", "الحصة السابعة"];
-    
-    daysList.forEach(d => {
-      const sRow = getDayStartRow(d);
-      if (sRow !== -1) {
-        if (!sheetData[sRow]) sheetData[sRow] = [`جدول الانتظار ليوم ${d}`];
-        if (!sheetData[sRow + 1]) sheetData[sRow + 1] = periodHeaders;
-        for (let i = 0; i < 4; i++) {
-          if (!sheetData[sRow + 2 + i]) sheetData[sRow + 2 + i] = ["", "", "", "", "", "", ""];
-        }
-      }
-    });
-
-    // إدراج وحفظ بيانات اليوم في مكانه الثابت والدقيق
-    const startRow = getDayStartRow(day);
-
-    if (startRow !== -1) {
-      for (let r = 0; r < 4; r++) {
-        let rowIndex = startRow + 2 + r;
-        if (!sheetData[rowIndex]) {
-          sheetData[rowIndex] = [];
-        }
-
-        for (let c = 0; c < 7; c++) {
-          let cellVal = (schedule && schedule[r] && schedule[r][c]) ? schedule[r][c] : "";
-          sheetData[rowIndex][c] = cellVal; // الحفظ يبدأ من العمود A (Index 0)
-        }
-      }
-    }
-
-    const newSheet = xlsx.utils.aoa_to_sheet(sheetData);
-    workbook.Sheets[WAITING_SHEET] = newSheet;
-    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
-      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
-    }
-
-    xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
-
-    res.json({ success: true, message: "تم الحفظ بنجاح" });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -903,7 +742,6 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
   }
 });
 
-// 👈 إكمال المسار المقطوع للـ DELETE
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -914,110 +752,22 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// =========================================================================
-// 💬 5. أحداث ومسارات الواتساب (WhatsApp Web Integration & Endpoints)
-// =========================================================================
-
-client.on('qr', (qr) => {
-  console.log('📱 تم توليد رمز QR للواتساب بنجاح');
-  qrcode.toDataURL(qr, (err, url) => {
-    if (!err) {
-      qrCodeData = url;
-      whatsappStatus = 'QR_READY';
-    }
-  });
-});
-
-client.on('ready', () => {
-  console.log('✅ تم الاتصال بالواتساب بنجاح وهو جاهز للاستخدام!');
-  isWhatsappConnected = true;
-  whatsappStatus = 'CONNECTED';
-  qrCodeData = '';
-});
-
-client.on('authenticated', () => {
-  console.log('🔐 تم توثيق حساب الواتساب بنجاح');
-  whatsappStatus = 'AUTHENTICATED';
-});
-
-client.on('auth_failure', (msg) => {
-  console.error('❌ فشل توثيق الواتساب:', msg);
-  isWhatsappConnected = false;
-  whatsappStatus = 'AUTH_FAILURE';
-});
-
-client.on('disconnected', (reason) => {
-  console.warn('⚠️ انقطع الاتصال بالواتساب:', reason);
-  isWhatsappConnected = false;
-  whatsappStatus = 'DISCONNECTED';
-  qrCodeData = '';
-  client.initialize().catch(err => console.error("فشل إعادة تهيئة الواتساب:", err.message));
-});
-
-// 📌 مسارات الـ API لحل خطأ 404
-app.get('/api/whatsapp/status', (req, res) => {
-  res.json({
-    success: true,
-    connected: isWhatsappConnected,
-    status: whatsappStatus,
-    hasQr: !!qrCodeData,      // ✅ إضافة hasQr الذي تتوقعه الواجهة
-    qrCode: qrCodeData
-  });
-});
-
-// 🖼️ مسار جلب صورة QR بصيغة JSON (كان ناقصاً)
-app.get('/api/whatsapp/qr-image', (req, res) => {
-  if (isWhatsappConnected) return res.json({ connected: true, qr: null });
-  if (qrCodeData)          return res.json({ connected: false, qr: qrCodeData });
-  res.json({ connected: false, qr: null });
-});
-
-app.post('/api/whatsapp/connect', async (req, res) => {
+app.get('/check-db', async (req, res) => {
   try {
-    if (isWhatsappConnected) {
-      return res.json({ success: true, message: 'الواتساب متصل بالفعل!', status: 'CONNECTED' });
-    }
-
-    if (whatsappStatus === 'DISCONNECTED' || whatsappStatus === 'AUTH_FAILURE') {
-      whatsappStatus = 'INITIALIZING';
-      client.initialize().catch(err => {
-        console.error("خطأ تشغيل الواتساب:", err);
-        whatsappStatus = 'ERROR';
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'جاري الاتصال بالواتساب...',
-      status: whatsappStatus,
-      qrCode: qrCodeData
+    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
+    res.json({ 
+      success: true, 
+      schools: result.rows 
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/api/whatsapp/disconnect', async (req, res) => {
-  try {
-    if (client) {
-      await client.destroy();
-      isWhatsappConnected = false;
-      whatsappStatus = 'DISCONNECTED';
-      qrCodeData = '';
-    }
-    res.json({ success: true, message: 'تم قطع الاتصال بالواتساب بنجاح' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // =========================================================================
-// 🚀 6. تشغيل السيرفر والواتساب
+// 🚀 تشغيل السيرفر
 // =========================================================================
-app.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);
-});
 
-client.initialize().catch(err => {
-  console.error("⚠️ تنبيه: تعذر البدء التلقائي للواتساب أثاء التشغيل الأول:", err.message);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
 });

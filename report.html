@@ -6,14 +6,9 @@
     <title>تقرير الانتظار</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- Font Awesome للأيقونات -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     
     <style>
         .teacher-report-card {
@@ -56,104 +51,9 @@
         .report-table tbody tr:nth-child(even) {
             background-color: #f8fafc;
         }
-
-        /* تنسيقات نافذة الواتساب المنبثقة */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            z-index: 99999;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-box {
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 12px;
-            max-width: 650px;
-            width: 90%;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        .wa-teacher-item {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 12px 15px;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .btn-wa-send {
-            background-color: #25D366;
-            color: white !important;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.88rem;
-        }
-        .btn-auto-send {
-            background-color: #0d6efd;
-            color: white !important;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.88rem;
-        }
-        .btn-wa-copy {
-            background-color: #475569;
-            color: white !important;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.88rem;
-        }
-        .btn-wa-send:hover { background-color: #1eb954; }
-        .btn-auto-send:hover { background-color: #0b5ed7; }
-        .btn-wa-copy:hover { background-color: #334155; }
-
-        .phone-badge {
-            font-size: 0.8rem;
-            background: #e2e8f0;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #475569;
-            direction: ltr;
-            display: inline-block;
-        }
-        
-        @media (max-width: 768px) {
-            .navbar-links.active {
-                display: flex;
-                flex-direction: column;
-                position: absolute;
-                top: 100%;
-                right: 0;
-                left: 0;
-                background-color: #2c3e50;
-                padding: 15px;
-            }
-        }
     </style>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </head>
 <body>
 
@@ -161,15 +61,17 @@
         <h2 id="schoolName">المدرسة </h2>
         <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
+        <!-- 🍔 زر القائمة للجوال -->
         <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
             <i class="fas fa-bars"></i>
         </button>
 
+        <!-- روابط الشريط -->
         <div class="navbar-links" id="navbarLinks">
             <a href="index.html">الرئيسية</a>
             <a href="dashboard.html#">الانتظار</a>
             <a href="/monitoring">الإشراف</a>
-            
+           
             <div class="dropdown-container">
                 <a href="#" class="dropdown-trigger">التقارير</a>
                 <div class="dropdown-menu">
@@ -180,7 +82,7 @@
             <div class="dropdown-container">
                 <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
                 <div class="dropdown-menu">
-                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>                   
+                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
                     <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
                 </div>
             </div>
@@ -214,99 +116,44 @@
             </form>
         </div>
 
+        <!-- حاوية النتائج -->
         <div class="card" id="reportResult" style="margin-top: 30px; display: none;">
             
+            <!-- سيتم هنا عرض جدول مستقل لكل معلم غائب تلقائياً -->
             <div id="tablesContainer"></div>
 
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-                <button type="button" onclick="previewPDF()" style="background-color: #e74c3c;">
-                    <i class="fas fa-file-pdf"></i> طباعة التقرير (PDF)
-                </button>
-                <button type="button" onclick="sendWhatsAppMessages()" style="background-color: #25D366; color: white;">
-                    <i class="fab fa-whatsapp"></i> إرسال رسائل واتساب للمعلمين البدلاء
-                </button>
-            </div>
+            <button type="button" onclick="previewPDF()" style="background-color: #e74c3c; margin-top: 15px;">طباعة التقرير </button>
         </div>
 
     </div>
-
-    <!-- نافذة منبثقة لإرسال رسائل الواتساب -->
-    <div id="whatsappModal" class="modal-overlay">
-        <div class="modal-box">
-            <h4 style="margin-top:0; color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                <i class="fab fa-whatsapp text-success"></i> إرسال رسائل التكليف مباشرة لكل معلم
-            </h4>
-            
-            <!-- زر إرسال جماعي تلقائي -->
-            <button type="button" id="btnSendAllAuto" onclick="sendAllAuto()" style="width: 100%; background-color: #0d6efd; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
-                <i class="fas fa-paper-plane"></i> إرسال التكليفات للجميع تلقائياً (في الخلفية)
-            </button>
-
-            <div id="whatsappList"></div>
-            <div style="text-align: left; margin-top: 20px;">
-                <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px; border:none; color:white; border-radius:6px; cursor:pointer;">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 
     <script>
-        let currentFilteredReportData = [];
-        let teachersPhoneMap = {}; 
-
-        function formatPhoneToInternational(phoneStr) {
-            if (!phoneStr) return '';
-            let cleaned = phoneStr.toString().trim();
-            cleaned = cleaned.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-            cleaned = cleaned.replace(/\D/g, ''); 
-
-            if (cleaned.startsWith('00966')) {
-                cleaned = cleaned.substring(2);
-            } else if (cleaned.startsWith('05')) {
-                cleaned = '966' + cleaned.substring(1);
-            } else if (cleaned.startsWith('5') && cleaned.length === 9) {
-                cleaned = '966' + cleaned;
-            }
-            return cleaned;
-        }
-
         async function generateReport() {
             const selectedDay = document.getElementById('reportDay').value;
+            
+            // 1. جلب قيمة التاريخ الهجري من الحقل
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
             let selectedDate = dateInput ? dateInput.value : '';
 
-            if (!selectedDay || !selectedDate) {
-                showNotification("⚠️ يرجى اختيار اليوم والتاريخ أولاً", "error");
-                return;
+            // 2. تحويل الأرقام العربية إلى أرقام إنجليزية لضمان المطابقة
+            if (selectedDate) {
+                selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
             }
 
-            selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+            const displayElement = document.getElementById('selectedDateDisplay') || document.getElementById('reportDateText');
+            if (displayElement) {
+                displayElement.innerText = selectedDate;
+            }
 
             try {
                 const res = await fetch('/get-report-data');
                 const data = await res.json();
                 
-                teachersPhoneMap = {};
-                if (data.teacherList && Array.isArray(data.teacherList)) {
-                    data.teacherList.forEach(t => {
-                        const name = t['اسم المعلم'] || t[0] || t[1];
-                        const phone = t['رقم الجوال'] || t['الجوال'] || t[2];
-                        if (name && phone) {
-                            teachersPhoneMap[name.trim()] = formatPhoneToInternational(phone);
-                        }
-                    });
-                }
-
+                // 3. تصفية البيانات بمطابقة التاريخ واليوم
                 const filteredData = (data.teachers || []).filter(item => {
                     const vals = Object.values(item);
                     return vals[0] === selectedDate && vals[1] === selectedDay;
                 });
-
-                currentFilteredReportData = filteredData;
 
                 if (filteredData.length === 0) { 
                     showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
@@ -317,10 +164,12 @@
                 const container = document.getElementById('tablesContainer');
                 container.innerHTML = "";
 
+                // فهارس الفصول والمعلمين البدلاء من حصة 1 إلى 7
                 const classCols = [3, 5, 7, 9, 11, 13, 15];
                 const subCols   = [4, 6, 8, 10, 12, 14, 16];
                 const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
 
+                // 4. إنشاء جدول مستقل لكل معلم غائب
                 filteredData.forEach(row => { 
                     const vals = Object.values(row);
                     const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---';
@@ -331,11 +180,7 @@
                         const className  = vals[classCols[i]] || '---';
                         const subTeacher = vals[subCols[i]] || '---';
 
-                        const rowPhone = row['الجوال'] || row['رقم الجوال'] || vals[17] || '';
-                        if (subTeacher !== '---' && rowPhone) {
-                            teachersPhoneMap[subTeacher.trim()] = formatPhoneToInternational(rowPhone);
-                        }
-
+                        // إضافة الصف فقط إذا كان هناك فصل أو معلم بديل محدد
                         if (className !== '---' || subTeacher !== '---') {
                             rowsHtml += `
                                 <tr>
@@ -347,6 +192,7 @@
                         }
                     }
 
+                    // في حال عدم وجود حصص محددة إطلاقاً
                     if (!rowsHtml) {
                         rowsHtml = `<tr><td colspan="3">لا توجد حصص مسندة لهذا المعلم</td></tr>`;
                     }
@@ -381,166 +227,6 @@
             }
         }
 
-        function sendWhatsAppMessages() {
-            if (!currentFilteredReportData || currentFilteredReportData.length === 0) {
-                showNotification("🔍 لا توجد بيانات مسجلة لإرسالها", "error");
-                return;
-            }
-
-            const day = document.getElementById('reportDay').value;
-            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-            const date = dateInput ? dateInput.value.trim() : '';
-
-            const classCols = [3, 5, 7, 9, 11, 13, 15];
-            const subCols   = [4, 6, 8, 10, 12, 14, 16];
-            const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
-
-            const substituteMap = {};
-
-            currentFilteredReportData.forEach(row => {
-                const vals = Object.values(row);
-                const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---';
-
-                for (let i = 0; i < 7; i++) {
-                    const subTeacher = vals[subCols[i]];
-                    const className  = vals[classCols[i]] || '---';
-
-                    if (subTeacher && subTeacher.trim() !== '' && subTeacher !== '---') {
-                        const name = subTeacher.trim();
-                        if (!substituteMap[name]) {
-                            substituteMap[name] = [];
-                        }
-                        substituteMap[name].push({
-                            period: periodNames[i],
-                            className: className,
-                            absentTeacher: absentTeacher
-                        });
-                    }
-                }
-            });
-
-            const subNames = Object.keys(substituteMap);
-            if (subNames.length === 0) {
-                showNotification("⚠️ لا يوجد معلمون بدلاء محددون في هذا التقرير", "error");
-                return;
-            }
-
-            const listContainer = document.getElementById('whatsappList');
-            listContainer.innerHTML = '';
-
-            subNames.forEach((subName, idx) => {
-                const tasks = substituteMap[subName];
-                const phone = teachersPhoneMap[subName] || '';
-
-                let msg = `السلام عليكم ورحمة الله وبركاته\n`;
-                msg += `أخي المعلم المكرم: *${subName}*\n`;
-                msg += `نود إحاطتك بتكليفك بحصص الانتظار ليوم *${day}* الموافق *${date}* هـ كالتالي:\n\n`;
-
-                tasks.forEach(t => {
-                    msg += `🔹 *${t.period}* | الفصل: *${t.className}* (بدلاً عن المعلم: ${t.absentTeacher})\n`;
-                });
-
-                msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
-
-                const encodedMsg = encodeURIComponent(msg);
-                const waUrl = phone 
-                    ? `https://wa.me/${phone}?text=${encodedMsg}` 
-                    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
-
-                listContainer.innerHTML += `
-                    <div class="wa-teacher-item">
-                        <div>
-                            <strong>👨‍🏫 ${subName}</strong> 
-                            <span class="text-muted" style="font-size:0.85rem;">(${tasks.length} حصة)</span>
-                            ${phone ? `<br><span class="phone-badge">📱 +${phone}</span>` : `<br><span style="color:#e74c3c; font-size:0.75rem;">لم يتم العثور على الرقم</span>`}
-                        </div>
-                        <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                            <button class="btn-auto-send" onclick="sendSingleAuto('${phone}', '${encodedMsg}', this)">
-                                <i class="fas fa-paper-plane"></i> إرسال تلقائي
-                            </button>
-                            <button class="btn-wa-copy" onclick="copyTextMessage('${encodedMsg}')">
-                                <i class="fas fa-copy"></i> نسخ
-                            </button>
-                            <a href="${waUrl}" target="_blank" class="btn-wa-send">
-                                <i class="fab fa-whatsapp"></i> واتساب Web
-                            </a>
-                        </div>
-                    </div>
-                `;
-            });
-
-            document.getElementById('whatsappModal').style.display = 'flex';
-        }
-
-        // إرسال فردي في الخلفية للسيرفر
-        async function sendSingleAuto(phone, encodedMsg, btnElement) {
-            if (!phone) {
-                showNotification("⚠️ لا يوجد رقم جوال مسجل لهذا المعلم", "error");
-                return;
-            }
-
-            const originalText = btnElement.innerHTML;
-            btnElement.disabled = true;
-            btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...`;
-
-            try {
-                const res = await fetch('/send-whatsapp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        phone: phone, 
-                        message: decodeURIComponent(encodedMsg) 
-                    })
-                });
-
-                const result = await res.json();
-
-                if (res.ok && result.success) {
-                    btnElement.style.backgroundColor = '#16a34a';
-                    btnElement.innerHTML = `<i class="fas fa-check"></i> تم الإرسال`;
-                    showNotification(`✅ تم إرسال الرسالة بنجاح إلى الرقم +${phone}`);
-                } else {
-                    throw new Error(result.error || 'فشل في إرسال الرسالة');
-                }
-            } catch (err) {
-                btnElement.disabled = false;
-                btnElement.innerHTML = originalText;
-                showNotification(`❌ خطأ: ${err.message}`, "error");
-            }
-        }
-
-        // إرسال تلقائي جماعي لجميع المعلمين في القائمة
-        async function sendAllAuto() {
-            const autoButtons = document.querySelectorAll('.btn-auto-send');
-            if (autoButtons.length === 0) return;
-
-            const mainBtn = document.getElementById('btnSendAllAuto');
-            mainBtn.disabled = true;
-            mainBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري إرسال التكليفات للجميع...`;
-
-            for (let btn of autoButtons) {
-                if (!btn.disabled) {
-                    await btn.click();
-                    // تأخير ثانية ونصف بين كل رسالة لحماية السيرفر وتجنب الحظر
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                }
-            }
-
-            mainBtn.disabled = false;
-            mainBtn.innerHTML = `<i class="fas fa-check-circle"></i> اكتمل إرسال جميع التكليفات`;
-        }
-
-        function copyTextMessage(encodedStr) {
-            const text = decodeURIComponent(encodedStr);
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification("📋 تم نسخ نص التكليف بنجاح");
-            });
-        }
-
-        function closeWhatsAppModal() {
-            document.getElementById('whatsappModal').style.display = 'none';
-        }
-
         async function previewPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -558,7 +244,9 @@
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
             let date = dateInput ? dateInput.value.trim() : '';
 
-            if (date) date = date.replace(/\//g, ' - ');
+            if (date) {
+                date = date.replace(/\//g, ' - ');
+            }   
 
             const res = await fetch('/get-report-data');
             const fullResponse = await res.json();
@@ -576,30 +264,25 @@
                 return;
             }
 
-            try {
-                const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
-                const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+            // تحميل خط Noto Sans Arabic
+            const fontData = await fetch('NotoSansArabic-Regular.ttf')
+              .then(res => res.arrayBuffer());
 
-                doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-                doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-                doc.setFont("Noto", "normal");
-            } catch (e) {
-                console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
-            }
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
             
-            try {
-                const img = new Image();
-                img.src = 'logo.png';
-                await img.decode();
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width; canvas.height = img.height;
-                canvas.getContext('2d').drawImage(img, 0, 0);
-                const imgData = canvas.toDataURL('image/png');
-                doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
-            } catch(e) {
-                console.warn("لم يتم العثور على صورة الشعار logo.png");
-            }
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
 
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
             doc.setFontSize(12);
             doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
             doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
@@ -620,10 +303,12 @@
                     currentY = 15;
                 }
 
+                // 1️⃣ طباعة النص
                 doc.setFontSize(10.5);
                 doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
                 doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
 
+                // 2️⃣ تجهيز بيانات جدول الحصص
                 const tableBody = [];
                 for (let i = 0; i < 7; i++) {
                     tableBody.push([
@@ -635,6 +320,7 @@
                     ]);
                 }
 
+                // 3️⃣ رسم جدول الحصص
                 doc.autoTable({
                     startY: currentY + 10,
                     head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
@@ -648,14 +334,18 @@
                 currentY = doc.lastAutoTable.finalY + 12;
             });
 
+            // إضافة التذييل
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
+                doc.setFont("Noto");
                 doc.setFontSize(11);
                 
+                // مدير المدرسة
                 doc.text("مدير المدرسة", 40, 279, { align: 'center' });
                 doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
                 
+                // وكيل المدرسة
                 doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
                 doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
             }
@@ -679,11 +369,18 @@
             }
         }
 
-        $(document).ready(function () {
-            $("#menuToggle").on("click", function () {
-                $("#navbarLinks").toggleClass("active");
-            });
+        document.addEventListener("DOMContentLoaded", () => {
+            loadSchoolName();
+        });
+    </script>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 
+    <script>
+        $(document).ready(function () {
             $("#hijriDate").hijriDatePicker({
                 hijri: true,
                 showSwitcher: false,
@@ -691,8 +388,6 @@
                 hijriFormat: 'iYYYY/iMM/iDD',
                 locale: 'ar-sa'
             });
-
-            loadSchoolName();
         });
 
         function showNotification(message, type = 'success') {
