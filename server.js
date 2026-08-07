@@ -26,6 +26,11 @@ app.use(cors({
     credentials: true
 }));
 
+// 💬 متغيرات تتبع حالة الواتساب
+let qrCodeData = '';
+let isWhatsappConnected = false;
+let whatsappStatus = 'DISCONNECTED';
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -35,7 +40,9 @@ const client = new Client({
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--single-process',
-            '--no-zygote'
+            '--no-zygote',
+            '--disable-gpu',
+            '--disable-accelerated-2d-canvas'
         ]
     }
 });
@@ -896,6 +903,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
   }
 });
 
+// 👈 إكمال المسار المقطوع للـ DELETE
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -906,16 +914,102 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/check-db', async (req, res) => {
+// =========================================================================
+// 💬 5. أحداث ومسارات الواتساب (WhatsApp Web Integration & Endpoints)
+// =========================================================================
+
+client.on('qr', (qr) => {
+  console.log('📱 تم توليد رمز QR للواتساب بنجاح');
+  qrcode.toDataURL(qr, (err, url) => {
+    if (!err) {
+      qrCodeData = url;
+      whatsappStatus = 'QR_READY';
+    }
+  });
+});
+
+client.on('ready', () => {
+  console.log('✅ تم الاتصال بالواتساب بنجاح وهو جاهز للاستخدام!');
+  isWhatsappConnected = true;
+  whatsappStatus = 'CONNECTED';
+  qrCodeData = '';
+});
+
+client.on('authenticated', () => {
+  console.log('🔐 تم توثيق حساب الواتساب بنجاح');
+  whatsappStatus = 'AUTHENTICATED';
+});
+
+client.on('auth_failure', (msg) => {
+  console.error('❌ فشل توثيق الواتساب:', msg);
+  isWhatsappConnected = false;
+  whatsappStatus = 'AUTH_FAILURE';
+});
+
+client.on('disconnected', (reason) => {
+  console.warn('⚠️ انقطع الاتصال بالواتساب:', reason);
+  isWhatsappConnected = false;
+  whatsappStatus = 'DISCONNECTED';
+  qrCodeData = '';
+  client.initialize().catch(err => console.error("فشل إعادة تهيئة الواتساب:", err.message));
+});
+
+// 📌 مسارات الـ API لحل خطأ 404
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json({
+    success: true,
+    connected: isWhatsappConnected,
+    status: whatsappStatus,
+    qrCode: qrCodeData
+  });
+});
+
+app.post('/api/whatsapp/connect', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW()');
-    res.json({ success: true, dbTime: result.rows[0].now });
+    if (isWhatsappConnected) {
+      return res.json({ success: true, message: 'الواتساب متصل بالفعل!', status: 'CONNECTED' });
+    }
+
+    if (whatsappStatus === 'DISCONNECTED' || whatsappStatus === 'AUTH_FAILURE') {
+      whatsappStatus = 'INITIALIZING';
+      client.initialize().catch(err => {
+        console.error("خطأ تشغيل الواتساب:", err);
+        whatsappStatus = 'ERROR';
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'جاري الاتصال بالواتساب...',
+      status: whatsappStatus,
+      qrCode: qrCodeData
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 🚀 تشغيل السيرفر
+app.post('/api/whatsapp/disconnect', async (req, res) => {
+  try {
+    if (client) {
+      await client.destroy();
+      isWhatsappConnected = false;
+      whatsappStatus = 'DISCONNECTED';
+      qrCodeData = '';
+    }
+    res.json({ success: true, message: 'تم قطع الاتصال بالواتساب بنجاح' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =========================================================================
+// 🚀 6. تشغيل السيرفر والواتساب
+// =========================================================================
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);
+});
+
+client.initialize().catch(err => {
+  console.error("⚠️ تنبيه: تعذر البدء التلقائي للواتساب أثاء التشغيل الأول:", err.message);
 });

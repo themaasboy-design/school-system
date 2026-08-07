@@ -295,13 +295,21 @@ let waCheckInterval = null;
 async function connectWhatsApp() {
     const btn = document.getElementById('btn-wa-connect');
     const statusMsg = document.getElementById('wa-status-msg');
+    const username = localStorage.getItem('username') || '';
 
     btn.disabled = true;
     btn.textContent = '⏳ جاري التهيئة...';
     statusMsg.innerHTML = '';
 
     try {
-        const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+        const res = await fetch('/api/whatsapp/connect', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-username': username
+            },
+            credentials: 'include'
+        });
         const data = await res.json();
 
         if (!res.ok) {
@@ -386,15 +394,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadSchoolName();
 
     try {
-        const res  = await fetch('/api/whatsapp/status');
-        const data = await res.json();
-
-        if (data.connected) {
-            document.getElementById('wa-status-msg').innerHTML = '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
-            const btn = document.getElementById('btn-wa-connect');
-            btn.textContent = '✅ متصل';
-            btn.style.background = '#25d366';
-            btn.disabled = true;
+        const username = localStorage.getItem('username') || '';
+        const res  = await fetch('/api/whatsapp/status', {
+            headers: { 'x-username': username },
+            credentials: 'include'
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.connected) {
+                document.getElementById('wa-status-msg').innerHTML = '<span style="color:#25d366">✅ واتساب متصل بالفعل!</span>';
+                const btn = document.getElementById('btn-wa-connect');
+                if (btn) {
+                    btn.textContent = '✅ متصل';
+                    btn.style.background = '#25d366';
+                    btn.disabled = true;
+                }
+            }
         }
     } catch (e) {
         // الاتصال الأولي صامت
