@@ -228,134 +228,169 @@
         }
 
         async function previewPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
 
-            const addBorder = () => {
-                doc.setDrawColor(0, 0, 0);
-                doc.setLineWidth(0.5);
-                doc.rect(5, 5, 200, 287);
-            };
-            addBorder();
-            
-            const dayElement = document.getElementById('reportDay');
-            const day = dayElement ? dayElement.value : '';
+    const addBorder = () => {
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
+    };
+    addBorder();
 
-            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-            let date = dateInput ? dateInput.value.trim() : '';
+    const dayElement = document.getElementById('reportDay');
+    const day = dayElement ? dayElement.value : '';
 
-            if (date) {
-                date = date.replace(/\//g, ' - ');
-            }   
+    const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+    let date = dateInput ? dateInput.value.trim() : '';
 
-            const res = await fetch('/get-report-data');
-            const fullResponse = await res.json();
-            const allData = fullResponse.teachers || [];
-            const mainInfo = fullResponse.mainInfo || {};
+    if (date) date = date.replace(/\//g, ' - ');
 
-            const dateInputVal = dateInput ? dateInput.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) : '';
-            const filteredTeachers = allData.filter(item => {
-                const vals = Object.values(item);
-                return vals[0] === dateInputVal && vals[1] === day;
-            });
+    const res = await fetch('/get-report-data');
+    const fullResponse = await res.json();
+    const allData = fullResponse.teachers || [];
+    const mainInfo = fullResponse.mainInfo || {};
 
-            if (filteredTeachers.length === 0) {
-                showNotification("🔍 لا توجد بيانات لطباعتها", "error");
-                return;
-            }
+    const dateInputVal = dateInput ? dateInput.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) : '';
+    const filteredTeachers = allData.filter(item => {
+        const vals = Object.values(item);
+        return vals[0] === dateInputVal && vals[1] === day;
+    });
 
-            // تحميل خط Noto Sans Arabic
-            const fontData = await fetch('NotoSansArabic-Regular.ttf')
-              .then(res => res.arrayBuffer());
+    if (filteredTeachers.length === 0) {
+        showNotification("🔍 لا توجد بيانات لطباعتها", "error");
+        return;
+    }
 
-            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+    // ✅ تحميل خط Cairo بصيغة TTF (تعمل مع btoa بشكل صحيح)
+    try {
+        const fontResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/cairo@5.0.8/files/cairo-arabic-400-normal.woff2');
+        const fontBuffer   = await fontResponse.arrayBuffer();
+        const fontBytes    = new Uint8Array(fontBuffer);
 
-            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-            doc.setFont("Noto", "normal");
-            
-            const img = new Image();
-            img.src = 'logo.png';
-            await img.decode();
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width; canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            const imgData = canvas.toDataURL('image/png');
-
-            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
-            doc.setFontSize(12);
-            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-            doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-            doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
-            doc.line(15, 35, 195, 35);
-
-            let currentY = 43;
-            const classCols = [3, 5, 7, 9, 11, 13, 15];
-            const subCols = [4, 6, 8, 10, 12, 14, 16];
-
-            filteredTeachers.forEach((teacherData) => {
-                const vals = Object.values(teacherData);
-                const teacherName = vals[2] || '---';
-
-                if (currentY > 220) {
-                    doc.addPage();
-                    addBorder();
-                    currentY = 15;
-                }
-
-                // 1️⃣ طباعة النص
-                doc.setFontSize(10.5);
-                doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
-                doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
-
-                // 2️⃣ تجهيز بيانات جدول الحصص
-                const tableBody = [];
-                for (let i = 0; i < 7; i++) {
-                    tableBody.push([
-                        '', '', 
-                        vals[subCols[i]] || '', 
-                        '', 
-                        vals[classCols[i]] || '', 
-                        (i + 1).toString()
-                    ]);
-                }
-
-                // 3️⃣ رسم جدول الحصص
-                doc.autoTable({
-                    startY: currentY + 10,
-                    head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
-                    body: tableBody,
-                    theme: 'grid',
-                    columnStyles: { 0: {cellWidth: 25}, 1: {cellWidth: 25}, 2: {cellWidth: 60}, 3: {cellWidth: 20}, 4: {cellWidth: 20}, 5: {cellWidth: 20} },
-                    styles: {font: 'Noto', halign: 'center', cellPadding: 2, minCellHeight: 6, fontSize: 9, textColor: 0},
-                    headStyles: {fillColor: [44, 62, 80], textColor: 255, font: 'Noto', fontSize: 9, cellPadding: 1, minCellHeight: 5} 
-                });
-
-                currentY = doc.lastAutoTable.finalY + 12;
-            });
-
-            // إضافة التذييل
-            const pageCount = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFont("Noto");
-                doc.setFontSize(11);
-                
-                // مدير المدرسة
-                doc.text("مدير المدرسة", 40, 279, { align: 'center' });
-                doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
-                
-                // وكيل المدرسة
-                doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
-                doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
-            }
-
-            const safeDay = day ? day.trim() : 'اليوم';
-            const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
-            const fileName = `جدول انتظار ${safeDay} ${safeDate}.pdf`;
-
-            doc.save(fileName);
+        // تحويل آمن يدعم Unicode
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < fontBytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...fontBytes.subarray(i, i + chunkSize));
         }
+        const fontBase64 = btoa(binary);
+
+        doc.addFileToVFS("Cairo-Regular.ttf", fontBase64);
+        doc.addFont("Cairo-Regular.ttf", "Cairo", "normal");
+        doc.setFont("Cairo", "normal");
+    } catch (e) {
+        console.warn("تعذر تحميل خط Cairo، سيتم استخدام الخط الافتراضي", e);
+    }
+
+    // ✅ إضافة الشعار
+    try {
+        const img = new Image();
+        img.src = 'logo.png';
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+    } catch (e) {
+        console.warn("لم يتم العثور على صورة الشعار logo.png");
+    }
+
+    // ✅ رأس الصفحة
+    doc.setFontSize(12);
+    doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+    doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+    doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+    doc.line(15, 35, 195, 35);
+
+    let currentY = 43;
+    const classCols = [3, 5, 7, 9, 11, 13, 15];
+    const subCols   = [4, 6, 8, 10, 12, 14, 16];
+
+    filteredTeachers.forEach((teacherData) => {
+        const vals = Object.values(teacherData);
+        const teacherName = vals[2] || '---';
+
+        if (currentY > 220) {
+            doc.addPage();
+            addBorder();
+            currentY = 15;
+        }
+
+        doc.setFontSize(10.5);
+        doc.text(
+            `إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`,
+            195, currentY, { align: 'right' }
+        );
+        doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
+
+        const tableBody = [];
+        for (let i = 0; i < 7; i++) {
+            tableBody.push([
+                '', '',
+                vals[subCols[i]] || '',
+                '',
+                vals[classCols[i]] || '',
+                (i + 1).toString()
+            ]);
+        }
+
+        doc.autoTable({
+            startY: currentY + 10,
+            head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
+            body: tableBody,
+            theme: 'grid',
+            columnStyles: {
+                0: { cellWidth: 25 },
+                1: { cellWidth: 25 },
+                2: { cellWidth: 60 },
+                3: { cellWidth: 20 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 20 }
+            },
+            styles: {
+                font: 'Cairo',
+                halign: 'center',
+                cellPadding: 2,
+                minCellHeight: 6,
+                fontSize: 9,
+                textColor: 0
+            },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                font: 'Cairo',
+                fontSize: 9,
+                cellPadding: 1,
+                minCellHeight: 5
+            }
+        });
+
+        currentY = doc.lastAutoTable.finalY + 12;
+    });
+
+    // ✅ التوقيعات في أسفل كل صفحة
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(11);
+
+        doc.text("مدير المدرسة", 40, 279, { align: 'center' });
+        doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
+
+        doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
+        doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+    }
+
+    // ✅ حفظ الملف
+    const safeDay  = day  ? day.trim()               : 'اليوم';
+    const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
+    const fileName = `جدول انتظار ${safeDay} ${safeDate}.pdf`;
+
+    doc.save(fileName);
+}
 
         async function loadSchoolName() {
             try {
