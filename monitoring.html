@@ -85,26 +85,38 @@
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark navbar-custom px-4">
-    <h2 id="schoolName" class="h4 mb-0 text-white">لوحة التحكم</h2>
-    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo ms-auto me-3" style="height: 40px;">
+ <nav class="navbar">
+    <h2 id="schoolName">المدرسة </h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <div class="navbar-links d-flex align-items-center gap-3">
-        <a href="index.html" class="text-white text-decoration-none">الرئيسية</a>
-        <a href="dashboard.html" class="text-white text-decoration-none">الانتظار</a>
-        <a href="/monitoring" class="text-white text-decoration-none">الإشراف</a>
-        
-        <div class="dropdown-container position-relative">
-            <a href="#" class="dropdown-trigger text-white text-decoration-none">التقارير</a>
+    <!-- 🍔 زر القائمة للجوال -->
+    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- روابط الشريط -->
+    <div class="navbar-links" id="navbarLinks">
+        <a href="index.html">الرئيسية</a>
+        <a href="dashboard.html#">الانتظار</a>
+        <a href="/monitoring">الإشراف</a>
+       
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger">التقارير</a>
             <div class="dropdown-menu">
-                <a href="report.html" class="dropdown-item">تقرير الغياب</a>
-                <a href="reportmoni.html" class="dropdown-item">تقرير الإشراف</a>
+                <a href="report.html">تقرير الغياب</a>
+                <a href="reportmoni.html">تقرير الإشراف</a>
             </div>
         </div>
-
-        <a href="/login.html" class="logout" onclick="localStorage.clear();">تسجيل الخروج</a>
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+            <div class="dropdown-menu">
+                <a class="nav-link" href="updata_school.html" >  جلب بيانات المدرسة  </a>               
+                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+            </div>
+        </div>
+                <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
-</nav>
+</nav>>
 
 <div class="container-fluid px-lg-5 my-4">
     <div class="text-center mb-4">
