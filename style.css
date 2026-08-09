@@ -459,3 +459,13 @@ button:active { transform: scale(0.98); }
         border-radius: 6px;
     }
 }
+/* إضافة تنعيم للحركة على كل البطاقات */
+.main-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.main-card:hover {
+  transform: scale(1.03); /* تكبير البطاقة بنسبة 3% */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15) !important;
+  cursor: pointer;
+}
