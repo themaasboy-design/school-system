@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>جدول المناوبة اليومية - 15 أسبوعاً</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    .week-card { border-top: 4px solid #112d4e !important; }
+    .duty-select { font-size: 0.82rem; padding: 2px 4px; }
+    .table-sm th, .table-sm td { vertical-align: middle; padding: 0.35rem; font-size: 0.85rem; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+
+  <!-- شريط أدوات التحكم -->
+  <div class="container-fluid py-3 mb-3 bg-white border-bottom shadow-sm no-print">
+    <div class="row align-items-center g-3">
+      <div class="col-md-4">
+        <h4 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة اليومية
+        </h4>
+      </div>
+      <div class="col-md-5">
+        <div class="d-flex align-items-center gap-2">
+          <label for="startDate" class="form-label mb-0 fw-semibold text-nowrap">تاريخ أسبوع (1) الأحد:</label>
+          <input type="date" id="startDate" class="form-control" onchange="generateHijriDates()">
+        </div>
+      </div>
+      <div class="col-md-3 text-start">
+        <button class="btn btn-outline-secondary" onclick="window.print()">
+          <i class="bi bi-printer me-1"></i> طباعة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- شبكة الجداول -->
+  <div class="container-fluid px-4 mb-5">
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3" id="weeksGrid"></div>
+  </div>
+
+  <script>
+    const weekNames = [
+      "الأسبوع الأول", "الأسبوع الثاني", "الأسبوع الثالث", "الأسبوع الرابع",
+      "الأسبوع الخامس", "الأسبوع السادس", "الأسبوع السابع", "الأسبوع الثامن",
+      "الأسبوع التاسع", "الأسبوع العاشر", "الأسبوع الحادي عشر", "الأسبوع الثاني عشر",
+      "الأسبوع الثالث عشر", "الأسبوع الرابع عشر", "الأسبوع الخامس عشر"
+    ];
+    const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+    let teachersList = [];
+
+    // 1. جلب قائمة المعلمين عند فتح الصفحة
+    async function fetchTeachers() {
+      try {
+        const res = await fetch('/api/teachers');
+        teachersList = await res.json();
+        initGrid();
+      } catch (err) {
+        console.error("فشل جلب المعلمين", err);
+        initGrid();
+      }
+    }
+
+    // 2. بناء شبكة الأسابيع الـ 15
+    function initGrid() {
+      const grid = document.getElementById("weeksGrid");
+      grid.innerHTML = "";
+
+      let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
+      teachersList.forEach(name => {
+        optionsHtml += `<option value="${name}">${name}</option>`;
+      });
+
+      weekNames.forEach((weekTitle, weekIndex) => {
+        let tableRows = "";
+        days.forEach((day, dayIndex) => {
+          tableRows += `
+            <tr>
+              <td class="fw-bold bg-light" style="width: 25%;">${day}</td>
+              <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 30%;">--/--</td>
+              <td style="width: 45%;">
+                <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
+                  ${optionsHtml}
+                </select>
+              </td>
+            </tr>
+          `;
+        });
+
+        const cardHtml = `
+          <div class="col">
+            <div class="card week-card shadow-sm h-100 d-flex flex-column">
+              <div class="card-header bg-white py-2 border-bottom">
+                <h6 class="fw-bold mb-0 text-center" style="color: #112d4e;">${weekTitle}</h6>
+              </div>
+              <div class="card-body p-2 flex-grow-1">
+                <table class="table table-bordered table-sm text-center mb-0">
+                  <thead>
+                    <tr class="table-light">
+                      <th>اليوم</th>
+                      <th>التاريخ</th>
+                      <th>المناوب</th>
+                    </tr>
+                  </thead>
+                  <tbody>${tableRows}</tbody>
+                </table>
+              </div>
+              <!-- أزرار الحفظ والمسح الخاصة بكل أسبوع -->
+              <div class="card-footer bg-white border-top p-2 d-flex gap-2 no-print">
+                <button class="btn btn-sm btn-success flex-fill" onclick="saveWeekData(${weekIndex})">
+                  <i class="bi bi-check-circle me-1"></i> حفظ
+                </button>
+                <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearWeekData(${weekIndex})">
+                  <i class="bi bi-x-circle me-1"></i> مسح
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        grid.innerHTML += cardHtml;
+      });
+
+      // ضبط التاريخ الافتراضي وتأكيده
+      const today = new Date();
+      const sunday = new Date(today.setDate(today.getDate() - today.getDay()));
+      document.getElementById("startDate").valueAsDate = sunday;
+      generateHijriDates();
+    }
+
+    // 3. توليد التواريخ الهجرية
+    function generateHijriDates() {
+      const inputVal = document.getElementById("startDate").value;
+      if (!inputVal) return;
+
+      let startDate = new Date(inputVal);
+      const dayOfWeek = startDate.getDay();
+      if (dayOfWeek !== 0) startDate.setDate(startDate.getDate() - dayOfWeek);
+
+      const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-uma', {
+        day: 'numeric', month: 'numeric'
+      });
+
+      for (let w = 0; w < 15; w++) {
+        for (let d = 0; d < 5; d++) {
+          let curr = new Date(startDate);
+          curr.setDate(startDate.getDate() + (w * 7) + d);
+          const cell = document.getElementById(`date-${w}-${d}`);
+          if (cell) cell.innerText = hijriFormatter.format(curr);
+        }
+      }
+    }
+
+    // 4. حفظ بيانات أسبوع محدد في الإكسل
+    async function saveWeekData(weekIndex) {
+      const weekTitle = weekNames[weekIndex];
+      const weekData = [];
+
+      for (let d = 0; d < 5; d++) {
+        const day = days[d];
+        const date = document.getElementById(`date-${weekIndex}-${d}`).innerText;
+        const teacher = document.getElementById(`select-${weekIndex}-${d}`).value;
+
+        weekData.push({ day, date, teacher });
+      }
+
+      try {
+        const res = await fetch('/api/save-rotation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ weekTitle, weekData })
+        });
+        const result = await res.json();
+        
+        if (res.ok) {
+          alert(result.message);
+        } else {
+          alert('خطأ: ' + result.error);
+        }
+      } catch (err) {
+        alert('تعذر الاتصال بالسيرفر للحفظ');
+      }
+    }
+
+    // 5. مسح خيارات أسبوع محدد
+    function clearWeekData(weekIndex) {
+      if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
+        for (let d = 0; d < 5; d++) {
+          document.getElementById(`select-${weekIndex}-${d}`).value = "";
+        }
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", fetchTeachers);
+  </script>
+</body>
+</html>
