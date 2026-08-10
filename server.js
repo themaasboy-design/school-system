@@ -764,6 +764,17 @@ app.get('/check-db', async (req, res) => {
   }
 });
 
+
+// مسار تنزيل ملف الإكسل waiting_data.xlsx من المجلد الرئيسي
+app.get('/download-template', (req, res) => {
+    const filePath = path.join(__dirname, 'waiting_data.xlsx');
+    res.download(filePath, 'waiting_data.xlsx', (err) => {
+        if (err) {
+            console.error('خطأ في تحميل الملف:', err);
+            res.status(404).send('تعذر العثور على ملف النموذج');
+        }
+    });
+});
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
