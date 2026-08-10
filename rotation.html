@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <title>الرئيسية</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام توزيع الإشراف اليومي - جدول المناوبة</title>
     
-    <title>نظام توزيع الإشراف اليومي</title>
     <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-    <!-- Toastify CSS للرسائل التنبيهية الأنيقة -->
+    <!-- Toastify CSS للرسائل التنبيهية -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
+    
     <style>
         .navbar-custom {
             background-color: #2c3e50;
@@ -22,202 +22,56 @@
         .navbar-custom .nav-link:hover {
             color: #2bc48a !important;
         }
-        .main-card {
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-top: 6px solid #0d6efd;
-        }
-        .checkbox-container {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        .teacher-item {
-            padding: 8px 12px;
-            border-radius: 6px;
-            transition: background 0.2s;
-        }
-        .teacher-item:hover {
-            background-color: #e9ecef;
-        }
-        .summary-card {
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-top: 6px solid #2bc48a;
-        }
-        .btn-save {
-            background-image: linear-gradient(to left, #2ecc71, #27ae60);
-            border: none;
-            padding: 12px 40px;
-            font-size: 18px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
-        }
-        .cursor-pointer {
-            cursor: pointer;
-        }
         .card h5 {
             font-size: 1.1rem !important; 
             margin-bottom: 15px !important;
         }
-
-        /* 2. تصغير نصوص التعليمات */
         .form-label, label {
             font-size: 0.85rem !important;
             font-weight: 600;
         }
-
-        /* 3. تصغير الخط داخل القوائم المنسدلة */
         .form-select {
             font-size: 0.85rem !important;
             padding: 6px 12px !important;
         }
-
-        /* 4. تصغير عناوين الجدول */
         .table th {
             font-size: 0.9rem !important;
             padding: 8px !important;
         }
-
-        /* 5. تصغير أسماء المعلمين والنصوص داخل خلايا الجدول */
         .table td {
             font-size: 0.85rem !important;
         }
 
-        /* 6. كتل الجدول */
-        .table td div, .table td span {
-            font-size: 0.85rem !important;
-            padding: 4px 8px !important;
-        }
-        .table tbody td div, .table tbody td {
-            font-size: 12px !important;
-        }
-
-        /* 🎯 تنسيق جديد لحاوية الصور لضمان التأثير والمظهر المتناسق */
-        .services-cards-container a {
-            transition: transform 0.2s ease-in-out;
-            display: inline-block;
-        }
-        .services-cards-container a:hover {
-            transform: translateY(-5px); /* تأثير ارتفاع بسيط عند مرور الماوس */
-        }
-        .services-cards-container img {
-            max-width: 280px; /* يمكنك تكبير أو تصغير العرض حسب رغبتك */
-            width: 100%;
-            height: auto;
-        }
-
-        /* 🎨 التنسيق الجديد الحديث لنافذة تحديث بيانات المدرسة */
-        .modal-content-custom {
-            border-radius: 16px;
-            overflow: hidden;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-        }
-        .modal-header-custom {
-            background: linear-gradient(135deg, #1e40af, #3b82f6);
-            color: #ffffff;
-            padding: 14px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .modal-header-custom .modal-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            margin: 0;
-        }
-        .drop-zone {
-            display: block;
-            border: 2px dashed #cbd5e1;
-            border-radius: 12px;
-            padding: 24px 16px;
-            text-align: center;
-            background-color: #f8fafc;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            margin-bottom: 12px;
-        }
-        .drop-zone:hover, .drop-zone.dragover {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
-        }
-        .upload-icon {
-            color: #3b82f6;
-            margin-bottom: 8px;
-        }
-        .drop-title {
-            margin: 0 0 4px 0;
-            font-size: 0.9rem;
-            color: #334155;
-            font-weight: 500;
-        }
-        .drop-title span {
-            color: #2563eb;
-            text-decoration: underline;
-            font-weight: 600;
-        }
-        .drop-hint {
-            margin: 0;
-            font-size: 0.78rem;
-            color: #94a3b8;
-        }
-        .file-info-box {
-            margin-bottom: 15px;
-            padding: 10px 14px;
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #166534;
-            font-size: 0.85rem;
-        }
-        .file-name {
-            flex-grow: 1;
-            margin: 0 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-weight: 500;
-        }
-        .remove-file {
-            cursor: pointer;
-            font-size: 1.2rem;
-            color: #dc2626;
-            font-weight: bold;
-            line-height: 1;
-        }
-        .btn-upload-custom {
-            background-color: #10b981;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 10px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-        }
-        .btn-upload-custom:hover {
-            background-color: #059669;
-            color: white;
-        }
-        .btn-upload-custom:active {
-            transform: scale(0.99);
+        /* 🖨️ تنسيقات الطباعة المخصصة */
+        @media print {
+            .no-print, nav, .navbar, .btn, .dropdown-container {
+                display: none !important;
+            }
+            body {
+                background: #fff !important;
+                padding: 0 !important;
+            }
+            .container-fluid {
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            .card {
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+            .duty-select {
+                border: none !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                background: transparent !important;
+                font-weight: bold;
+            }
         }
     </style>
 </head>
 <body>
+
 <nav class="navbar">
     <h2 id="schoolName">لوحة التحكم</h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
@@ -235,67 +89,70 @@
             </div>
         </div>
 
-         <div class="dropdown-container">
-                <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
-                <div class="dropdown-menu">
-                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
-                    <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
-                </div>
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+            <div class="dropdown-menu">
+                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>              
+                <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
             </div>
-                    <a href="/login.html" class="logout">تسجيل الخروج</a>
+        </div>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
 </nav>
 
-
 <!-- شريط الأدوات -->
-  <div class="container-fluid py-3 mb-3 bg-white border-bottom shadow-sm no-print">
+<div class="container-fluid py-3 mb-3 bg-white border-bottom shadow-sm no-print">
     <div class="row align-items-center g-3">
-      <div class="col-md-3">
-        <h4 class="fw-bold mb-0 text-dark">
-          <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة
-        </h4>
-      </div>
-      
-      <!-- اختيار بداية الأسبوع بالتقويم الهجري -->
-      <div class="col-md-7">
-        <div class="d-flex align-items-center gap-2">
-          <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
-          
-          <select id="hijriDay" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
-          
-          <select id="hijriMonth" class="form-select form-select-sm w-auto" onchange="generateFromHijri()">
-            <option value="1">محرم</option>
-            <option value="2">صفر</option>
-            <option value="3">ربيع الأول</option>
-            <option value="4">ربيع الآخر</option>
-            <option value="5">جمادى الأولى</option>
-            <option value="6">جمادى الآخرة</option>
-            <option value="7">رجب</option>
-            <option value="8">شعبان</option>
-            <option value="9">رمضان</option>
-            <option value="10">شوال</option>
-            <option value="11">ذو القعدة</option>
-            <option value="12">ذو الحجة</option>
-          </select>
-          
-          <select id="hijriYear" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
+        <div class="col-md-3">
+            <h4 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة
+            </h4>
         </div>
-      </div>
+      
+        <!-- اختيار بداية الأسبوع بالتقويم الهجري -->
+        <div class="col-md-7">
+            <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
+                
+                <select id="hijriDay" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
+                
+                <select id="hijriMonth" class="form-select form-select-sm w-auto" onchange="generateFromHijri()">
+                    <option value="1">محرم</option>
+                    <option value="2">صفر</option>
+                    <option value="3">ربيع الأول</option>
+                    <option value="4">ربيع الآخر</option>
+                    <option value="5">جمادى الأولى</option>
+                    <option value="6">جمادى الآخرة</option>
+                    <option value="7">رجب</option>
+                    <option value="8">شعبان</option>
+                    <option value="9">رمضان</option>
+                    <option value="10">شوال</option>
+                    <option value="11">ذو القعدة</option>
+                    <option value="12">ذو الحجة</option>
+                </select>
+                
+                <select id="hijriYear" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
+            </div>
+        </div>
 
-      <div class="col-md-2 text-start">
-        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-          <i class="bi bi-printer me-1"></i> طباعة
-        </button>
-      </div>
+        <div class="col-md-2 text-start">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> طباعة
+            </button>
+        </div>
     </div>
-  </div>
+</div>
 
-  <!-- شبكة الجداول (3 جداول بالسطر للشاشات الكبيرة) -->
-  <div class="container-fluid px-4 mb-5">
+<!-- شبكة الجداول -->
+<div class="container-fluid px-4 mb-5">
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="weeksGrid"></div>
-  </div>
+</div>
 
-  <script>
+<!-- المكتبات -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
     const weekNames = [
       "الأسبوع الأول", "الأسبوع الثاني", "الأسبوع الثالث", "الأسبوع الرابع",
       "الأسبوع الخامس", "الأسبوع السادس", "الأسبوع السابع", "الأسبوع الثامن",
@@ -305,230 +162,250 @@
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
     let teachersList = [];
 
-    // 1. بداية التشغيل
-    async function initPage() {
-      initGrid();
-      populateHijriSelects();
-      generateFromHijri();
-
-      try {
-        const res = await fetch('/api/teachers');
-        teachersList = await res.json();
-        updateTeachersDropdowns();
-        await loadSavedRotation();
-      } catch (err) {
-        console.error("فشل جلب قائمة المعلمين أو البيانات المحفوظة", err);
-      }
+    // دالة عرض التنبيهات باستخدام Toastify
+    function showToast(message, isError = false) {
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "left",
+            style: {
+                background: isError ? "#dc3545" : "#198754",
+                borderRadius: "8px",
+                fontSize: "14px"
+            }
+        }).showToast();
     }
 
-    // 2. بناء الهيكل الشبكي للجداول بتوزيع مساحات أوسع
+    // 1. بداية التشغيل
+    async function initPage() {
+        initGrid();
+        populateHijriSelects();
+        generateFromHijri();
+        await loadSchoolName();
+
+        try {
+            const res = await fetch('/api/teachers');
+            teachersList = await res.json();
+            updateTeachersDropdowns();
+            await loadSavedRotation();
+        } catch (err) {
+            console.error("فشل جلب قائمة المعلمين أو البيانات المحفوظة", err);
+            showToast("تعذر تحميل قائمة المعلمين من السيرفر", true);
+        }
+    }
+
+    // 2. بناء الهيكل الشبكي للجداول
     function initGrid() {
-      const grid = document.getElementById("weeksGrid");
-      grid.innerHTML = "";
+        const grid = document.getElementById("weeksGrid");
+        grid.innerHTML = "";
 
-      weekNames.forEach((weekTitle, weekIndex) => {
-        let tableRows = "";
-        days.forEach((day, dayIndex) => {
-          tableRows += `
-            <tr>
-              <td class="fw-bold bg-light" style="width: 18%;">${day}</td>
-              <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 44%;">--/--/----</td>
-              <td style="width: 38%;">
-                <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
-                  <option value="">-- اختر المناوب --</option>
-                </select>
-              </td>
-            </tr>
-          `;
-        });
+        weekNames.forEach((weekTitle, weekIndex) => {
+            let tableRows = "";
+            days.forEach((day, dayIndex) => {
+                tableRows += `
+                <tr>
+                    <td class="fw-bold bg-light" style="width: 20%;">${day}</td>
+                    <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 42%;">--/--/----</td>
+                    <td style="width: 38%;">
+                        <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
+                            <option value="">-- اختر المناوب --</option>
+                        </select>
+                    </td>
+                </tr>
+                `;
+            });
 
-        grid.innerHTML += `
-          <div class="col">
-            <div class="card week-card shadow-sm h-100 d-flex flex-column">
-              <div class="card-header bg-white py-2 border-bottom">
-                <h6 class="fw-bold mb-0 text-center" style="color: #112d4e;">${weekTitle}</h6>
-              </div>
-              <div class="card-body p-2 flex-grow-1">
-                <table class="table table-bordered table-sm text-center mb-0">
-                  <thead>
-                    <tr class="table-light">
-                      <th>اليوم</th>
-                      <th>التاريخ الهجري</th>
-                      <th>المناوب</th>
-                    </tr>
-                  </thead>
-                  <tbody>${tableRows}</tbody>
-                </table>
-              </div>
-              <div class="card-footer bg-white border-top p-2 d-flex gap-2 no-print">
-                <button class="btn btn-sm btn-success flex-fill" onclick="saveWeekData(${weekIndex})">
-                  <i class="bi bi-check-circle me-1"></i> حفظ
-                </button>
-                <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearWeekData(${weekIndex})">
-                  <i class="bi bi-x-circle me-1"></i> مسح
-                </button>
-              </div>
+            grid.innerHTML += `
+            <div class="col">
+                <div class="card week-card shadow-sm h-100 d-flex flex-column">
+                    <div class="card-header bg-white py-2 border-bottom">
+                        <h6 class="fw-bold mb-0 text-center" style="color: #112d4e;">${weekTitle}</h6>
+                    </div>
+                    <div class="card-body p-2 flex-grow-1">
+                        <table class="table table-bordered table-sm text-center mb-0">
+                            <thead>
+                                <tr class="table-light">
+                                    <th>اليوم</th>
+                                    <th>التاريخ الهجري</th>
+                                    <th>المناوب</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white border-top p-2 d-flex gap-2 no-print">
+                        <button class="btn btn-sm btn-success flex-fill" onclick="saveWeekData(${weekIndex})">
+                            <i class="bi bi-check-circle me-1"></i> حفظ
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearWeekData(${weekIndex})">
+                            <i class="bi bi-x-circle me-1"></i> مسح
+                        </button>
+                    </div>
+                </div>
             </div>
-          </div>
-        `;
-      });
+            `;
+        });
     }
 
     // 3. تعبئة القوائم المنسدلة للتاريخ الهجري
     function populateHijriSelects() {
-      const daySelect = document.getElementById("hijriDay");
-      const yearSelect = document.getElementById("hijriYear");
+        const daySelect = document.getElementById("hijriDay");
+        const yearSelect = document.getElementById("hijriYear");
 
-      daySelect.innerHTML = "";
-      for (let i = 1; i <= 30; i++) {
-        daySelect.innerHTML += `<option value="${i}">${i}</option>`;
-      }
+        daySelect.innerHTML = "";
+        for (let i = 1; i <= 30; i++) {
+            daySelect.innerHTML += `<option value="${i}">${i}</option>`;
+        }
 
-      yearSelect.innerHTML = "";
-      for (let i = 1445; i <= 1455; i++) {
-        yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
-      }
+        yearSelect.innerHTML = "";
+        for (let i = 1445; i <= 1455; i++) {
+            yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        }
 
-      const today = new Date();
-      const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-uma', {
-        day: 'numeric', month: 'numeric', year: 'numeric'
-      });
-      const parts = formatter.formatToParts(today);
+        const today = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
+            day: 'numeric', month: 'numeric', year: 'numeric'
+        });
+        const parts = formatter.formatToParts(today);
 
-      const hDay = parseInt(parts.find(p => p.type === 'day').value);
-      const hMonth = parseInt(parts.find(p => p.type === 'month').value);
-      const hYear = parseInt(parts.find(p => p.type === 'year').value);
+        const hDay = parseInt(parts.find(p => p.type === 'day').value);
+        const hMonth = parseInt(parts.find(p => p.type === 'month').value);
+        const hYear = parseInt(parts.find(p => p.type === 'year').value);
 
-      daySelect.value = hDay;
-      document.getElementById("hijriMonth").value = hMonth;
-      yearSelect.value = hYear;
+        daySelect.value = hDay;
+        document.getElementById("hijriMonth").value = hMonth;
+        yearSelect.value = hYear;
     }
 
     // 4. تحويل التاريخ الهجري إلى ميلادي لحساب الأسابيع
     function hijriToGregorianDate(hYear, hMonth, hDay) {
-      let approxGYear = Math.floor(hYear * 0.970224 + 621.577);
-      const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-uma', {
-        day: 'numeric', month: 'numeric', year: 'numeric'
-      });
+        let approxGYear = Math.floor(hYear * 0.970224 + 621.577);
+        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
+            day: 'numeric', month: 'numeric', year: 'numeric'
+        });
 
-      for (let offset = -60; offset <= 60; offset++) {
-        let testDate = new Date(approxGYear, 0, 1 + offset);
-        let parts = formatter.formatToParts(testDate);
-        let iy = parseInt(parts.find(p => p.type === 'year').value);
-        let im = parseInt(parts.find(p => p.type === 'month').value);
-        let id = parseInt(parts.find(p => p.type === 'day').value);
+        for (let offset = -60; offset <= 60; offset++) {
+            let testDate = new Date(approxGYear, 0, 1 + offset);
+            let parts = formatter.formatToParts(testDate);
+            let iy = parseInt(parts.find(p => p.type === 'year').value);
+            let im = parseInt(parts.find(p => p.type === 'month').value);
+            let id = parseInt(parts.find(p => p.type === 'day').value);
 
-        if (iy === hYear && im === hMonth && id === hDay) {
-          return testDate;
+            if (iy === hYear && im === hMonth && id === hDay) {
+                return testDate;
+            }
         }
-      }
-      return new Date();
+        return new Date();
     }
 
     // 5. حساب وتوليد تواريخ الـ 15 أسبوعاً بالتقويم الهجري
     function generateFromHijri() {
-      const hDay = parseInt(document.getElementById("hijriDay").value);
-      const hMonth = parseInt(document.getElementById("hijriMonth").value);
-      const hYear = parseInt(document.getElementById("hijriYear").value);
+        const hDay = parseInt(document.getElementById("hijriDay").value);
+        const hMonth = parseInt(document.getElementById("hijriMonth").value);
+        const hYear = parseInt(document.getElementById("hijriYear").value);
 
-      let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
+        let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
 
-      const dayOfWeek = startDate.getDay();
-      if (dayOfWeek !== 0) {
-        startDate.setDate(startDate.getDate() - dayOfWeek);
-      }
-
-      const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-uma', {
-        day: 'numeric', month: 'numeric', year: 'numeric'
-      });
-
-      for (let w = 0; w < 15; w++) {
-        for (let d = 0; d < 5; d++) {
-          let curr = new Date(startDate);
-          curr.setDate(startDate.getDate() + (w * 7) + d);
-          
-          const cell = document.getElementById(`date-${w}-${d}`);
-          if (cell) cell.innerText = hijriFormatter.format(curr);
+        const dayOfWeek = startDate.getDay();
+        if (dayOfWeek !== 0) {
+            startDate.setDate(startDate.getDate() - dayOfWeek);
         }
-      }
+
+        const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+            day: 'numeric', month: 'numeric', year: 'numeric'
+        });
+
+        for (let w = 0; w < 15; w++) {
+            for (let d = 0; d < 5; d++) {
+                let curr = new Date(startDate);
+                curr.setDate(startDate.getDate() + (w * 7) + d);
+                
+                const cell = document.getElementById(`date-${w}-${d}`);
+                if (cell) cell.innerText = hijriFormatter.format(curr);
+            }
+        }
     }
 
     // 6. تعبئة قائمة المعلمين في القوائم المنسدلة
     function updateTeachersDropdowns() {
-      if (!teachersList || teachersList.length === 0) return;
+        if (!teachersList || teachersList.length === 0) return;
 
-      let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
-      teachersList.forEach(name => {
-        optionsHtml += `<option value="${name}">${name}</option>`;
-      });
+        let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
+        teachersList.forEach(name => {
+            optionsHtml += `<option value="${name}">${name}</option>`;
+        });
 
-      for (let w = 0; w < 15; w++) {
-        for (let d = 0; d < 5; d++) {
-          const selectEl = document.getElementById(`select-${w}-${d}`);
-          if (selectEl) selectEl.innerHTML = optionsHtml;
+        for (let w = 0; w < 15; w++) {
+            for (let d = 0; d < 5; d++) {
+                const selectEl = document.getElementById(`select-${w}-${d}`);
+                if (selectEl) selectEl.innerHTML = optionsHtml;
+            }
         }
-      }
     }
 
     // 7. استرجاع البيانات المحفوظة
     async function loadSavedRotation() {
-      try {
-        const res = await fetch('/api/get-rotation');
-        const savedData = await res.json();
+        try {
+            const res = await fetch('/api/get-rotation');
+            const savedData = await res.json();
 
-        savedData.forEach(item => {
-          const weekIndex = weekNames.indexOf(item['الأسبوع']);
-          const dayIndex = days.indexOf(item['اليوم']);
+            savedData.forEach(item => {
+                const weekIndex = weekNames.indexOf(item['الأسبوع']);
+                const dayIndex = days.indexOf(item['اليوم']);
 
-          if (weekIndex !== -1 && dayIndex !== -1) {
-            const selectEl = document.getElementById(`select-${weekIndex}-${dayIndex}`);
-            if (selectEl && item['المناوب']) {
-              selectEl.value = item['المناوب'];
-            }
-          }
-        });
-      } catch (err) {
-        console.error("تعذر جلب البيانات المحفوظة", err);
-      }
+                if (weekIndex !== -1 && dayIndex !== -1) {
+                    const selectEl = document.getElementById(`select-${weekIndex}-${dayIndex}`);
+                    if (selectEl && item['المناوب']) {
+                        selectEl.value = item['المناوب'];
+                    }
+                }
+            });
+        } catch (err) {
+            console.error("تعذر جلب البيانات المحفوظة", err);
+        }
     }
 
     // 8. حفظ بيانات الأسبوع
     async function saveWeekData(weekIndex) {
-      const weekTitle = weekNames[weekIndex];
-      const weekData = [];
+        const weekTitle = weekNames[weekIndex];
+        const weekData = [];
 
-      for (let d = 0; d < 5; d++) {
-        const day = days[d];
-        const date = document.getElementById(`date-${weekIndex}-${d}`).innerText;
-        const teacher = document.getElementById(`select-${weekIndex}-${d}`).value;
-        weekData.push({ day, date, teacher });
-      }
+        for (let d = 0; d < 5; d++) {
+            const day = days[d];
+            const date = document.getElementById(`date-${weekIndex}-${d}`).innerText;
+            const teacher = document.getElementById(`select-${weekIndex}-${d}`).value;
+            weekData.push({ day, date, teacher });
+        }
 
-      try {
-        const res = await fetch('/api/save-rotation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ weekTitle, weekData })
-        });
-        const result = await res.json();
-        if (res.ok) alert(result.message);
-        else alert('خطأ: ' + result.error);
-      } catch (err) {
-        alert('تعذر الاتصال بالسيرفر للحفظ');
-      }
+        try {
+            const res = await fetch('/api/save-rotation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ weekTitle, weekData })
+            });
+            const result = await res.json();
+            if (res.ok) {
+                showToast(result.message || "تم حفظ بيانات الأسبوع بنجاح");
+            } else {
+                showToast('خطأ: ' + (result.error || "تعذر الحفظ"), true);
+            }
+        } catch (err) {
+            showToast('تعذر الاتصال بالسيرفر للحفظ', true);
+        }
     }
 
     // 9. مسح خيارات الأسبوع
     function clearWeekData(weekIndex) {
-      if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
-        for (let d = 0; d < 5; d++) {
-          document.getElementById(`select-${weekIndex}-${d}`).value = "";
+        if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
+            for (let d = 0; d < 5; d++) {
+                document.getElementById(`select-${weekIndex}-${d}`).value = "";
+            }
+            showToast(`تم مسح خيارات ${weekNames[weekIndex]}`);
         }
-      }
     }
 
-    document.addEventListener("DOMContentLoaded", initPage);
-    
+    // 10. جلب اسم المدرسة
     async function loadSchoolName() {
         try {
             const response = await fetch('/get-report-data');
@@ -541,15 +418,8 @@
         }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-        loadSchoolName();
-    });
+    document.addEventListener("DOMContentLoaded", initPage);
 </script>
-
-<!-- مكتبة التنبيهات الخارجية -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-<!-- 🎯 أضف ملف جافاسكريبت Bootstrap هنا -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>
