@@ -775,6 +775,67 @@ app.get('/download-template', (req, res) => {
         }
     });
 });
+app.use(express.json());
+
+// 1️⃣ مسار جلب أسماء المعلمين من ورقة teacher_name
+app.get('/api/teachers', (req, res) => {
+    try {
+        const filePath = path.join(__dirname, 'waiting_data.xlsx');
+        const workbook = xlsx.readFile(filePath);
+        const sheet = workbook.Sheets['teacher_name'];
+        
+        if (!sheet) {
+            return res.status(404).json({ error: 'ورقة العمل teacher_name غير موجودة' });
+        }
+
+        // تحويل البيانات لصفوف واستخراج الأسماء
+        const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+        const teachers = rows.flat().filter(name => name && name !== 'اسم المعلم' && name !== 'Name');
+        
+        res.json(teachers);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'خطأ في قراءة ملف الإكسل' });
+    }
+});
+
+// 2️⃣ مسار حفظ مناوبة الأسبوع في ورقة rotation
+app.post('/api/save-rotation', (req, res) => {
+    try {
+        const { weekTitle, weekData } = req.body;
+        const filePath = path.join(__dirname, 'waiting_data.xlsx');
+        const workbook = xlsx.readFile(filePath);
+
+        let sheet = workbook.Sheets['rotation'];
+        let existingData = sheet ? xlsx.utils.sheet_to_json(sheet) : [];
+
+        // حذف بيانات الأسبوع القديمة إن وجدت لتحديثها ومنع التكرار
+        existingData = existingData.filter(row => row['الأسبوع'] !== weekTitle);
+
+        // إضافة الصفوف الجديدة
+        weekData.forEach(item => {
+            existingData.push({
+                'الأسبوع': weekTitle,
+                'اليوم': item.day,
+                'التاريخ': item.date,
+                'المناوب': item.teacher
+            });
+        });
+
+        // تحديث ورقة rotation وحفظ الملف
+        const newSheet = xlsx.utils.json_to_sheet(existingData);
+        workbook.Sheets['rotation'] = newSheet;
+        if (!workbook.SheetNames.includes('rotation')) {
+            workbook.SheetNames.push('rotation');
+        }
+
+        xlsx.writeFile(workbook, filePath);
+        res.json({ success: true, message: `تم حفظ ${weekTitle} بنجاح` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'حدث خطأ أثناء حفظ البيانات' });
+    }
+});
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
