@@ -290,9 +290,9 @@
     </div>
   </div>
 
-  <!-- شبكة الجداول -->
+  <!-- شبكة الجداول (3 جداول بالسطر للشاشات الكبيرة) -->
   <div class="container-fluid px-4 mb-5">
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3" id="weeksGrid"></div>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="weeksGrid"></div>
   </div>
 
   <script>
@@ -305,11 +305,11 @@
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
     let teachersList = [];
 
-    // 1. بداية التشغيل المباشر
+    // 1. بداية التشغيل
     async function initPage() {
       initGrid();
       populateHijriSelects();
-      generateFromHijri(); // توليد التواريخ فوراً
+      generateFromHijri();
 
       try {
         const res = await fetch('/api/teachers');
@@ -321,7 +321,7 @@
       }
     }
 
-    // 2. بناء الهيكل الشبكي للجداول
+    // 2. بناء الهيكل الشبكي للجداول بتوزيع مساحات أوسع
     function initGrid() {
       const grid = document.getElementById("weeksGrid");
       grid.innerHTML = "";
@@ -331,9 +331,9 @@
         days.forEach((day, dayIndex) => {
           tableRows += `
             <tr>
-              <td class="fw-bold bg-light" style="width: 22%;">${day}</td>
-              <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 38%;">--/--/----</td>
-              <td style="width: 40%;">
+              <td class="fw-bold bg-light" style="width: 18%;">${day}</td>
+              <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 44%;">--/--/----</td>
+              <td style="width: 38%;">
                 <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
                   <option value="">-- اختر المناوب --</option>
                 </select>
@@ -374,7 +374,7 @@
       });
     }
 
-    // 3. تعبئة القوائم المنسدلة للتاريخ الهجري بتاريخ اليوم الحالي
+    // 3. تعبئة القوائم المنسدلة للتاريخ الهجري
     function populateHijriSelects() {
       const daySelect = document.getElementById("hijriDay");
       const yearSelect = document.getElementById("hijriYear");
@@ -389,7 +389,6 @@
         yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
       }
 
-      // جلب التاريخ الهجري الحالي مباشرة من المحرك المدمج
       const today = new Date();
       const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-uma', {
         day: 'numeric', month: 'numeric', year: 'numeric'
@@ -405,7 +404,7 @@
       yearSelect.value = hYear;
     }
 
-    // 4. دالة تحويل من تاريخ هجري إلى تاريخ نظام (بدون مكتبات خارجية)
+    // 4. تحويل التاريخ الهجري إلى ميلادي لحساب الأسابيع
     function hijriToGregorianDate(hYear, hMonth, hDay) {
       let approxGYear = Math.floor(hYear * 0.970224 + 621.577);
       const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-uma', {
@@ -434,7 +433,6 @@
 
       let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
 
-      // الرجوع ليوم الأحد إذا كان اليوم المحدد غير الأحد
       const dayOfWeek = startDate.getDay();
       if (dayOfWeek !== 0) {
         startDate.setDate(startDate.getDate() - dayOfWeek);
@@ -455,8 +453,10 @@
       }
     }
 
-    // 6. تحديث خيارات المعلمين بعد جلبهم من ملف الإكسل
+    // 6. تعبئة قائمة المعلمين في القوائم المنسدلة
     function updateTeachersDropdowns() {
+      if (!teachersList || teachersList.length === 0) return;
+
       let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
       teachersList.forEach(name => {
         optionsHtml += `<option value="${name}">${name}</option>`;
@@ -518,7 +518,7 @@
       }
     }
 
-    // 9. مسح خيارات أسبوع
+    // 9. مسح خيارات الأسبوع
     function clearWeekData(weekIndex) {
       if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
         for (let d = 0; d < 5; d++) {
