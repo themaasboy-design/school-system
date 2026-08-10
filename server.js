@@ -764,6 +764,24 @@ app.get('/check-db', async (req, res) => {
   }
 });
 
+// 🔍 مسار فحص الاتصال بقاعدة البيانات
+app.get('/check', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, school_name FROM users;');
+    res.status(200).json({
+      status: "success",
+      database: "Render PostgreSQL",
+      total_records: result.rowCount,
+      data: result.rows
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      message: "حدث خطأ أثناء فحص البيانات من قاعدة البيانات",
+      error: err.message
+    });
+  }
+});
 
 // مسار تنزيل ملف الإكسل waiting_data.xlsx من المجلد الرئيسي
 app.get('/download-template', (req, res) => {
@@ -862,29 +880,6 @@ app.post('/api/save-rotation', (req, res) => {
     }
 });
 
-const { Pool } = require('pg');
-
-
-// 🔍 مسار فحص البيانات المحفوظة
-app.get('/check', async (req, res) => {
-  try {
-    // استبدل rotation باسم الجدول المخصص للمناوبة لديك في قاعدة البيانات
-    const result = await pool.query('SELECT * FROM rotation;');
-    
-    res.status(200).json({
-      status: "success",
-      database: "Render PostgreSQL (دائم ومستقر)",
-      total_records: result.rowCount,
-      data: result.rows
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "حدث خطأ أثناء جلب البيانات من قاعدة بيانات PostgreSQL",
-      error: err.message
-    });
-  }
-});
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
