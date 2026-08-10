@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام توزيع الإشراف اليومي - جدول المناوبة</title>
-    
+
     <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <!-- Toastify CSS للرسائل التنبيهية -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
-    
+
     <style>
         .navbar-custom {
             background-color: #2c3e50;
@@ -85,7 +85,7 @@
         <a href="index.html" style="color: #ffffff;">الرئيسية</a>
         <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
         <a href="/monitoring" style="color: #ffffff;">الإشراف</a>
-        
+
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">التقارير</a>
             <div class="dropdown-menu">
@@ -113,15 +113,15 @@
                 <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة
             </h4>
         </div>
-      
-        <!-- اختيار بداية الأسبوع مع زر مسح التواريخ -->
+
+        <!-- اختيار بداية الأسبوع مع زري (تعبئة) و(مسح التواريخ) -->
         <div class="col-md-7">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
-                
-                <select id="hijriDay" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
-                
-                <select id="hijriMonth" class="form-select form-select-sm w-auto" onchange="generateFromHijri()">
+
+                <select id="hijriDay" class="form-select form-select-sm w-auto"></select>
+
+                <select id="hijriMonth" class="form-select form-select-sm w-auto">
                     <option value="1">محرم</option>
                     <option value="2">صفر</option>
                     <option value="3">ربيع الأول</option>
@@ -135,10 +135,15 @@
                     <option value="11">ذو القعدة</option>
                     <option value="12">ذو الحجة</option>
                 </select>
-                
-                <select id="hijriYear" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
 
-                <!-- زر مسح التواريخ المضاف -->
+                <select id="hijriYear" class="form-select form-select-sm w-auto"></select>
+
+                <!-- زر تعبئة التواريخ المضاف -->
+                <button class="btn btn-primary btn-sm text-nowrap ms-1" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
+                    تعبئة
+                </button>
+
+                <!-- زر مسح التواريخ -->
                 <button class="btn btn-outline-danger btn-sm text-nowrap ms-1" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
                     مسح التواريخ
                 </button>
@@ -189,7 +194,6 @@
     async function initPage() {
         initGrid();
         populateHijriSelects();
-        generateFromHijri();
         await loadSchoolName();
 
         try {
@@ -199,7 +203,7 @@
             await loadSavedRotation();
         } catch (err) {
             console.error("فشل جلب قائمة المعلمين أو البيانات المحفوظة", err);
-            updateTeachersDropdowns(); // تعبئة خيارات الإجازات حتى لو تعذر جلب قائمة المعلمين
+            updateTeachersDropdowns();
             showToast("تعذر تحميل قائمة المعلمين من السيرفر", true);
         }
     }
@@ -305,6 +309,7 @@
         return new Date();
     }
 
+    // تُستدعى الآن عند الضغط على زر "تعبئة"
     function generateFromHijri() {
         const hDay = parseInt(document.getElementById("hijriDay").value);
         const hMonth = parseInt(document.getElementById("hijriMonth").value);
@@ -325,14 +330,14 @@
             for (let d = 0; d < 5; d++) {
                 let curr = new Date(startDate);
                 curr.setDate(startDate.getDate() + (w * 7) + d);
-                
+
                 const cell = document.getElementById(`date-${w}-${d}`);
                 if (cell) cell.innerText = hijriFormatter.format(curr);
             }
         }
+        showToast("تمت تعبئة التواريخ بنجاح");
     }
 
-    // 🧹 دالة مسح كل التواريخ
     function clearAllDates() {
         for (let w = 0; w < 15; w++) {
             for (let d = 0; d < 5; d++) {
@@ -343,7 +348,6 @@
         showToast("تم مسح جميع التواريخ");
     }
 
-    // تعبئة القائمة بالمعلمين والإجازات في الأسفل
     function updateTeachersDropdowns() {
         let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
 
@@ -366,7 +370,6 @@
             });
         }
 
-        // إضافة الإجازات في نهاية كل قائمة
         optionsHtml += `<option disabled>──────────</option>`;
         optionsHtml += `<option value="إجازة يوم وطني">إجازة يوم وطني</option>`;
         optionsHtml += `<option value="إجازة يوم مطول">إجازة يوم مطول</option>`;
@@ -393,6 +396,11 @@
                     const selectEl = document.getElementById(`select-${weekIndex}-${dayIndex}`);
                     if (selectEl && item['المناوب']) {
                         selectEl.value = item['المناوب'];
+                    }
+                    // إذا كان التقرير المحفوظ يحتوي على تاريخ مسبق استرجعه أيضاً
+                    if (item['التاريخ'] || item['تاريخ']) {
+                        const dateCell = document.getElementById(`date-${weekIndex}-${dayIndex}`);
+                        if (dateCell) dateCell.innerText = item['التاريخ'] || item['تاريخ'];
                     }
                 }
             });
