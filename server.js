@@ -861,6 +861,37 @@ app.post('/api/save-rotation', (req, res) => {
         res.status(500).json({ error: 'حدث خطأ أثناء حفظ البيانات' });
     }
 });
+
+const { Pool } = require('pg');
+
+// إعداد الاتصال بقاعدة بيانات Render PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // يأخذ الرابط تلقائياً من إعدادات البيئة في Render
+  ssl: {
+    rejectUnauthorized: false // ضروري جداً لاتصالات Render PostgreSQL الآمنة
+  }
+});
+
+// 🔍 مسار فحص البيانات المحفوظة
+app.get('/check', async (req, res) => {
+  try {
+    // استبدل rotation باسم الجدول المخصص للمناوبة لديك في قاعدة البيانات
+    const result = await pool.query('SELECT * FROM rotation;');
+    
+    res.status(200).json({
+      status: "success",
+      database: "Render PostgreSQL (دائم ومستقر)",
+      total_records: result.rowCount,
+      data: result.rows
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      message: "حدث خطأ أثناء جلب البيانات من قاعدة بيانات PostgreSQL",
+      error: err.message
+    });
+  }
+});
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
