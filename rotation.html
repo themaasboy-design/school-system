@@ -114,7 +114,7 @@
             </h4>
         </div>
 
-        <!-- اختيار بداية الأسبوع مع زري (تعبئة) و(مسح التواريخ) -->
+        <!-- اختيار بداية الأسبوع -->
         <div class="col-md-7">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
@@ -138,7 +138,7 @@
 
                 <select id="hijriYear" class="form-select form-select-sm w-auto"></select>
 
-                <!-- زر تعبئة التواريخ المضاف -->
+                <!-- زر تعبئة التواريخ -->
                 <button class="btn btn-primary btn-sm text-nowrap ms-1" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
                     تعبئة
                 </button>
@@ -274,29 +274,29 @@
             yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
         }
 
-        const today = new Date();
-        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
-            day: 'numeric', month: 'numeric', year: 'numeric'
-        });
-        const parts = formatter.formatToParts(today);
-
-        const hDay = parseInt(parts.find(p => p.type === 'day').value);
-        const hMonth = parseInt(parts.find(p => p.type === 'month').value);
-        const hYear = parseInt(parts.find(p => p.type === 'year').value);
-
-        daySelect.value = hDay;
-        document.getElementById("hijriMonth").value = hMonth;
-        yearSelect.value = hYear;
+        // إعداد القيم الافتراضية لقوائم الاختيار (1 / محرم / 1448)
+        daySelect.value = 1;
+        document.getElementById("hijriMonth").value = 1;
+        yearSelect.value = 1448;
     }
 
+    // دالة محولة محسنة ودقيقة لحساب التاريخ الميلادي من الهجري (تقويم أم القرى)
     function hijriToGregorianDate(hYear, hMonth, hDay) {
-        let approxGYear = Math.floor(hYear * 0.970224 + 621.577);
+        const baseHijriYear = 1445;
+        const baseGregorian = new Date(2023, 6, 19); // 19 يوليو 2023م يوافق 1 محرم 1445هـ
+        
+        const yearDiff = hYear - baseHijriYear;
+        const totalDaysApprox = Math.floor((yearDiff * 354.367) + ((hMonth - 1) * 29.53) + (hDay - 1));
+        
+        let approxDate = new Date(baseGregorian.getTime() + totalDaysApprox * 86400000);
+        
         const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
             day: 'numeric', month: 'numeric', year: 'numeric'
         });
 
-        for (let offset = -60; offset <= 60; offset++) {
-            let testDate = new Date(approxGYear, 0, 1 + offset);
+        // البحث الدقيق في نطاق 15 يوماً حول التاريخ التقديري
+        for (let offset = -15; offset <= 15; offset++) {
+            let testDate = new Date(approxDate.getTime() + offset * 86400000);
             let parts = formatter.formatToParts(testDate);
             let iy = parseInt(parts.find(p => p.type === 'year').value);
             let im = parseInt(parts.find(p => p.type === 'month').value);
@@ -306,10 +306,10 @@
                 return testDate;
             }
         }
-        return new Date();
+        return approxDate;
     }
 
-    // تُستدعى الآن عند الضغط على زر "تعبئة"
+    // تُستدعى عند الضغط على زر "تعبئة"
     function generateFromHijri() {
         const hDay = parseInt(document.getElementById("hijriDay").value);
         const hMonth = parseInt(document.getElementById("hijriMonth").value);
@@ -317,19 +317,15 @@
 
         let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
 
-        const dayOfWeek = startDate.getDay();
-        if (dayOfWeek !== 0) {
-            startDate.setDate(startDate.getDate() - dayOfWeek);
-        }
-
         const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
             day: 'numeric', month: 'numeric', year: 'numeric'
         });
 
         for (let w = 0; w < 15; w++) {
             for (let d = 0; d < 5; d++) {
-                let curr = new Date(startDate);
-                curr.setDate(startDate.getDate() + (w * 7) + d);
+                // إضافة الأيام بالتسلسل من تاريخ البداية المباشر
+                let offsetDays = (w * 7) + d;
+                let curr = new Date(startDate.getTime() + offsetDays * 86400000);
 
                 const cell = document.getElementById(`date-${w}-${d}`);
                 if (cell) cell.innerText = hijriFormatter.format(curr);
@@ -397,7 +393,6 @@
                     if (selectEl && item['المناوب']) {
                         selectEl.value = item['المناوب'];
                     }
-                    // إذا كان التقرير المحفوظ يحتوي على تاريخ مسبق استرجعه أيضاً
                     if (item['التاريخ'] || item['تاريخ']) {
                         const dateCell = document.getElementById(`date-${weekIndex}-${dayIndex}`);
                         if (dateCell) dateCell.innerText = item['التاريخ'] || item['تاريخ'];
