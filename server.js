@@ -777,42 +777,68 @@ app.get('/download-template', (req, res) => {
 });
 app.use(express.json());
 
-// 1️⃣ مسار جلب أسماء المعلمين من ورقة teacher_name
+// 1️⃣ جلب أسماء المعلمين من العمود B فقط (Index 1)
 app.get('/api/teachers', (req, res) => {
     try {
         const filePath = path.join(__dirname, 'waiting_data.xlsx');
+        if (!fs.existsSync(filePath)) return res.json([]);
+
         const workbook = xlsx.readFile(filePath);
         const sheet = workbook.Sheets['teacher_name'];
-        
-        if (!sheet) {
-            return res.status(404).json({ error: 'ورقة العمل teacher_name غير موجودة' });
-        }
+        if (!sheet) return res.json([]);
 
-        // تحويل البيانات لصفوف واستخراج الأسماء
         const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-        const teachers = rows.flat().filter(name => name && name !== 'اسم المعلم' && name !== 'Name');
         
+        // أخذ العمود B (row[1]) وتجاهل السطر الأول (الهيدر) والربط مع القيم الصحيحة فقط
+        const teachers = rows
+            .slice(1) 
+            .map(row => row[1]) 
+            .filter(name => name && typeof name === 'string' && name.trim() !== '');
+
         res.json(teachers);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'خطأ في قراءة ملف الإكسل' });
+        res.status(500).json({ error: 'خطأ في قراءة أسماء المعلمين' });
     }
 });
 
-// 2️⃣ مسار حفظ مناوبة الأسبوع في ورقة rotation
+// 2️⃣ جلب البيانات المحفوظة سابقاً من ورقة rotation لاسترجاعها في الصفحة
+app.get('/api/get-rotation', (req, res) => {
+    try {
+        const filePath = path.join(__dirname, 'waiting_data.xlsx');
+        if (!fs.existsSync(filePath)) return res.json([]);
+
+        const workbook = xlsx.readFile(filePath);
+        const sheet = workbook.Sheets['rotation'];
+        if (!sheet) return res.json([]);
+
+        const savedData = xlsx.utils.sheet_to_json(sheet);
+        res.json(savedData);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'خطأ في قراءة بيانات المناوبة المحفوظة' });
+    }
+});
+
+// 3️⃣ حفظ بيانات الأسبوع في ورقة rotation
 app.post('/api/save-rotation', (req, res) => {
     try {
         const { weekTitle, weekData } = req.body;
         const filePath = path.join(__dirname, 'waiting_data.xlsx');
-        const workbook = xlsx.readFile(filePath);
+        
+        let workbook;
+        if (fs.existsSync(filePath)) {
+            workbook = xlsx.readFile(filePath);
+        } else {
+            workbook = xlsx.utils.book_new();
+        }
 
         let sheet = workbook.Sheets['rotation'];
         let existingData = sheet ? xlsx.utils.sheet_to_json(sheet) : [];
 
-        // حذف بيانات الأسبوع القديمة إن وجدت لتحديثها ومنع التكرار
+        // حذف بيانات الأسبوع القديمة وتحديثها بالجديدة
         existingData = existingData.filter(row => row['الأسبوع'] !== weekTitle);
 
-        // إضافة الصفوف الجديدة
         weekData.forEach(item => {
             existingData.push({
                 'الأسبوع': weekTitle,
@@ -822,7 +848,6 @@ app.post('/api/save-rotation', (req, res) => {
             });
         });
 
-        // تحديث ورقة rotation وحفظ الملف
         const newSheet = xlsx.utils.json_to_sheet(existingData);
         workbook.Sheets['rotation'] = newSheet;
         if (!workbook.SheetNames.includes('rotation')) {
