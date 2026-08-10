@@ -309,6 +309,18 @@
   <!-- صف بطاقات الإعدادات -->
 <div class="d-flex gap-3 flex-wrap">
   
+    
+  <!-- بطاقة 2: جلب ورفع بيانات المدرسة -->
+  <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
+    <h5 class="fw-bold mb-2">
+      <a href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal" class="text-decoration-none" style="color: #198754;">جلب بيانات المدرسة</a>
+    </h5>
+    <p class="text-muted small mb-3">رفع الملف المعبأ وتحديث البيانات</p>
+    <button type="button" class="btn btn-sm btn-success w-100 mt-auto" data-bs-toggle="modal" data-bs-target="#updateExcelModal">
+      <i class="bi bi-upload me-1"></i> رفع البيانات
+    </button>
+  </div>
+  
   <!-- بطاقة 1: تنزيل نموذج الإكسل -->
   <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
     <h5 class="fw-bold mb-2">
@@ -320,25 +332,8 @@
     </a>
   </div>
 
-  <!-- بطاقة 2: جلب ورفع بيانات المدرسة -->
-  <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
-    <h5 class="fw-bold mb-2">
-      <a href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal" class="text-decoration-none" style="color: #198754;">جلب بيانات المدرسة</a>
-    </h5>
-    <p class="text-muted small mb-3">رفع الملف المعبأ وتحديث البيانات</p>
-    <button type="button" class="btn btn-sm btn-success w-100 mt-auto" data-bs-toggle="modal" data-bs-target="#updateExcelModal">
-      <i class="bi bi-upload me-1"></i> رفع البيانات
-    </button>
-  </div>
 
-  <!-- بطاقة 3: إعداد جدول الانتظار -->
-  <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
-    <h5 class="fw-bold mb-2">
-      <a href="waiting_setting.html" class="text-decoration-none" style="color: #198754;">إعداد جدول الانتظار</a>
-    </h5>
-    <p class="text-muted small mb-0">ضبط وإعداد جدول الانتظار الأسبوعي</p>
-  </div>
-
+ 
 </div>
 <!-- Modal تحديث الملف بتنسيق وأداء عصري رائع -->
 <div class="modal fade" id="updateExcelModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
