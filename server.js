@@ -881,6 +881,71 @@ app.post('/api/save-rotation', (req, res) => {
 });
 
 // =========================================================================
+// ⏳ مسارات جدول الإعدادات والانتظار (Waiting Schedule Routes)
+// =========================================================================
+
+// 1️⃣ جلب جدول الانتظار الكامل
+app.get('/get-waiting-schedule-full', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+    const sheet = getSheet(workbook, WAITING_SHEET);
+
+    if (!sheet) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const rawData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+    res.json({ success: true, data: rawData });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 2️⃣ حفظ بيانات يوم معين في جدول الانتظار
+app.post('/save-waiting-schedule-day', async (req, res) => {
+  try {
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
+    const { day, teachersData } = req.body;
+
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+    let sheet = getSheet(workbook, WAITING_SHEET);
+    let data = sheet ? xlsx.utils.sheet_to_json(sheet, { header: 1 }) : [];
+
+    // البحث عن اليوم للتعديل عليه أو إضافته
+    let dayIndex = data.findIndex(row => row && row[0] === day);
+
+    if (dayIndex !== -1) {
+      // تحديث الصفوف الخاصة باليوم (4 صفوف للمستويات/الحصص)
+      for (let i = 0; i < 4; i++) {
+        if (teachersData && teachersData[i]) {
+          data[dayIndex + 1 + i] = teachersData[i];
+        }
+      }
+    } else {
+      // إضافة يوم جديد إذا لم يكن موجوداً
+      data.push([day]);
+      if (Array.isArray(teachersData)) {
+        teachersData.forEach(row => data.push(row));
+      }
+    }
+
+    const newSheet = xlsx.utils.aoa_to_sheet(data);
+    workbook.Sheets[WAITING_SHEET] = newSheet;
+    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
+      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
+    }
+
+    xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
+    res.json({ success: true, message: "تم حفظ جدول اليوم بنجاح" });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "خطأ أثناء حفظ الجدول: " + e.message });
+  }
+});
+// =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
 
