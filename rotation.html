@@ -31,15 +31,20 @@
             font-weight: 600;
         }
         .form-select {
-            font-size: 0.85rem !important;
-            padding: 6px 12px !important;
+            font-size: 0.82rem !important;
+            padding: 5px 8px !important;
         }
         .table th {
-            font-size: 0.9rem !important;
-            padding: 8px !important;
+            font-size: 0.85rem !important;
+            padding: 8px 4px !important;
         }
         .table td {
-            font-size: 0.85rem !important;
+            font-size: 0.82rem !important;
+            padding: 5px 4px !important;
+            vertical-align: middle;
+        }
+        .hijri-date {
+            white-space: nowrap;
         }
 
         /* 🖨️ تنسيقات الطباعة المخصصة */
@@ -109,9 +114,9 @@
             </h4>
         </div>
       
-        <!-- اختيار بداية الأسبوع بالتقويم الهجري -->
+        <!-- اختيار بداية الأسبوع مع زر مسح التواريخ -->
         <div class="col-md-7">
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
                 <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
                 
                 <select id="hijriDay" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
@@ -132,6 +137,11 @@
                 </select>
                 
                 <select id="hijriYear" class="form-select form-select-sm w-auto" onchange="generateFromHijri()"></select>
+
+                <!-- زر مسح التواريخ المضاف -->
+                <button class="btn btn-outline-danger btn-sm text-nowrap ms-1" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
+                    مسح التواريخ
+                </button>
             </div>
         </div>
 
@@ -162,7 +172,6 @@
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
     let teachersList = [];
 
-    // دالة عرض التنبيهات باستخدام Toastify
     function showToast(message, isError = false) {
         Toastify({
             text: message,
@@ -177,7 +186,6 @@
         }).showToast();
     }
 
-    // 1. بداية التشغيل
     async function initPage() {
         initGrid();
         populateHijriSelects();
@@ -191,11 +199,11 @@
             await loadSavedRotation();
         } catch (err) {
             console.error("فشل جلب قائمة المعلمين أو البيانات المحفوظة", err);
+            updateTeachersDropdowns(); // تعبئة خيارات الإجازات حتى لو تعذر جلب قائمة المعلمين
             showToast("تعذر تحميل قائمة المعلمين من السيرفر", true);
         }
     }
 
-    // 2. بناء الهيكل الشبكي للجداول
     function initGrid() {
         const grid = document.getElementById("weeksGrid");
         grid.innerHTML = "";
@@ -205,9 +213,9 @@
             days.forEach((day, dayIndex) => {
                 tableRows += `
                 <tr>
-                    <td class="fw-bold bg-light" style="width: 20%;">${day}</td>
-                    <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 42%;">--/--/----</td>
-                    <td style="width: 38%;">
+                    <td class="fw-bold bg-light" style="width: 18%;">${day}</td>
+                    <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 30%;">--/--/----</td>
+                    <td style="width: 52%;">
                         <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
                             <option value="">-- اختر المناوب --</option>
                         </select>
@@ -226,9 +234,9 @@
                         <table class="table table-bordered table-sm text-center mb-0">
                             <thead>
                                 <tr class="table-light">
-                                    <th>اليوم</th>
-                                    <th>التاريخ الهجري</th>
-                                    <th>المناوب</th>
+                                    <th style="width: 18%;">اليوم</th>
+                                    <th style="width: 30%;">التاريخ</th>
+                                    <th style="width: 52%;">المعلم المناوب</th>
                                 </tr>
                             </thead>
                             <tbody>${tableRows}</tbody>
@@ -248,7 +256,6 @@
         });
     }
 
-    // 3. تعبئة القوائم المنسدلة للتاريخ الهجري
     function populateHijriSelects() {
         const daySelect = document.getElementById("hijriDay");
         const yearSelect = document.getElementById("hijriYear");
@@ -278,7 +285,6 @@
         yearSelect.value = hYear;
     }
 
-    // 4. تحويل التاريخ الهجري إلى ميلادي لحساب الأسابيع
     function hijriToGregorianDate(hYear, hMonth, hDay) {
         let approxGYear = Math.floor(hYear * 0.970224 + 621.577);
         const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
@@ -299,7 +305,6 @@
         return new Date();
     }
 
-    // 5. حساب وتوليد تواريخ الـ 15 أسبوعاً بالتقويم الهجري
     function generateFromHijri() {
         const hDay = parseInt(document.getElementById("hijriDay").value);
         const hMonth = parseInt(document.getElementById("hijriMonth").value);
@@ -327,14 +332,45 @@
         }
     }
 
-    // 6. تعبئة قائمة المعلمين في القوائم المنسدلة
-    function updateTeachersDropdowns() {
-        if (!teachersList || teachersList.length === 0) return;
+    // 🧹 دالة مسح كل التواريخ
+    function clearAllDates() {
+        for (let w = 0; w < 15; w++) {
+            for (let d = 0; d < 5; d++) {
+                const cell = document.getElementById(`date-${w}-${d}`);
+                if (cell) cell.innerText = "--/--/----";
+            }
+        }
+        showToast("تم مسح جميع التواريخ");
+    }
 
+    // تعبئة القائمة بالمعلمين والإجازات في الأسفل
+    function updateTeachersDropdowns() {
         let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
-        teachersList.forEach(name => {
-            optionsHtml += `<option value="${name}">${name}</option>`;
-        });
+
+        if (teachersList) {
+            let list = Array.isArray(teachersList) 
+                ? teachersList 
+                : (teachersList.teachers || teachersList.data || []);
+
+            list.forEach(item => {
+                let teacherName = "";
+                if (typeof item === 'string') {
+                    teacherName = item;
+                } else if (typeof item === 'object' && item !== null) {
+                    teacherName = item.name || item['اسم المعلم'] || item.teacher || item.Name || Object.values(item)[0];
+                }
+
+                if (teacherName) {
+                    optionsHtml += `<option value="${teacherName}">${teacherName}</option>`;
+                }
+            });
+        }
+
+        // إضافة الإجازات في نهاية كل قائمة
+        optionsHtml += `<option disabled>──────────</option>`;
+        optionsHtml += `<option value="إجازة يوم وطني">إجازة يوم وطني</option>`;
+        optionsHtml += `<option value="إجازة يوم مطول">إجازة يوم مطول</option>`;
+        optionsHtml += `<option value="إجازة">إجازة</option>`;
 
         for (let w = 0; w < 15; w++) {
             for (let d = 0; d < 5; d++) {
@@ -344,7 +380,6 @@
         }
     }
 
-    // 7. استرجاع البيانات المحفوظة
     async function loadSavedRotation() {
         try {
             const res = await fetch('/api/get-rotation');
@@ -366,7 +401,6 @@
         }
     }
 
-    // 8. حفظ بيانات الأسبوع
     async function saveWeekData(weekIndex) {
         const weekTitle = weekNames[weekIndex];
         const weekData = [];
@@ -395,7 +429,6 @@
         }
     }
 
-    // 9. مسح خيارات الأسبوع
     function clearWeekData(weekIndex) {
         if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
             for (let d = 0; d < 5; d++) {
@@ -405,7 +438,6 @@
         }
     }
 
-    // 10. جلب اسم المدرسة
     async function loadSchoolName() {
         try {
             const response = await fetch('/get-report-data');
