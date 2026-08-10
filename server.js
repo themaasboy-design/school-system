@@ -864,13 +864,6 @@ app.post('/api/save-rotation', (req, res) => {
 
 const { Pool } = require('pg');
 
-// إعداد الاتصال بقاعدة بيانات Render PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // يأخذ الرابط تلقائياً من إعدادات البيئة في Render
-  ssl: {
-    rejectUnauthorized: false // ضروري جداً لاتصالات Render PostgreSQL الآمنة
-  }
-});
 
 // 🔍 مسار فحص البيانات المحفوظة
 app.get('/check', async (req, res) => {
