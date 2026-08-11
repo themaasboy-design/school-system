@@ -276,7 +276,9 @@
         }
     }
 
-    function renderSchools(schools) {
+   
+   
+   function renderSchools(schools) {
         const tbody = document.getElementById('schoolsTableBody');
         document.getElementById('totalSchoolsCount').textContent = schools.length;
 
@@ -294,12 +296,12 @@
                 <td><code>${s.username || '-'}</code></td>
                 <td><span class="badge bg-warning text-dark pass-text" title="${s.password}">${s.password || '-'}</span></td>
                 <td>
-                    ${s.excel_path 
+                    ${s.has_excel 
                         ? `<a href="/api/admin/download-excel/${s.id}" class="badge bg-success text-decoration-none" title="اضغط لتنزيل الملف">مرفوع 📊 (تنزيل)</a>` 
                         : `<span class="badge bg-danger">غير مرفوع ❌</span>`}
                 </td>
                 <td>
-                    ${s.excel_path 
+                    ${s.has_excel 
                         ? `<a href="/api/admin/download-excel/${s.id}" class="btn btn-sm btn-success ms-1 fw-bold" title="تنزيل ملف الإكسل">تنزيل 📥</a>` 
                         : ''}
                     <button class="btn btn-sm btn-outline-warning ms-1 fw-bold" onclick='openEditModal(${JSON.stringify(s)})'>تعديل / رفع ✏️</button>
@@ -308,7 +310,6 @@
             </tr>
         `).join('');
     }
-
     function openEditModal(school) {
         document.getElementById('editSchoolId').value = school.id;
         document.getElementById('editFullName').value = school.full_name || '';
@@ -378,6 +379,31 @@
         editModalObj = new bootstrap.Modal(document.getElementById('editModal'));
         checkAuth();
     };
+    // 📥 مسار تنزيل ملف الإكسل المباشر من PostgreSQL للأدمن
+app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT username, school_name, excel_data FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].excel_data) {
+      return res.status(404).json({ success: false, message: 'عذراً، لا يوجد ملف إكسل مخزن لهذه المدرسة.' });
+    }
+
+    const school = result.rows[0];
+    const fileName = `school_${school.username || id}_data.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    return res.send(school.excel_data);
+  } catch (error) {
+    console.error('خطأ في تنزيل ملف الإكسل للأدمن:', error);
+    res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);
+  }
+});
 </script>
 </body>
 </html>
