@@ -863,6 +863,33 @@ app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   }
 });
 
+// 📥 مسار تنزيل ملف الإكسل الخاص بالمدرسة من لوحة التحكم (مباشرة من PostgreSQL)
+app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT username, school_name, excel_data FROM users WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].excel_data) {
+      return res.status(404).send('عذراً، لا يوجد ملف إكسل مخزن لهذه المدرسة في قاعدة البيانات.');
+    }
+
+    const school = result.rows[0];
+    const fileName = `school_${school.username || id}_data.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    return res.send(school.excel_data);
+  } catch (error) {
+    console.error('خطأ في تنزيل ملف الإكسل للأدمن:', error);
+    res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);
+  }
+});
+
+// ✏️ مسار تعديل بيانات مدرسة من لوحة الأدمن
 app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -904,55 +931,26 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    console.error('خطأ في تعديل المدرسة:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+// 🗑️ مسار حذف مدرسة من لوحة الأدمن
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
   } catch (error) {
+    console.error('خطأ في حذف المدرسة:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/check-db', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
-    res.json({ 
-      success: true, 
-      schools: result.rows 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 🔍 مسار فحص الاتصال بقاعدة البيانات
-app.get('/check', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, username, school_name FROM users;');
-    res.status(200).json({
-      status: "success",
-      database: "Render PostgreSQL",
-      total_records: result.rowCount,
-      data: result.rows
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "حدث خطأ أثناء فحص البيانات من قاعدة البيانات",
-      error: err.message
-    });
-  }
-});
-
 // =========================================================================
-// 🚀 تشغيل السيرفر
+// 🚀 5. تشغيل السيرفر
 // =========================================================================
 app.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل الآن بنجاح على المنفذ: ${PORT}`);
+  console.log(`🚀 السيرفر يعمل على المنفذ: ${PORT}`);
 });
