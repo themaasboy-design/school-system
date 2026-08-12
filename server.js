@@ -165,6 +165,7 @@ const WAITING_SHEET = ' Waiting_table';
 const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
+const ROTATION_SHEET = 'rotation';
 
 // 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة لجلب أحدث ملف من PostgreSQL دائماً)
 async function getUserExcelPath(req) {
@@ -379,6 +380,84 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
     res.json({ success: true, schedule });
   } catch (e) {
     res.status(500).json({ success: false, error: "خطأ أثناء قراءة الجدول: " + e.message });
+  }
+});
+
+// 👩‍🏫 مسار جلب أسماء المعلمين (يُستخدم في صفحة rotation)
+app.get('/api/teachers', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+    const sheet = getSheet(workbook, TEACHERS_SHEET);
+    res.json(xlsx.utils.sheet_to_json(sheet));
+  } catch (e) {
+    res.status(401).json({ error: e.message });
+  }
+});
+
+// 📥 مسار جلب بيانات جدول المناوبة المحفوظة (rotation)
+app.get('/api/get-rotation', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    if (!workbook.SheetNames.includes(ROTATION_SHEET)) {
+      return res.json([]);
+    }
+
+    const rows = xlsx.utils.sheet_to_json(workbook.Sheets[ROTATION_SHEET]);
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: "خطأ في قراءة جدول المناوبة: " + e.message });
+  }
+});
+
+// 💾 مسار حفظ بيانات أسبوع من جدول المناوبة (rotation)
+app.post('/api/save-rotation', async (req, res) => {
+  const { weekTitle, weekData } = req.body;
+  try {
+    if (!weekTitle || !Array.isArray(weekData)) {
+      return res.status(400).json({ success: false, error: "بيانات غير صالحة: يجب إرسال weekTitle و weekData" });
+    }
+
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    const header = ["الأسبوع", "اليوم", "التاريخ", "المناوب"];
+    let rows = [];
+    if (workbook.SheetNames.includes(ROTATION_SHEET)) {
+      rows = xlsx.utils.sheet_to_json(workbook.Sheets[ROTATION_SHEET]);
+    }
+
+    weekData.forEach(entry => {
+      const existingIndex = rows.findIndex(r => r['الأسبوع'] === weekTitle && r['اليوم'] === entry.day);
+      const newRow = {
+        "الأسبوع": weekTitle,
+        "اليوم": entry.day,
+        "التاريخ": entry.date || "",
+        "المناوب": entry.teacher || ""
+      };
+      if (existingIndex !== -1) {
+        rows[existingIndex] = newRow;
+      } else {
+        rows.push(newRow);
+      }
+    });
+
+    const newSheet = xlsx.utils.json_to_sheet(rows, { header });
+    if (workbook.SheetNames.includes(ROTATION_SHEET)) {
+      workbook.Sheets[ROTATION_SHEET] = newSheet;
+    } else {
+      xlsx.utils.book_append_sheet(workbook, newSheet, ROTATION_SHEET);
+    }
+
+    xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
+    res.json({ success: true, message: "تم حفظ بيانات الأسبوع بنجاح" });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
   }
 });
 
