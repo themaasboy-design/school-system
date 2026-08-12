@@ -23,7 +23,6 @@ app.get('/', (req, res) => {
 app.use(express.static(__dirname, { index: false }));
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 
 // 🎯 إعداد الجلسات (Session)
 app.use(session({
@@ -90,7 +89,7 @@ async function initDb() {
 
 initDb();
 
-// 🔄 دالة حفظ ومزامنة ملف الإكسل بداخل قاعدة البيانات
+// 🔄 دالة حفظ ملف الإكسل بداخل قاعدة البيانات
 async function syncExcelToDb(username, filePath) {
   try {
     if (fs.existsSync(filePath)) {
@@ -167,7 +166,7 @@ const REPORT_SHEET = 'report';
 const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (تضمن جلب أحدث ملف من PostgreSQL دائماً)
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة لجلب أحدث ملف من PostgreSQL دائماً)
 async function getUserExcelPath(req) {
   const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -282,10 +281,94 @@ app.get('/get-waiting-teachers', async (req, res) => {
   }
 });
 
+// 💾 مسار حفظ جدول الانتظار ليوم محدد (يُستخدم في صفحة waiting_setting)
+app.post('/save-waiting-schedule-day', async (req, res) => {
+  const { day, schedule } = req.body;
+  try {
+    if (!day || !Array.isArray(schedule)) {
+      return res.status(400).json({ success: false, error: "بيانات غير صالحة: يجب إرسال day و schedule" });
+    }
+
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    let data = [];
+    if (workbook.SheetNames.includes(WAITING_SHEET)) {
+      data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
+    }
+
+    let dayIndex = data.findIndex(row => row && row[0] === day);
+
+    // إذا اليوم غير موجود بالشيت، أنشئ له بلوك جديد (عنوان اليوم + 4 صفوف فارغة)
+    if (dayIndex === -1) {
+      dayIndex = data.length;
+      data.push([day]);
+      for (let r = 0; r < 4; r++) data.push([]);
+    }
+
+    for (let r = 0; r < 4; r++) {
+      const rowIndex = dayIndex + 1 + r;
+      const rowValues = schedule[r] || [];
+      if (!data[rowIndex]) data[rowIndex] = [];
+      for (let c = 0; c < 7; c++) {
+        data[rowIndex][c] = rowValues[c] || "";
+      }
+    }
+
+    const newSheet = xlsx.utils.aoa_to_sheet(data);
+    if (workbook.SheetNames.includes(WAITING_SHEET)) {
+      workbook.Sheets[WAITING_SHEET] = newSheet;
+    } else {
+      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
+    }
+
+    xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
+  }
+});
+
+// 📥 مسار جلب جدول الانتظار الكامل لكل الأيام (يُستخدم في صفحة waiting_setting)
+app.get('/get-waiting-schedule-full', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
+      return res.json({ success: true, schedule: {} });
+    }
+
+    const data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
+    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    let schedule = {};
+
+    daysList.forEach(day => {
+      const dayIndex = data.findIndex(row => row && row[0] === day);
+      if (dayIndex === -1) {
+        schedule[day] = [[], [], [], []];
+        return;
+      }
+      let matrix = [];
+      for (let r = 1; r <= 4; r++) {
+        matrix.push(data[dayIndex + r] || []);
+      }
+      schedule[day] = matrix;
+    });
+
+    res.json({ success: true, schedule });
+  } catch (e) {
+    res.status(500).json({ success: false, error: "خطأ أثناء قراءة الجدول: " + e.message });
+  }
+});
+
 app.post('/save-report', async (req, res) => {
   const reportData = req.body;
   try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
     const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
@@ -368,7 +451,7 @@ app.get('/get-monitoring-teachers', async (req, res) => {
 app.post('/save-monitoring', async (req, res) => {
   const weeklySchedule = req.body;
   try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
     
@@ -647,172 +730,6 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 });
 
 // =========================================================================
-// 🔄 API المناوبة وأسماء المعلمين (ربط ديناميكي مع PostgreSQL لكل مدرسة)
-// =========================================================================
-
-// تنزيل ملف النموذج العامة
-app.get('/download-template', (req, res) => {
-    const filePath = path.join(__dirname, 'templates', 'waiting_data.xlsx');
-    res.download(filePath, 'waiting_data.xlsx', (err) => {
-        if (err) {
-            console.error('خطأ في تحميل الملف:', err);
-            res.status(404).send('تعذر العثور على ملف النموذج');
-        }
-    });
-});
-
-// 1️⃣ جلب أسماء المعلمين الخاصة بالمدرسة
-app.get('/api/teachers', async (req, res) => {
-    try {
-        const filePath = await getUserExcelPath(req);
-        const workbook = xlsx.readFile(filePath);
-        const sheet = workbook.Sheets[TEACHERS_SHEET];
-        if (!sheet) return res.json([]);
-
-        const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-        const teachers = rows
-            .slice(1) 
-            .map(row => row[1]) 
-            .filter(name => name && typeof name === 'string' && name.trim() !== '');
-
-        res.json(teachers);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'خطأ في قراءة أسماء المعلمين: ' + err.message });
-    }
-});
-
-// 2️⃣ جلب بيانات المناوبة المحفوظة للمدرسة
-app.get('/api/get-rotation', async (req, res) => {
-    try {
-        const filePath = await getUserExcelPath(req);
-        const workbook = xlsx.readFile(filePath);
-        const sheet = workbook.Sheets['rotation'];
-        if (!sheet) return res.json([]);
-
-        const savedData = xlsx.utils.sheet_to_json(sheet);
-        res.json(savedData);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'خطأ في قراءة بيانات المناوبة المحفوظة: ' + err.message });
-    }
-});
-
-// 3️⃣ حفظ بيانات الأسبوع بجدول المناوبة في PostgreSQL
-app.post('/api/save-rotation', async (req, res) => {
-    try {
-        const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
-        const { weekTitle, weekData } = req.body;
-        const filePath = await getUserExcelPath(req);
-        const workbook = xlsx.readFile(filePath);
-
-        let sheet = workbook.Sheets['rotation'];
-        let existingData = sheet ? xlsx.utils.sheet_to_json(sheet) : [];
-
-        // حذف بيانات الأسبوع القديمة وتحديثها
-        existingData = existingData.filter(row => row['الأسبوع'] !== weekTitle);
-
-        weekData.forEach(item => {
-            existingData.push({
-                'الأسبوع': weekTitle,
-                'اليوم': item.day,
-                'التاريخ': item.date,
-                'المناوب': item.teacher
-            });
-        });
-
-        const newSheet = xlsx.utils.json_to_sheet(existingData);
-        workbook.Sheets['rotation'] = newSheet;
-        if (!workbook.SheetNames.includes('rotation')) {
-            workbook.SheetNames.push('rotation');
-        }
-
-        xlsx.writeFile(workbook, filePath);
-        if (username) await syncExcelToDb(username, filePath);
-
-        res.json({ success: true, message: `تم حفظ ${weekTitle} والمزامنة مع قاعدة البيانات بنجاح` });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'حدث خطأ أثناء حفظ بيانات المناوبة: ' + err.message });
-    }
-});
-
-// =========================================================================
-// ⏳ مسارات جدول الإعدادات والانتظار (Waiting Schedule Routes)
-// =========================================================================
-
-// 1️⃣ جلب جدول الانتظار الكامل
-app.get('/get-waiting-schedule-full', async (req, res) => {
-  try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, WAITING_SHEET);
-
-    if (!sheet) {
-      return res.json({ success: true, data: [] });
-    }
-
-    const rawData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-    res.json({ success: true, data: rawData });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// 2️⃣ حفظ بيانات يوم معين بجدول الانتظار مع المزامنة الفورية في PostgreSQL
-app.post('/save-waiting-schedule-day', async (req, res) => {
-  try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username || req.query?.username;
-
-    if (!username) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "انتهت الجلسة! يرجى إعادة تسجيل الدخول لحفظ البيانات في قاعدة البيانات." 
-      });
-    }
-
-    const { day, teachersData } = req.body;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-
-    let sheet = getSheet(workbook, WAITING_SHEET);
-    let data = sheet ? xlsx.utils.sheet_to_json(sheet, { header: 1 }) : [];
-
-    let dayIndex = data.findIndex(row => row && row[0] === day);
-
-    if (dayIndex !== -1) {
-      for (let i = 0; i < 4; i++) {
-        if (teachersData && teachersData[i]) {
-          data[dayIndex + 1 + i] = teachersData[i];
-        }
-      }
-    } else {
-      data.push([day]);
-      if (Array.isArray(teachersData)) {
-        teachersData.forEach(row => data.push(row));
-      }
-    }
-
-    const newSheet = xlsx.utils.aoa_to_sheet(data);
-    workbook.Sheets[WAITING_SHEET] = newSheet;
-    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
-      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
-    }
-
-    // كتابة الملف محلياً
-    xlsx.writeFile(workbook, userExcel);
-
-    // المزامنة الإجبارية الفورية في PostgreSQL
-    await syncExcelToDb(username, userExcel);
-
-    res.json({ success: true, message: "تم حفظ جدول اليوم بنجاح ومزامنته مع PostgreSQL" });
-  } catch (e) {
-    console.error("❌ خطأ أثناء حفظ جدول الانتظار:", e);
-    res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
-  }
-});
-
-// =========================================================================
 // 🛠️ 4. مسارات لوحة تحكم الأدمن (Admin Routes)
 // =========================================================================
 
@@ -863,33 +780,6 @@ app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   }
 });
 
-// 📥 مسار تنزيل ملف الإكسل الخاص بالمدرسة من لوحة التحكم (مباشرة من PostgreSQL)
-app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      'SELECT username, school_name, excel_data FROM users WHERE id = $1',
-      [id]
-    );
-
-    if (result.rows.length === 0 || !result.rows[0].excel_data) {
-      return res.status(404).send('عذراً، لا يوجد ملف إكسل مخزن لهذه المدرسة في قاعدة البيانات.');
-    }
-
-    const school = result.rows[0];
-    const fileName = `school_${school.username || id}_data.xlsx`;
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-
-    return res.send(school.excel_data);
-  } catch (error) {
-    console.error('خطأ في تنزيل ملف الإكسل للأدمن:', error);
-    res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);
-  }
-});
-
-// ✏️ مسار تعديل بيانات مدرسة من لوحة الأدمن
 app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -931,26 +821,48 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (error) {
-    console.error('خطأ في تعديل المدرسة:', error);
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 🗑️ مسار حذف مدرسة من لوحة الأدمن
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
   } catch (error) {
-    console.error('خطأ في حذف المدرسة:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+app.get('/check-db', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
+    res.json({ 
+      success: true, 
+      schools: result.rows 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+// مسار تنزيل ملف الإكسل waiting_data.xlsx من المجلد الرئيسي
+app.get('/download-template', (req, res) => {
+    const filePath = path.join(__dirname,'templates', 'waiting_data.xlsx');
+    res.download(filePath, 'waiting_data.xlsx', (err) => {
+        if (err) {
+            console.error('خطأ في تحميل الملف:', err);
+            res.status(404).send('تعذر العثور على ملف النموذج');
+        }
+    });
+});
 // =========================================================================
-// 🚀 5. تشغيل السيرفر
+// 🚀 تشغيل السيرفر
 // =========================================================================
-app.listen(PORT, () => {
-  console.log(`🚀 السيرفر يعمل على المنفذ: ${PORT}`);
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
 });
