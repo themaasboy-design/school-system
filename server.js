@@ -225,6 +225,22 @@ function getSheet(workbook, sheetIdentifier) {
   return workbook.Sheets[sheetIdentifier];
 }
 
+// 🧹 دالة تطبيع النص العربي (توحيد الهمزات والمسافات) لمنع مشاكل عدم تطابق أسماء الأيام
+function normalizeArabicText(str) {
+  if (!str) return '';
+  return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
+}
+
+// 📅 قائمة الأيام الرسمية المعتمدة لتخزين جدول الانتظار (الشكل القياسي المستخدم داخل ملف الإكسل)
+const CANONICAL_WAITING_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+
+// 🔁 دالة تحويل أي تهجئة ليوم (مثل "الاثنين" أو "الإثنين") إلى الاسم القياسي الموحّد
+function canonicalizeDayName(day) {
+  const normalizedInput = normalizeArabicText(day);
+  const match = CANONICAL_WAITING_DAYS.find(d => normalizeArabicText(d) === normalizedInput);
+  return match || day;
+}
+
 // =========================================================================
 // 📊 مسارات جلب وحفظ البيانات الأساسية
 // =========================================================================
@@ -263,7 +279,7 @@ app.get('/get-waiting-teachers', async (req, res) => {
     const sheet = getSheet(workbook, WAITING_SHEET);
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    let dayIndex = data.findIndex(row => row && row[0] === day);
+    let dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(day));
     if (dayIndex === -1) return res.json({ teachers: [] });
 
     const colIndex = parseInt(period) - 1;
@@ -293,17 +309,19 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
 
+    const canonicalDay = canonicalizeDayName(day);
+
     let data = [];
     if (workbook.SheetNames.includes(WAITING_SHEET)) {
       data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
     }
 
-    let dayIndex = data.findIndex(row => row && row[0] === day);
+    let dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(canonicalDay));
 
-    // إذا اليوم غير موجود بالشيت، أنشئ له بلوك جديد (عنوان اليوم + 4 صفوف فارغة)
+    // إذا اليوم غير موجود بالشيت، أنشئ له بلوك جديد بالاسم القياسي الموحّد (عنوان اليوم + 4 صفوف فارغة)
     if (dayIndex === -1) {
       dayIndex = data.length;
-      data.push([day]);
+      data.push([canonicalDay]);
       for (let r = 0; r < 4; r++) data.push([]);
     }
 
@@ -343,11 +361,10 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
     }
 
     const data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
-    const daysList = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
     let schedule = {};
 
-    daysList.forEach(day => {
-      const dayIndex = data.findIndex(row => row && row[0] === day);
+    CANONICAL_WAITING_DAYS.forEach(day => {
+      const dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(day));
       if (dayIndex === -1) {
         schedule[day] = [[], [], [], []];
         return;
