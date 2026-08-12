@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>طباعة جدول المناوبة</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="/style.css">
+
+    <style>
+        .navbar-custom {
+            background-color: #2c3e50;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-custom .navbar-brand, .navbar-custom .nav-link {
+            color: #ffffff !important;
+        }
+        .navbar-custom .nav-link:hover {
+            color: #2bc48a !important;
+        }
+        .card h5 {
+            font-size: 1.1rem !important;
+            margin-bottom: 15px !important;
+        }
+        .form-label, label {
+            font-size: 0.85rem !important;
+            font-weight: 600;
+        }
+        .form-select {
+            font-size: 0.82rem !important;
+            padding: 5px 8px !important;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h2 id="schoolName">لوحة التحكم</h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+
+    <div class="navbar-links">
+        <a href="index.html" style="color: #ffffff;">الرئيسية</a>
+        <a href="dashboard.html#" style="color: #ffffff;">الانتظار</a>
+        <a href="/monitoring" style="color: #ffffff;">الإشراف</a>
+
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">التقارير</a>
+            <div class="dropdown-menu">
+                <a href="report.html">تقرير الغياب</a>
+                <a href="reportmoni.html">تقرير الإشراف</a>
+                <a href="rotation_setting.html">طباعة جدول المناوبة</a>
+            </div>
+        </div>
+
+        <div class="dropdown-container">
+            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+            <div class="dropdown-menu">
+                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>
+                <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                <a href="rotation.html"> إعداد جدول المناوبة </a>
+            </div>
+        </div>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
+    </div>
+</nav>
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-4 text-dark">
+                    <i class="bi bi-printer me-2" style="color:#112d4e;"></i> طباعة جدول المناوبة
+                </h5>
+
+                <div class="mb-3">
+                    <label class="form-label">نوع العرض</label>
+                    <select id="reportType" class="form-select">
+                        <option value="جدول">جدول</option>
+                        <option value="تقرير">تقرير</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">النطاق</label>
+                    <select id="rangeType" class="form-select">
+                        <option value="week">أسبوع</option>
+                        <option value="month">شهر</option>
+                        <option value="all">الكل</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="weekWrapper">
+                    <label class="form-label">اختر الأسبوع</label>
+                    <select id="weekSelect" class="form-select"></select>
+                </div>
+
+                <div class="mb-3 d-none" id="monthWrapper">
+                    <label class="form-label">اختر الشهر</label>
+                    <select id="monthSelect" class="form-select">
+                        <option value="0">الشهر الأول (الأسبوع 1 - 4)</option>
+                        <option value="1">الشهر الثاني (الأسبوع 5 - 8)</option>
+                        <option value="2">الشهر الثالث (الأسبوع 9 - 12)</option>
+                        <option value="3">الشهر الرابع (الأسبوع 13 - 15)</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary w-100 mt-2" onclick="printReport()">
+                    <i class="bi bi-printer me-1"></i> طباعة PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+    const weekNames = [
+      "الأسبوع الأول", "الأسبوع الثاني", "الأسبوع الثالث", "الأسبوع الرابع",
+      "الأسبوع الخامس", "الأسبوع السادس", "الأسبوع السابع", "الأسبوع الثامن",
+      "الأسبوع التاسع", "الأسبوع العاشر", "الأسبوع الحادي عشر", "الأسبوع الثاني عشر",
+      "الأسبوع الثالث عشر", "الأسبوع الرابع عشر", "الأسبوع الخامس عشر"
+    ];
+    const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+
+    function showToast(message, isError = false) {
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "left",
+            style: {
+                background: isError ? "#dc3545" : "#198754",
+                borderRadius: "8px",
+                fontSize: "14px"
+            }
+        }).showToast();
+    }
+
+    function populateWeekSelect() {
+        const sel = document.getElementById('weekSelect');
+        sel.innerHTML = weekNames.map(w => `<option value="${w}">${w}</option>`).join('');
+    }
+
+    function toggleRangeInputs() {
+        const rangeType = document.getElementById('rangeType').value;
+        document.getElementById('weekWrapper').classList.toggle('d-none', rangeType !== 'week');
+        document.getElementById('monthWrapper').classList.toggle('d-none', rangeType !== 'month');
+    }
+
+    function getSelectedWeeks() {
+        const rangeType = document.getElementById('rangeType').value;
+        if (rangeType === 'all') return weekNames.slice();
+        if (rangeType === 'week') {
+            const val = document.getElementById('weekSelect').value;
+            return val ? [val] : [];
+        }
+        if (rangeType === 'month') {
+            const monthIndex = parseInt(document.getElementById('monthSelect').value);
+            const startIdx = monthIndex * 4;
+            const endIdx = Math.min(startIdx + 4, weekNames.length);
+            return weekNames.slice(startIdx, endIdx);
+        }
+        return [];
+    }
+
+    async function loadSchoolName() {
+        try {
+            const response = await fetch('/get-report-data');
+            const data = await response.json();
+            if (data.mainInfo && data.mainInfo.B2) {
+                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
+            }
+        } catch (e) {
+            console.error("خطأ في جلب اسم المدرسة:", e);
+        }
+    }
+
+    async function printReport() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        // ===== بداية التقرير (رأس الصفحة) =====
+        const addBorder = () => {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        };
+        addBorder();
+
+        const res = await fetch('/get-report-data');
+        const fullResponse = await res.json();
+        const mainInfo = fullResponse.mainInfo || {};
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.line(15, 35, 195, 35);
+        // ===== نهاية رأس الصفحة =====
+
+        // ===== محتوى جدول/تقرير المناوبة =====
+        const reportType = document.getElementById('reportType').value;
+        const selectedWeeks = getSelectedWeeks();
+
+        if (selectedWeeks.length === 0) {
+            showToast("يرجى تحديد نطاق صحيح للطباعة", true);
+            return;
+        }
+
+        const rotRes = await fetch('/api/get-rotation');
+        const rotationData = await rotRes.json();
+
+        const titleText = reportType === 'تقرير' ? 'تقرير جدول المناوبة' : 'جدول المناوبة';
+        doc.setFontSize(14);
+        doc.text(titleText, 105, 42, { align: 'center' });
+
+        const tableRows = [];
+        selectedWeeks.forEach(weekName => {
+            days.forEach(day => {
+                const record = rotationData.find(r => r['الأسبوع'] === weekName && r['اليوم'] === day);
+                tableRows.push([
+                    weekName,
+                    day,
+                    record ? (record['التاريخ'] || '') : '',
+                    record ? (record['المناوب'] || '') : ''
+                ]);
+            });
+        });
+
+        doc.autoTable({
+            startY: 48,
+            head: [['الأسبوع', 'اليوم', 'التاريخ', 'المناوب']],
+            body: tableRows,
+            styles: {
+                font: doc.getFontList().Noto ? 'Noto' : 'helvetica',
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 2
+            },
+            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            margin: { left: 15, right: 15 }
+        });
+        // ===== نهاية محتوى الجدول/التقرير =====
+
+        // ===== نهاية الكود (تذييل الصفحة) =====
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(11);
+
+            doc.text("مدير المدرسة", 40, 279, { align: 'center' });
+            doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
+
+            doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
+            doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+        }
+
+        const rangeType = document.getElementById('rangeType').value;
+        const rangeLabel = rangeType === 'week'
+            ? document.getElementById('weekSelect').value
+            : rangeType === 'month'
+                ? document.getElementById('monthSelect').selectedOptions[0].text
+                : 'الكل';
+
+        const fileName = `${titleText} - ${rangeLabel}.pdf`;
+        doc.save(fileName);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSchoolName();
+        populateWeekSelect();
+        toggleRangeInputs();
+        document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
+    });
+</script>
+
+</body>
+</html>
