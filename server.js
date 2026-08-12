@@ -389,7 +389,14 @@ app.get('/api/teachers', async (req, res) => {
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
     const sheet = getSheet(workbook, TEACHERS_SHEET);
-    res.json(xlsx.utils.sheet_to_json(sheet));
+    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+    // استهداف العمود الثاني (index 1) تحديداً وهو اسم المعلم، وتجاهل عمود السجل المدني (index 0)
+    const teachersNames = data.slice(1)
+      .map(row => row[1])
+      .filter(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "");
+
+    res.json(teachersNames);
   } catch (e) {
     res.status(401).json({ error: e.message });
   }
