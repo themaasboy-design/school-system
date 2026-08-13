@@ -337,7 +337,6 @@
         const dateInput = document.getElementById('hijriDate');
         let date = dateInput ? dateInput.value.trim() : '';
 
-        // ===== التحقق من اختيار البيانات المطلوبة من المستخدم =====
         if (!teacherName) {
             showToast("يرجى اختيار اسم المناوب أولاً", true);
             return;
@@ -396,18 +395,32 @@
         doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 35, 195, 35);
 
-        // ===== عنوان التقرير مع اليوم والتاريخ =====
-        doc.setFontSize(14);
-        doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.text(`اليوم: ${day}   |   التاريخ: ${date}`, 105, 47, { align: 'center' });
-
         const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+
+        // ===== عنوان التقرير =====
+        doc.setFontSize(15);
+        doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
+
+        // ===== سطر اليوم والتاريخ (باستخدام autoTable لمنع مشاكل الاتجاهات والأرقام) =====
+        doc.autoTable({
+            startY: 44,
+            body: [
+                [`التاريخ :  ${date} هـ`, `اليوم :  ${day}`]
+            ],
+            theme: 'plain',
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 11,
+                textColor: [0, 0, 0],
+                cellPadding: 1
+            },
+            margin: { left: 20, right: 20 }
+        });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
-            startY: 52,
+            startY: doc.lastAutoTable.finalY + 3,
             head: [['التوقيع', 'اسم المناوب']],
             body: [['', teacherName]],
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3 },
@@ -421,7 +434,7 @@
             lateStudentsBody.push(['', '', '', String(i)]);
         }
         doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 8,
+            startY: doc.lastAutoTable.finalY + 6,
             head: [['ملاحظات', 'الإجراء', 'أسماء الطلاب المتأخرين بالانصراف', 'الرقم']],
             body: lateStudentsBody,
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
@@ -435,7 +448,7 @@
             violationsBody.push(['', '', '', String(i)]);
         }
         doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 8,
+            startY: doc.lastAutoTable.finalY + 6,
             head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
             body: violationsBody,
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
@@ -443,7 +456,7 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== توقيع الادارة بالمكشوف في الأسفل =====
+        // ===== توقيع الإدارة =====
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
