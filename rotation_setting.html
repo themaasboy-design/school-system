@@ -278,8 +278,6 @@
         doc.setFontSize(14);
         doc.text("جدول المناوبة", 105, 42, { align: 'center' });
 
-        // ترتيب الأعمدة من اليمين لليسار: الأسبوع - اليوم - التاريخ - المناوب
-        // المصفوفة تُكتب من اليسار لليمين، لذا نعكس الترتيب المنطقي
         const tableRows = [];
         selectedWeeks.forEach(weekName => {
             days.forEach(day => {
@@ -333,6 +331,26 @@
 
     // ================= طباعة "تقرير" المناوبة =================
     async function printDutyReport() {
+        const teacherName = document.getElementById('teacherSelect').value;
+        const dayElement = document.getElementById('reportDay');
+        const day = dayElement ? dayElement.value : '';
+        const dateInput = document.getElementById('hijriDate');
+        let date = dateInput ? dateInput.value.trim() : '';
+
+        // ===== التحقق من اختيار البيانات المطلوبة من المستخدم =====
+        if (!teacherName) {
+            showToast("يرجى اختيار اسم المناوب أولاً", true);
+            return;
+        }
+        if (!day) {
+            showToast("يرجى اختيار اليوم", true);
+            return;
+        }
+        if (!date) {
+            showToast("يرجى تحديد التاريخ الهجري", true);
+            return;
+        }
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -343,29 +361,9 @@
         };
         addBorder();
 
-        const dayElement = document.getElementById('reportDay');
-        const day = dayElement ? dayElement.value : '';
-
-        const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
-        let date = dateInput ? dateInput.value.trim() : '';
-
-        if (date) date = date.replace(/\//g, ' - ');
-
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
-        const allData = fullResponse.teachers || [];
         const mainInfo = fullResponse.mainInfo || {};
-
-        const dateInputVal = dateInput ? dateInput.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) : '';
-        const filteredTeachers = allData.filter(item => {
-            const vals = Object.values(item);
-            return vals[0] === dateInputVal && vals[1] === day;
-        });
-
-        if (filteredTeachers.length === 0) {
-            showToast("🔍 لا توجد بيانات لطباعتها", true);
-            return;
-        }
 
         try {
             const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
@@ -391,22 +389,25 @@
             console.warn("لم يتم العثور على صورة الشعار logo.png");
         }
 
+        // ===== الهيدر العلوي =====
         doc.setFontSize(12);
         doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
         doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
         doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 35, 195, 35);
 
-        // ===== عنوان التقرير =====
+        // ===== عنوان التقرير مع اليوم والتاريخ =====
         doc.setFontSize(14);
-        doc.text("تقرير المناوبة", 105, 42, { align: 'center' });
+        doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.text(`اليوم: ${day}   |   التاريخ: ${date}`, 105, 47, { align: 'center' });
 
         const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
-        const teacherName = document.getElementById('teacherSelect').value;
 
-        // ===== جدول اسم المناوب / التوقيع (عمودين × صفين) =====
+        // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
-            startY: 48,
+            startY: 52,
             head: [['التوقيع', 'اسم المناوب']],
             body: [['', teacherName]],
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3 },
@@ -414,7 +415,7 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== جدول الطلاب المتأخرين بالانصراف (4 أعمدة × 6 صفوف) =====
+        // ===== جدول الطلاب المتأخرين بالانصراف =====
         const lateStudentsBody = [];
         for (let i = 1; i <= 5; i++) {
             lateStudentsBody.push(['', '', '', String(i)]);
@@ -428,13 +429,13 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== جدول المخالفين سلوكياً (4 أعمدة × 6 صفوف) =====
+        // ===== جدول المخالفين سلوكياً =====
         const violationsBody = [];
         for (let i = 1; i <= 5; i++) {
             violationsBody.push(['', '', '', String(i)]);
         }
         doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 10,
+            startY: doc.lastAutoTable.finalY + 8,
             head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
             body: violationsBody,
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
@@ -442,6 +443,7 @@
             margin: { left: 15, right: 15 }
         });
 
+        // ===== توقيع الادارة بالمكشوف في الأسفل =====
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -455,8 +457,8 @@
         }
 
         const safeDay = day ? day.trim() : 'اليوم';
-        const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
-        const fileName = `تقرير المناوبة ${safeDay} ${safeDate}.pdf`;
+        const safeDate = date ? date.replace(/[\/\s]/g, '-') : 'التاريخ';
+        const fileName = `تقرير المناوبة - ${teacherName} - ${safeDay} ${safeDate}.pdf`;
 
         doc.save(fileName);
     }
