@@ -8,30 +8,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
 
     <style>
-        .navbar-custom {
-            background-color: #2c3e50;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .navbar-custom .navbar-brand, .navbar-custom .nav-link {
-            color: #ffffff !important;
-        }
-        .navbar-custom .nav-link:hover {
-            color: #2bc48a !important;
-        }
-        .card h5 {
-            font-size: 1.1rem !important;
-            margin-bottom: 15px !important;
-        }
-        .form-label, label {
-            font-size: 0.85rem !important;
-            font-weight: 600;
-        }
-        .form-select {
-            font-size: 0.82rem !important;
-            padding: 5px 8px !important;
-        }
+        .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
+        .navbar-custom { background-color: #2c3e50; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card h5 { font-size: 1.1rem !important; margin-bottom: 15px !important; }
+        .form-label, label { font-size: 0.85rem !important; font-weight: 600; }
+        .form-select, .form-control { font-size: 0.82rem !important; padding: 5px 8px !important; }
+        .d-none { display: none !important; }
     </style>
 </head>
 <body>
@@ -77,33 +62,64 @@
                 <div class="mb-3">
                     <label class="form-label">نوع العرض</label>
                     <select id="reportType" class="form-select">
+                        <option value="" selected>-- اختر نوع العرض --</option>
                         <option value="جدول">جدول</option>
                         <option value="تقرير">تقرير</option>
                     </select>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">النطاق</label>
-                    <select id="rangeType" class="form-select">
-                        <option value="week">أسبوع</option>
-                        <option value="month">شهر</option>
-                        <option value="all">الكل</option>
-                    </select>
+                <!-- خيارات "جدول": تظهر فقط عند اختيار جدول -->
+                <div id="scheduleOptions" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label">النطاق</label>
+                        <select id="rangeType" class="form-select">
+                            <option value="week">أسبوع</option>
+                            <option value="month">شهر</option>
+                            <option value="all">الكل</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="weekWrapper">
+                        <label class="form-label">اختر الأسبوع</label>
+                        <select id="weekSelect" class="form-select"></select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="monthWrapper">
+                        <label class="form-label">اختر الشهر</label>
+                        <select id="monthSelect" class="form-select">
+                            <option value="0">الشهر الأول (الأسبوع 1 - 4)</option>
+                            <option value="1">الشهر الثاني (الأسبوع 5 - 8)</option>
+                            <option value="2">الشهر الثالث (الأسبوع 9 - 12)</option>
+                            <option value="3">الشهر الرابع (الأسبوع 13 - 15)</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="mb-3" id="weekWrapper">
-                    <label class="form-label">اختر الأسبوع</label>
-                    <select id="weekSelect" class="form-select"></select>
-                </div>
+                <!-- خيارات "تقرير": تظهر فقط عند اختيار تقرير -->
+                <div id="reportOptions" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المناوب</label>
+                        <select id="teacherSelect" class="form-select">
+                            <option value="">-- اختر اسم المناوب --</option>
+                        </select>
+                    </div>
 
-                <div class="mb-3 d-none" id="monthWrapper">
-                    <label class="form-label">اختر الشهر</label>
-                    <select id="monthSelect" class="form-select">
-                        <option value="0">الشهر الأول (الأسبوع 1 - 4)</option>
-                        <option value="1">الشهر الثاني (الأسبوع 5 - 8)</option>
-                        <option value="2">الشهر الثالث (الأسبوع 9 - 12)</option>
-                        <option value="3">الشهر الرابع (الأسبوع 13 - 15)</option>
-                    </select>
+                    <div class="mb-3">
+                        <label class="form-label">اليوم</label>
+                        <select id="reportDay" class="form-select">
+                            <option value="">-- اختر اليوم --</option>
+                            <option value="الأحد">الأحد</option>
+                            <option value="الاثنين">الاثنين</option>
+                            <option value="الثلاثاء">الثلاثاء</option>
+                            <option value="الأربعاء">الأربعاء</option>
+                            <option value="الخميس">الخميس</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" style="position: relative;">
+                        <label class="form-label">التاريخ</label>
+                        <input type="text" id="hijriDate" class="form-control" placeholder="اختر التاريخ الهجري" autocomplete="off">
+                    </div>
                 </div>
 
                 <button class="btn btn-primary w-100 mt-2" onclick="printReport()">
@@ -114,10 +130,14 @@
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 
 <script>
     const weekNames = [
@@ -145,6 +165,29 @@
     function populateWeekSelect() {
         const sel = document.getElementById('weekSelect');
         sel.innerHTML = weekNames.map(w => `<option value="${w}">${w}</option>`).join('');
+    }
+
+    async function populateTeacherSelect() {
+        try {
+            const res = await fetch('/api/teachers');
+            const teachers = await res.json();
+            const sel = document.getElementById('teacherSelect');
+            (Array.isArray(teachers) ? teachers : []).forEach(name => {
+                if (!name) return;
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.text = name;
+                sel.appendChild(opt);
+            });
+        } catch (e) {
+            console.error("خطأ في جلب أسماء المعلمين:", e);
+        }
+    }
+
+    function toggleReportTypeSections() {
+        const type = document.getElementById('reportType').value;
+        document.getElementById('scheduleOptions').classList.toggle('d-none', type !== 'جدول');
+        document.getElementById('reportOptions').classList.toggle('d-none', type !== 'تقرير');
     }
 
     function toggleRangeInputs() {
@@ -181,17 +224,14 @@
         }
     }
 
-    async function printReport() {
+    // ================= طباعة "جدول" المناوبة =================
+    async function printScheduleTable() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // ===== بداية التقرير (رأس الصفحة) =====
-        const addBorder = () => {
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.5);
-            doc.rect(5, 5, 200, 287);
-        };
-        addBorder();
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
 
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
@@ -225,12 +265,8 @@
         doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
         doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 35, 195, 35);
-        // ===== نهاية رأس الصفحة =====
 
-        // ===== محتوى جدول/تقرير المناوبة =====
-        const reportType = document.getElementById('reportType').value;
         const selectedWeeks = getSelectedWeeks();
-
         if (selectedWeeks.length === 0) {
             showToast("يرجى تحديد نطاق صحيح للطباعة", true);
             return;
@@ -239,26 +275,27 @@
         const rotRes = await fetch('/api/get-rotation');
         const rotationData = await rotRes.json();
 
-        const titleText = reportType === 'تقرير' ? 'تقرير جدول المناوبة' : 'جدول المناوبة';
         doc.setFontSize(14);
-        doc.text(titleText, 105, 42, { align: 'center' });
+        doc.text("جدول المناوبة", 105, 42, { align: 'center' });
 
+        // ترتيب الأعمدة من اليمين لليسار: الأسبوع - اليوم - التاريخ - المناوب
+        // المصفوفة تُكتب من اليسار لليمين، لذا نعكس الترتيب المنطقي
         const tableRows = [];
         selectedWeeks.forEach(weekName => {
             days.forEach(day => {
                 const record = rotationData.find(r => r['الأسبوع'] === weekName && r['اليوم'] === day);
                 tableRows.push([
-                    weekName,
-                    day,
+                    record ? (record['المناوب'] || '') : '',
                     record ? (record['التاريخ'] || '') : '',
-                    record ? (record['المناوب'] || '') : ''
+                    day,
+                    weekName
                 ]);
             });
         });
 
         doc.autoTable({
             startY: 48,
-            head: [['الأسبوع', 'اليوم', 'التاريخ', 'المناوب']],
+            head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
             body: tableRows,
             styles: {
                 font: doc.getFontList().Noto ? 'Noto' : 'helvetica',
@@ -269,9 +306,142 @@
             headStyles: { fillColor: [17, 45, 78], textColor: 255 },
             margin: { left: 15, right: 15 }
         });
-        // ===== نهاية محتوى الجدول/التقرير =====
 
-        // ===== نهاية الكود (تذييل الصفحة) =====
+        finishAndSaveSchedule(doc, mainInfo);
+    }
+
+    function finishAndSaveSchedule(doc, mainInfo) {
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(11);
+            doc.text("مدير المدرسة", 40, 279, { align: 'center' });
+            doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
+            doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
+            doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+        }
+
+        const rangeType = document.getElementById('rangeType').value;
+        const rangeLabel = rangeType === 'week'
+            ? document.getElementById('weekSelect').value
+            : rangeType === 'month'
+                ? document.getElementById('monthSelect').selectedOptions[0].text
+                : 'الكل';
+
+        doc.save(`جدول المناوبة - ${rangeLabel}.pdf`);
+    }
+
+    // ================= طباعة "تقرير" المناوبة =================
+    async function printDutyReport() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        const addBorder = () => {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        };
+        addBorder();
+
+        const dayElement = document.getElementById('reportDay');
+        const day = dayElement ? dayElement.value : '';
+
+        const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+        let date = dateInput ? dateInput.value.trim() : '';
+
+        if (date) date = date.replace(/\//g, ' - ');
+
+        const res = await fetch('/get-report-data');
+        const fullResponse = await res.json();
+        const allData = fullResponse.teachers || [];
+        const mainInfo = fullResponse.mainInfo || {};
+
+        const dateInputVal = dateInput ? dateInput.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) : '';
+        const filteredTeachers = allData.filter(item => {
+            const vals = Object.values(item);
+            return vals[0] === dateInputVal && vals[1] === day;
+        });
+
+        if (filteredTeachers.length === 0) {
+            showToast("🔍 لا توجد بيانات لطباعتها", true);
+            return;
+        }
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.line(15, 35, 195, 35);
+
+        // ===== عنوان التقرير =====
+        doc.setFontSize(14);
+        doc.text("تقرير المناوبة", 105, 42, { align: 'center' });
+
+        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+        const teacherName = document.getElementById('teacherSelect').value;
+
+        // ===== جدول اسم المناوب / التوقيع (عمودين × صفين) =====
+        doc.autoTable({
+            startY: 48,
+            head: [['التوقيع', 'اسم المناوب']],
+            body: [['', teacherName]],
+            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3 },
+            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            margin: { left: 15, right: 15 }
+        });
+
+        // ===== جدول الطلاب المتأخرين بالانصراف (4 أعمدة × 6 صفوف) =====
+        const lateStudentsBody = [];
+        for (let i = 1; i <= 5; i++) {
+            lateStudentsBody.push(['', '', '', String(i)]);
+        }
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 8,
+            head: [['ملاحظات', 'الإجراء', 'أسماء الطلاب المتأخرين بالانصراف', 'الرقم']],
+            body: lateStudentsBody,
+            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
+            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            margin: { left: 15, right: 15 }
+        });
+
+        // ===== جدول المخالفين سلوكياً (4 أعمدة × 6 صفوف) =====
+        const violationsBody = [];
+        for (let i = 1; i <= 5; i++) {
+            violationsBody.push(['', '', '', String(i)]);
+        }
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
+            body: violationsBody,
+            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
+            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            margin: { left: 15, right: 15 }
+        });
+
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -284,22 +454,42 @@
             doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
         }
 
-        const rangeType = document.getElementById('rangeType').value;
-        const rangeLabel = rangeType === 'week'
-            ? document.getElementById('weekSelect').value
-            : rangeType === 'month'
-                ? document.getElementById('monthSelect').selectedOptions[0].text
-                : 'الكل';
+        const safeDay = day ? day.trim() : 'اليوم';
+        const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
+        const fileName = `تقرير المناوبة ${safeDay} ${safeDate}.pdf`;
 
-        const fileName = `${titleText} - ${rangeLabel}.pdf`;
         doc.save(fileName);
+    }
+
+    async function printReport() {
+        const reportType = document.getElementById('reportType').value;
+        if (!reportType) {
+            showToast("يرجى اختيار نوع العرض أولاً", true);
+            return;
+        }
+        if (reportType === 'جدول') {
+            await printScheduleTable();
+        } else {
+            await printDutyReport();
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadSchoolName();
         populateWeekSelect();
+        populateTeacherSelect();
+        toggleReportTypeSections();
         toggleRangeInputs();
+        document.getElementById('reportType').addEventListener('change', toggleReportTypeSections);
         document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
+
+        $("#hijriDate").hijriDatePicker({
+            hijri: true,
+            showSwitcher: false,
+            format: 'iYYYY/iMM/iDD',
+            hijriFormat: 'iYYYY/iMM/iDD',
+            locale: 'ar-sa'
+        });
     });
 </script>
 
