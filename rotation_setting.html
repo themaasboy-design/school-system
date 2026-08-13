@@ -401,26 +401,44 @@
         doc.setFontSize(15);
         doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
 
-        // ===== سطر اليوم والتاريخ (باستخدام autoTable لمنع مشاكل الاتجاهات والأرقام) =====
+        // ===== إعادة ترتيب وتنسيق التاريخ لضمان عدم اختفاء اليوم والشهر =====
+        let formattedDate = date;
+        if (date) {
+            const parts = date.trim().split(/[\/\-]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    formattedDate = `${parts[2]} / ${parts[1]} / ${parts[0]}`;
+                } else {
+                    formattedDate = `${parts[0]} / ${parts[1]} / ${parts[2]}`;
+                }
+            }
+        }
+
+        // ===== سطر اليوم والتاريخ (مقسم إلى 4 أعمدة منفصلة لمنع قص النص) =====
         doc.autoTable({
-            startY: 44,
+            startY: 45,
             body: [
-                [`التاريخ :  ${date} هـ`, `اليوم :  ${day}`]
+                [`${formattedDate} هـ`, 'التاريخ :', day, 'اليوم :']
             ],
             theme: 'plain',
             styles: {
                 font: fontName,
-                halign: 'center',
                 fontSize: 11,
                 textColor: [0, 0, 0],
                 cellPadding: 1
+            },
+            columnStyles: {
+                0: { halign: 'right' },
+                1: { halign: 'left', fontStyle: 'bold' },
+                2: { halign: 'right' },
+                3: { halign: 'left', fontStyle: 'bold' }
             },
             margin: { left: 20, right: 20 }
         });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 3,
+            startY: doc.lastAutoTable.finalY + 4,
             head: [['التوقيع', 'اسم المناوب']],
             body: [['', teacherName]],
             styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3 },
