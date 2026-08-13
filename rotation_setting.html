@@ -68,7 +68,7 @@
                     </select>
                 </div>
 
-                <!-- خيارات "جدول": تظهر فقط عند اختيار جدول -->
+                <!-- خيارات "جدول" -->
                 <div id="scheduleOptions" class="d-none">
                     <div class="mb-3">
                         <label class="form-label">النطاق</label>
@@ -95,7 +95,7 @@
                     </div>
                 </div>
 
-                <!-- خيارات "تقرير": تظهر فقط عند اختيار تقرير -->
+                <!-- خيارات "تقرير" -->
                 <div id="reportOptions" class="d-none">
                     <div class="mb-3">
                         <label class="form-label">اسم المناوب</label>
@@ -291,17 +291,28 @@
             });
         });
 
+        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+
         doc.autoTable({
             startY: 48,
             head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
             body: tableRows,
             styles: {
-                font: doc.getFontList().Noto ? 'Noto' : 'helvetica',
+                font: fontName,
                 halign: 'center',
                 fontSize: 10,
-                cellPadding: 2
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
             },
-            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
             margin: { left: 15, right: 15 }
         });
 
@@ -353,12 +364,10 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        const addBorder = () => {
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.5);
-            doc.rect(5, 5, 200, 287);
-        };
-        addBorder();
+        // إطار الصفحة الخارجية
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
 
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
@@ -401,48 +410,33 @@
         doc.setFontSize(15);
         doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
 
-        // ===== إعادة ترتيب وتنسيق التاريخ لضمان عدم اختفاء اليوم والشهر =====
-        let formattedDate = date;
-        if (date) {
-            const parts = date.trim().split(/[\/\-]/);
-            if (parts.length === 3) {
-                if (parts[0].length === 4) {
-                    formattedDate = `${parts[2]} / ${parts[1]} / ${parts[0]}`;
-                } else {
-                    formattedDate = `${parts[0]} / ${parts[1]} / ${parts[2]}`;
-                }
-            }
-        }
-
-        // ===== سطر اليوم والتاريخ (مقسم إلى 4 أعمدة منفصلة لمنع قص النص) =====
-        doc.autoTable({
-            startY: 45,
-            body: [
-                [`${formattedDate} هـ`, 'التاريخ :', day, 'اليوم :']
-            ],
-            theme: 'plain',
-            styles: {
-                font: fontName,
-                fontSize: 11,
-                textColor: [0, 0, 0],
-                cellPadding: 1
-            },
-            columnStyles: {
-                0: { halign: 'right' },
-                1: { halign: 'left', fontStyle: 'bold' },
-                2: { halign: 'right' },
-                3: { halign: 'left', fontStyle: 'bold' }
-            },
-            margin: { left: 20, right: 20 }
-        });
+        // ===== طباعة اليوم والتاريخ مباشرة بدون جدول لتجنب قص النص =====
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
+        doc.text(`التاريخ : ${date} هـ`, 110, 48, { align: 'right' });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 4,
+            startY: 53,
             head: [['التوقيع', 'اسم المناوب']],
             body: [['', teacherName]],
-            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3 },
-            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
             margin: { left: 15, right: 15 }
         });
 
@@ -455,8 +449,26 @@
             startY: doc.lastAutoTable.finalY + 6,
             head: [['ملاحظات', 'الإجراء', 'أسماء الطلاب المتأخرين بالانصراف', 'الرقم']],
             body: lateStudentsBody,
-            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
-            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                minCellHeight: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            columnStyles: {
+                3: { cellWidth: 15 }
+            },
             margin: { left: 15, right: 15 }
         });
 
@@ -469,8 +481,26 @@
             startY: doc.lastAutoTable.finalY + 6,
             head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
             body: violationsBody,
-            styles: { font: fontName, halign: 'center', fontSize: 10, cellPadding: 3, minCellHeight: 8 },
-            headStyles: { fillColor: [17, 45, 78], textColor: 255 },
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                minCellHeight: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            columnStyles: {
+                3: { cellWidth: 15 }
+            },
             margin: { left: 15, right: 15 }
         });
 
