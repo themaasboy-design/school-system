@@ -6,9 +6,10 @@
     <title>طباعة جدول المناوبة</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
+    <link rel="stylesheet" href="/style.css">
 
     <style>
         .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
@@ -109,7 +110,7 @@
                         <select id="reportDay" class="form-select">
                             <option value="">-- اختر اليوم --</option>
                             <option value="الأحد">الأحد</option>
-                            <option value="الاثنين">الاثنين</option>
+                            <option value="الإثنين">الإثنين</option>
                             <option value="الثلاثاء">الثلاثاء</option>
                             <option value="الأربعاء">الأربعاء</option>
                             <option value="الخميس">الخميس</option>
@@ -118,7 +119,7 @@
 
                     <div class="mb-3" style="position: relative;">
                         <label class="form-label">التاريخ</label>
-                        <input type="text" id="hijriDate" class="form-control" placeholder="اختر التاريخ الهجري" autocomplete="off">
+                        <input type="text" id="hijriDate" class="form-control" placeholder="YYYY/MM/DD" autocomplete="off">
                     </div>
                 </div>
 
@@ -148,10 +149,9 @@
     ];
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
 
-    // 🔢 تحويل الأرقام العربية الشرقية (٠-٩) إلى أرقام غربية (0-9)
-    // لأن خط NotoSansArabic-Regular.ttf المستخدم بالطباعة لا يدعم رسم الأرقام الشرقية
+    // 🔢 تحويل الأرقام الشرقية (٠-٩) إلى أرقام غربية (0-9)
     function toWesternDigits(str) {
-        if (!str) return '';
+        if (str === null || str === undefined) return '';
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
@@ -224,7 +224,7 @@
             const response = await fetch('/get-report-data');
             const data = await response.json();
             if (data.mainInfo && data.mainInfo.B2) {
-                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
+                document.getElementById('schoolName').textContent = "مدرسة " + toWesternDigits(data.mainInfo.B2);
             }
         } catch (e) {
             console.error("خطأ في جلب اسم المدرسة:", e);
@@ -235,10 +235,6 @@
     async function printScheduleTable() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.5);
-        doc.rect(5, 5, 200, 287);
 
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
@@ -269,8 +265,8 @@
 
         doc.setFontSize(12);
         doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-        doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-        doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 35, 195, 35);
 
         const selectedWeeks = getSelectedWeeks();
@@ -288,12 +284,12 @@
         const tableRows = [];
         selectedWeeks.forEach(weekName => {
             days.forEach(day => {
-                const record = rotationData.find(r => r['الأسبوع'] === weekName && r['اليوم'] === day);
+                const record = rotationData.find(r => r['الأسبوع'] === weekName && (r['اليوم'] === day || r['اليوم'] === day.replace('إ', 'ا')));
                 tableRows.push([
-                    record ? (record['المناوب'] || '') : '',
-                    record ? toWesternDigits(record['التاريخ'] || '') : '',
+                    toWesternDigits(record ? (record['المناوب'] || '') : ''),
+                    toWesternDigits(record ? (record['التاريخ'] || '') : ''),
                     day,
-                    weekName
+                    toWesternDigits(weekName)
                 ]);
             });
         });
@@ -333,11 +329,16 @@
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
+            
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+
             doc.setFontSize(11);
-            doc.text("مدير المدرسة", 40, 279, { align: 'center' });
-            doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
-            doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
-            doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
+            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
         }
 
         const rangeType = document.getElementById('rangeType').value;
@@ -347,7 +348,7 @@
                 ? document.getElementById('monthSelect').selectedOptions[0].text
                 : 'الكل';
 
-        doc.save(`جدول المناوبة - ${rangeLabel}.pdf`);
+        doc.save(`جدول المناوبة - ${toWesternDigits(rangeLabel)}.pdf`);
     }
 
     // ================= طباعة "تقرير" المناوبة =================
@@ -356,7 +357,7 @@
         const dayElement = document.getElementById('reportDay');
         const day = dayElement ? dayElement.value : '';
         const dateInput = document.getElementById('hijriDate');
-        let date = dateInput ? dateInput.value.trim() : '';
+        let date = dateInput ? toWesternDigits(dateInput.value.trim()) : '';
 
         if (!teacherName) {
             showToast("يرجى اختيار اسم المناوب أولاً", true);
@@ -373,11 +374,6 @@
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-
-        // إطار الصفحة الخارجية
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.5);
-        doc.rect(5, 5, 200, 287);
 
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
@@ -410,8 +406,8 @@
         // ===== الهيدر العلوي =====
         doc.setFontSize(12);
         doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-        doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
-        doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
         doc.line(15, 35, 195, 35);
 
         const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
@@ -420,18 +416,18 @@
         doc.setFontSize(15);
         doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
 
-        // ===== طباعة اليوم والتاريخ مباشرة بدون جدول لتجنب قص النص =====
+        // ===== اليوم والتاريخ بصيغة 0-9 و YYYY/MM/DD =====
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
         doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
-        doc.text(`التاريخ : ${toWesternDigits(date)} هـ`, 110, 48, { align: 'right' });
+        doc.text(`التاريخ : ${date} هـ`, 110, 48, { align: 'right' });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
             startY: 53,
             theme: 'grid',
             head: [['التوقيع', 'اسم المناوب']],
-            body: [['', teacherName]],
+            body: [['', toWesternDigits(teacherName)]],
             styles: {
                 font: fontName,
                 halign: 'center',
@@ -523,17 +519,21 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== توقيع الإدارة =====
+        // ===== إطار الصفحة والتوقيعات لكل الصفحات =====
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+
             doc.setFontSize(11);
+            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
 
-            doc.text("مدير المدرسة", 40, 279, { align: 'center' });
-            doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
-
-            doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
-            doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
         }
 
         const safeDay = day ? day.trim() : 'اليوم';
@@ -565,12 +565,15 @@
         document.getElementById('reportType').addEventListener('change', toggleReportTypeSections);
         document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
 
+        // إعداد التاريخ الهجري بصيغة YYYY/MM/DD والأرقام الغربية
         $("#hijriDate").hijriDatePicker({
             hijri: true,
             showSwitcher: false,
-            format: 'iYYYY/iMM/iDD',
-            hijriFormat: 'iYYYY/iMM/iDD',
+            format: 'YYYY/MM/DD',
+            hijriFormat: 'YYYY/MM/DD',
             locale: 'ar-sa'
+        }).on('dp.change change input', function () {
+            this.value = toWesternDigits(this.value);
         });
     });
 </script>
