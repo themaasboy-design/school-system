@@ -148,6 +148,13 @@
     ];
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
 
+    // 🔢 تحويل الأرقام العربية الشرقية (٠-٩) إلى أرقام غربية (0-9)
+    // لأن خط NotoSansArabic-Regular.ttf المستخدم بالطباعة لا يدعم رسم الأرقام الشرقية
+    function toWesternDigits(str) {
+        if (!str) return '';
+        return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    }
+
     function showToast(message, isError = false) {
         Toastify({
             text: message,
@@ -284,7 +291,7 @@
                 const record = rotationData.find(r => r['الأسبوع'] === weekName && r['اليوم'] === day);
                 tableRows.push([
                     record ? (record['المناوب'] || '') : '',
-                    record ? (record['التاريخ'] || '') : '',
+                    record ? toWesternDigits(record['التاريخ'] || '') : '',
                     day,
                     weekName
                 ]);
@@ -295,6 +302,7 @@
 
         doc.autoTable({
             startY: 48,
+            theme: 'grid',
             head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
             body: tableRows,
             styles: {
@@ -304,7 +312,8 @@
                 cellPadding: 3,
                 textColor: [0, 0, 0],
                 lineColor: [0, 0, 0],
-                lineWidth: 0.2
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
             },
             headStyles: {
                 fillColor: [230, 230, 230],
@@ -313,6 +322,7 @@
                 lineColor: [0, 0, 0],
                 lineWidth: 0.2
             },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
             margin: { left: 15, right: 15 }
         });
 
@@ -414,11 +424,12 @@
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
         doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
-        doc.text(`التاريخ : ${date} هـ`, 110, 48, { align: 'right' });
+        doc.text(`التاريخ : ${toWesternDigits(date)} هـ`, 110, 48, { align: 'right' });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
             startY: 53,
+            theme: 'grid',
             head: [['التوقيع', 'اسم المناوب']],
             body: [['', teacherName]],
             styles: {
@@ -428,7 +439,8 @@
                 cellPadding: 3,
                 textColor: [0, 0, 0],
                 lineColor: [0, 0, 0],
-                lineWidth: 0.2
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
             },
             headStyles: {
                 fillColor: [230, 230, 230],
@@ -437,6 +449,7 @@
                 lineColor: [0, 0, 0],
                 lineWidth: 0.2
             },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
             margin: { left: 15, right: 15 }
         });
 
@@ -447,6 +460,7 @@
         }
         doc.autoTable({
             startY: doc.lastAutoTable.finalY + 6,
+            theme: 'grid',
             head: [['ملاحظات', 'الإجراء', 'أسماء الطلاب المتأخرين بالانصراف', 'الرقم']],
             body: lateStudentsBody,
             styles: {
@@ -457,7 +471,8 @@
                 minCellHeight: 8,
                 textColor: [0, 0, 0],
                 lineColor: [0, 0, 0],
-                lineWidth: 0.2
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
             },
             headStyles: {
                 fillColor: [230, 230, 230],
@@ -466,6 +481,7 @@
                 lineColor: [0, 0, 0],
                 lineWidth: 0.2
             },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
             columnStyles: {
                 3: { cellWidth: 15 }
             },
@@ -479,6 +495,7 @@
         }
         doc.autoTable({
             startY: doc.lastAutoTable.finalY + 6,
+            theme: 'grid',
             head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
             body: violationsBody,
             styles: {
@@ -489,7 +506,8 @@
                 minCellHeight: 8,
                 textColor: [0, 0, 0],
                 lineColor: [0, 0, 0],
-                lineWidth: 0.2
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
             },
             headStyles: {
                 fillColor: [230, 230, 230],
@@ -498,6 +516,7 @@
                 lineColor: [0, 0, 0],
                 lineWidth: 0.2
             },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
             columnStyles: {
                 3: { cellWidth: 15 }
             },
