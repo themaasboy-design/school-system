@@ -149,16 +149,16 @@
     ];
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
 
-    // 🔢 تحويل الأرقام الشرقية (٠-٩) إلى أرقام غربية (0-9)
+    // 🔢 تحويل الأرقام الشرقية إلى أرقام غربية
     function toWesternDigits(str) {
         if (str === null || str === undefined) return '';
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ ليظهر من اليمين إلى اليسار (اليوم على اليمين ثم الشهر ثم السنة هـ)
+    // 🗓️ تنسيق التاريخ لتكون (هـ) على أقصى اليسار بعد السنة
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
-        let str = toWesternDigits(rawDate).toString().trim().replace('',/هـ/g).trim();
+        let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
         if (!str) return '';
 
         let day = null, month = null, year = null;
@@ -195,10 +195,10 @@
         }
 
         if (day && month && year) {
-            return `${year}-${month}-${day} هـ`;
+            return `هـ ${year}-${month}-${day}`;
         }
 
-        return str ? `${str} هـ` : '';
+        return str ? `هـ ${str}` : '';
     }
 
     function normalizeArabicText(str) {
@@ -454,7 +454,6 @@
             console.warn("لم يتم العثور على صورة الشعار logo.png");
         }
 
-        // ===== الهيدر العلوي =====
         doc.setFontSize(12);
         doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
         doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
@@ -463,17 +462,14 @@
 
         const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
 
-        // ===== عنوان التقرير =====
         doc.setFontSize(15);
         doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
 
-        // ===== اليوم والتاريخ =====
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
         doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
         doc.text(`التاريخ : ${date}`, 110, 48, { align: 'right' });
 
-        // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
             startY: 53,
             theme: 'grid',
@@ -500,7 +496,6 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== جدول الطلاب المتأخرين بالانصراف =====
         const lateStudentsBody = [];
         for (let i = 1; i <= 5; i++) {
             lateStudentsBody.push(['', '', '', String(i)]);
@@ -535,7 +530,6 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== جدول المخالفين سلوكياً =====
         const violationsBody = [];
         for (let i = 1; i <= 5; i++) {
             violationsBody.push(['', '', '', String(i)]);
@@ -570,7 +564,6 @@
             margin: { left: 15, right: 15 }
         });
 
-        // ===== إطار الصفحة والتوقيعات لكل الصفحات =====
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
