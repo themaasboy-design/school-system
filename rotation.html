@@ -3,76 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام توزيع الإشراف اليومي - جدول المناوبة</title>
+    <title>طباعة جدول المناوبة</title>
 
-    <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-    <!-- Toastify CSS للرسائل التنبيهية -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
     <link rel="stylesheet" href="/style.css">
 
     <style>
-        .navbar-custom {
-            background-color: #2c3e50;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .navbar-custom .navbar-brand, .navbar-custom .nav-link {
-            color: #ffffff !important;
-        }
-        .navbar-custom .nav-link:hover {
-            color: #2bc48a !important;
-        }
-        .card h5 {
-            font-size: 1.1rem !important; 
-            margin-bottom: 15px !important;
-        }
-        .form-label, label {
-            font-size: 0.85rem !important;
-            font-weight: 600;
-        }
-        .form-select {
-            font-size: 0.82rem !important;
-            padding: 5px 8px !important;
-        }
-        .table th {
-            font-size: 0.85rem !important;
-            padding: 8px 4px !important;
-        }
-        .table td {
-            font-size: 0.82rem !important;
-            padding: 5px 4px !important;
-            vertical-align: middle;
-        }
-        .hijri-date {
-            white-space: nowrap;
-        }
-
-        /* 🖨️ تنسيقات الطباعة المخصصة */
-        @media print {
-            .no-print, nav, .navbar, .btn, .dropdown-container {
-                display: none !important;
-            }
-            body {
-                background: #fff !important;
-                padding: 0 !important;
-            }
-            .container-fluid {
-                width: 100% !important;
-                padding: 0 !important;
-            }
-            .card {
-                border: 1px solid #ccc !important;
-                box-shadow: none !important;
-                page-break-inside: avoid;
-            }
-            .duty-select {
-                border: none !important;
-                appearance: none !important;
-                -webkit-appearance: none !important;
-                background: transparent !important;
-                font-weight: bold;
-            }
-        }
+        .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
+        .navbar-custom { background-color: #2c3e50; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card h5 { font-size: 1.1rem !important; margin-bottom: 15px !important; }
+        .form-label, label { font-size: 0.85rem !important; font-weight: 600; }
+        .form-select, .form-control { font-size: 0.82rem !important; padding: 5px 8px !important; }
+        .d-none { display: none !important; }
     </style>
 </head>
 <body>
@@ -91,81 +36,109 @@
             <div class="dropdown-menu">
                 <a href="report.html">تقرير الغياب</a>
                 <a href="reportmoni.html">تقرير الإشراف</a>
+                <a href="rotation_setting.html">طباعة جدول المناوبة</a>
             </div>
         </div>
 
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
             <div class="dropdown-menu">
-                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>              
+                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>
                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                <a href="rotation.html"> إعداد جدول المناوبة </a>
             </div>
         </div>
         <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
 </nav>
 
-<!-- شريط الأدوات -->
-<div class="container-fluid py-3 mb-3 bg-white border-bottom shadow-sm no-print">
-    <div class="row align-items-center g-3">
-        <div class="col-md-3">
-            <h4 class="fw-bold mb-0 text-dark">
-                <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة
-            </h4>
-        </div>
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-4 text-dark">
+                    <i class="bi bi-printer me-2" style="color:#112d4e;"></i> طباعة جدول المناوبة
+                </h5>
 
-        <!-- اختيار بداية الأسبوع -->
-        <div class="col-md-7">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
+                <div class="mb-3">
+                    <label class="form-label">نوع العرض</label>
+                    <select id="reportType" class="form-select">
+                        <option value="" selected>-- اختر نوع العرض --</option>
+                        <option value="جدول">جدول</option>
+                        <option value="تقرير">تقرير</option>
+                    </select>
+                </div>
 
-                <select id="hijriDay" class="form-select form-select-sm w-auto"></select>
+                <!-- خيارات "جدول" -->
+                <div id="scheduleOptions" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label">النطاق</label>
+                        <select id="rangeType" class="form-select">
+                            <option value="week">أسبوع</option>
+                            <option value="month">شهر</option>
+                            <option value="all">الكل</option>
+                        </select>
+                    </div>
 
-                <select id="hijriMonth" class="form-select form-select-sm w-auto">
-                    <option value="1">محرم</option>
-                    <option value="2">صفر</option>
-                    <option value="3">ربيع الأول</option>
-                    <option value="4">ربيع الآخر</option>
-                    <option value="5">جمادى الأولى</option>
-                    <option value="6">جمادى الآخرة</option>
-                    <option value="7">رجب</option>
-                    <option value="8">شعبان</option>
-                    <option value="9">رمضان</option>
-                    <option value="10">شوال</option>
-                    <option value="11">ذو القعدة</option>
-                    <option value="12">ذو الحجة</option>
-                </select>
+                    <div class="mb-3" id="weekWrapper">
+                        <label class="form-label">اختر الأسبوع</label>
+                        <select id="weekSelect" class="form-select"></select>
+                    </div>
 
-                <select id="hijriYear" class="form-select form-select-sm w-auto"></select>
+                    <div class="mb-3 d-none" id="monthWrapper">
+                        <label class="form-label">اختر الشهر</label>
+                        <select id="monthSelect" class="form-select">
+                            <option value="0">الشهر الأول (الأسبوع 1 - 4)</option>
+                            <option value="1">الشهر الثاني (الأسبوع 5 - 8)</option>
+                            <option value="2">الشهر الثالث (الأسبوع 9 - 12)</option>
+                            <option value="3">الشهر الرابع (الأسبوع 13 - 15)</option>
+                        </select>
+                    </div>
+                </div>
 
-                <!-- زر تعبئة التواريخ -->
-                <button class="btn btn-primary btn-sm text-nowrap ms-1" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
-                    تعبئة
-                </button>
+                <!-- خيارات "تقرير" -->
+                <div id="reportOptions" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المناوب</label>
+                        <select id="teacherSelect" class="form-select">
+                            <option value="">-- اختر اسم المناوب --</option>
+                        </select>
+                    </div>
 
-                <!-- زر مسح التواريخ -->
-                <button class="btn btn-outline-danger btn-sm text-nowrap ms-1" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
-                    مسح التواريخ
+                    <div class="mb-3">
+                        <label class="form-label">اليوم</label>
+                        <select id="reportDay" class="form-select">
+                            <option value="">-- اختر اليوم --</option>
+                            <option value="الأحد">الأحد</option>
+                            <option value="الإثنين">الإثنين</option>
+                            <option value="الثلاثاء">الثلاثاء</option>
+                            <option value="الأربعاء">الأربعاء</option>
+                            <option value="الخميس">الخميس</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" style="position: relative;">
+                        <label class="form-label">التاريخ</label>
+                        <input type="text" id="hijriDate" class="form-control" placeholder="YYYY/MM/DD" autocomplete="off">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100 mt-2" onclick="printReport()">
+                    <i class="bi bi-printer me-1"></i> طباعة PDF
                 </button>
             </div>
-        </div>
-
-        <div class="col-md-2 text-start">
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> طباعة
-            </button>
         </div>
     </div>
 </div>
 
-<!-- شبكة الجداول -->
-<div class="container-fluid px-4 mb-5">
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="weeksGrid"></div>
-</div>
-
-<!-- المكتبات -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 
 <script>
     const weekNames = [
@@ -175,9 +148,24 @@
       "الأسبوع الثالث عشر", "الأسبوع الرابع عشر", "الأسبوع الخامس عشر"
     ];
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
-    let teachersList = [];
 
-    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمعروض
+    // 🔢 تحويل الأرقام الشرقية (٠-٩) إلى أرقام غربية (0-9)
+    function toWesternDigits(str) {
+        if (str === null || str === undefined) return '';
+        return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    }
+
+    // 📅 استخراج أرقام التاريخ فقط (يتجاهل أي فواصل أو محارف اتجاه مخفية RTL/LRM)
+    // ويعيد تركيبها بصيغة نظيفة مضمونة: YYYY/MM/DD بأرقام غربية
+    function cleanDateYMD(str) {
+        if (!str) return '';
+        const westernized = toWesternDigits(str);
+        const groups = westernized.match(/\d+/g);
+        if (!groups || groups.length === 0) return '';
+        return groups.join('/');
+    }
+
+    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمطبوع
     function normalizeArabicText(str) {
         if (!str) return '';
         return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/\s+/g, '');
@@ -197,262 +185,54 @@
         }).showToast();
     }
 
-    async function initPage() {
-        initGrid();
-        populateHijriSelects();
-        await loadSchoolName();
+    function populateWeekSelect() {
+        const sel = document.getElementById('weekSelect');
+        sel.innerHTML = weekNames.map(w => `<option value="${w}">${w}</option>`).join('');
+    }
 
+    async function populateTeacherSelect() {
         try {
             const res = await fetch('/api/teachers');
-            teachersList = await res.json();
-            updateTeachersDropdowns();
-            await loadSavedRotation();
-        } catch (err) {
-            console.error("فشل جلب قائمة المعلمين أو البيانات المحفوظة", err);
-            updateTeachersDropdowns();
-            showToast("تعذر تحميل قائمة المعلمين من السيرفر", true);
-        }
-    }
-
-    function initGrid() {
-        const grid = document.getElementById("weeksGrid");
-        grid.innerHTML = "";
-
-        weekNames.forEach((weekTitle, weekIndex) => {
-            let tableRows = "";
-            days.forEach((day, dayIndex) => {
-                tableRows += `
-                <tr>
-                    <td class="fw-bold bg-light" style="width: 18%;">${day}</td>
-                    <td class="text-muted hijri-date" id="date-${weekIndex}-${dayIndex}" style="width: 30%;">--/--/----</td>
-                    <td style="width: 52%;">
-                        <select class="form-select duty-select" id="select-${weekIndex}-${dayIndex}">
-                            <option value="">-- اختر المناوب --</option>
-                        </select>
-                    </td>
-                </tr>
-                `;
+            const teachers = await res.json();
+            const sel = document.getElementById('teacherSelect');
+            (Array.isArray(teachers) ? teachers : []).forEach(name => {
+                if (!name) return;
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.text = name;
+                sel.appendChild(opt);
             });
-
-            grid.innerHTML += `
-            <div class="col">
-                <div class="card week-card shadow-sm h-100 d-flex flex-column">
-                    <div class="card-header bg-white py-2 border-bottom">
-                        <h6 class="fw-bold mb-0 text-center" style="color: #112d4e;">${weekTitle}</h6>
-                    </div>
-                    <div class="card-body p-2 flex-grow-1">
-                        <table class="table table-bordered table-sm text-center mb-0">
-                            <thead>
-                                <tr class="table-light">
-                                    <th style="width: 18%;">اليوم</th>
-                                    <th style="width: 30%;">التاريخ</th>
-                                    <th style="width: 52%;">المعلم المناوب</th>
-                                </tr>
-                            </thead>
-                            <tbody>${tableRows}</tbody>
-                        </table>
-                    </div>
-                    <div class="card-footer bg-white border-top p-2 d-flex gap-2 no-print">
-                        <button class="btn btn-sm btn-success flex-fill" onclick="saveWeekData(${weekIndex})">
-                            <i class="bi bi-check-circle me-1"></i> حفظ
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearWeekData(${weekIndex})">
-                            <i class="bi bi-x-circle me-1"></i> مسح
-                        </button>
-                    </div>
-                </div>
-            </div>
-            `;
-        });
-    }
-
-    function populateHijriSelects() {
-        const daySelect = document.getElementById("hijriDay");
-        const yearSelect = document.getElementById("hijriYear");
-
-        daySelect.innerHTML = "";
-        for (let i = 1; i <= 30; i++) {
-            daySelect.innerHTML += `<option value="${i}">${i}</option>`;
-        }
-
-        yearSelect.innerHTML = "";
-        for (let i = 1445; i <= 1455; i++) {
-            yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
-        }
-
-        // إعداد القيم الافتراضية لقوائم الاختيار (1 / محرم / 1448)
-        daySelect.value = 1;
-        document.getElementById("hijriMonth").value = 1;
-        yearSelect.value = 1448;
-    }
-
-    // دالة محولة محسنة ودقيقة لحساب التاريخ الميلادي من الهجري (تقويم أم القرى)
-    function hijriToGregorianDate(hYear, hMonth, hDay) {
-        const baseHijriYear = 1445;
-        const baseGregorian = new Date(2023, 6, 19); // 19 يوليو 2023م يوافق 1 محرم 1445هـ
-        
-        const yearDiff = hYear - baseHijriYear;
-        const totalDaysApprox = Math.floor((yearDiff * 354.367) + ((hMonth - 1) * 29.53) + (hDay - 1));
-        
-        let approxDate = new Date(baseGregorian.getTime() + totalDaysApprox * 86400000);
-        
-        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
-            day: 'numeric', month: 'numeric', year: 'numeric'
-        });
-
-        // البحث الدقيق في نطاق 15 يوماً حول التاريخ التقديري
-        for (let offset = -15; offset <= 15; offset++) {
-            let testDate = new Date(approxDate.getTime() + offset * 86400000);
-            let parts = formatter.formatToParts(testDate);
-            let iy = parseInt(parts.find(p => p.type === 'year').value);
-            let im = parseInt(parts.find(p => p.type === 'month').value);
-            let id = parseInt(parts.find(p => p.type === 'day').value);
-
-            if (iy === hYear && im === hMonth && id === hDay) {
-                return testDate;
-            }
-        }
-        return approxDate;
-    }
-
-    // دالة تنسيق التاريخ الهجري بأرقام غربية (0-9) وصيغة YYYY/MM/DD
-    function formatHijriYMD(date) {
-        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
-            day: '2-digit', month: '2-digit', year: 'numeric'
-        });
-        const parts = formatter.formatToParts(date);
-        const y = parts.find(p => p.type === 'year').value;
-        const m = parts.find(p => p.type === 'month').value;
-        const d = parts.find(p => p.type === 'day').value;
-        return `${y}/${m}/${d}`;
-    }
-
-    // تُستدعى عند الضغط على زر "تعبئة"
-    function generateFromHijri() {
-        const hDay = parseInt(document.getElementById("hijriDay").value);
-        const hMonth = parseInt(document.getElementById("hijriMonth").value);
-        const hYear = parseInt(document.getElementById("hijriYear").value);
-
-        let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
-
-        for (let w = 0; w < 15; w++) {
-            for (let d = 0; d < 5; d++) {
-                // إضافة الأيام بالتسلسل من تاريخ البداية المباشر
-                let offsetDays = (w * 7) + d;
-                let curr = new Date(startDate.getTime() + offsetDays * 86400000);
-
-                const cell = document.getElementById(`date-${w}-${d}`);
-                if (cell) cell.innerText = formatHijriYMD(curr);
-            }
-        }
-        showToast("تمت تعبئة التواريخ بنجاح");
-    }
-
-    function clearAllDates() {
-        for (let w = 0; w < 15; w++) {
-            for (let d = 0; d < 5; d++) {
-                const cell = document.getElementById(`date-${w}-${d}`);
-                if (cell) cell.innerText = "--/--/----";
-            }
-        }
-        showToast("تم مسح جميع التواريخ");
-    }
-
-    function updateTeachersDropdowns() {
-        let optionsHtml = `<option value="">-- اختر المناوب --</option>`;
-
-        if (teachersList) {
-            let list = Array.isArray(teachersList) 
-                ? teachersList 
-                : (teachersList.teachers || teachersList.data || []);
-
-            list.forEach(item => {
-                let teacherName = "";
-                if (typeof item === 'string') {
-                    teacherName = item;
-                } else if (typeof item === 'object' && item !== null) {
-                    teacherName = item.name || item['اسم المعلم'] || item.teacher || item.Name || Object.values(item)[0];
-                }
-
-                if (teacherName) {
-                    optionsHtml += `<option value="${teacherName}">${teacherName}</option>`;
-                }
-            });
-        }
-
-        optionsHtml += `<option disabled>──────────</option>`;
-        optionsHtml += `<option value="إجازة يوم وطني">إجازة يوم وطني</option>`;
-        optionsHtml += `<option value="إجازة يوم مطول">إجازة يوم مطول</option>`;
-        optionsHtml += `<option value="إجازة">إجازة</option>`;
-
-        for (let w = 0; w < 15; w++) {
-            for (let d = 0; d < 5; d++) {
-                const selectEl = document.getElementById(`select-${w}-${d}`);
-                if (selectEl) selectEl.innerHTML = optionsHtml;
-            }
+        } catch (e) {
+            console.error("خطأ في جلب أسماء المعلمين:", e);
         }
     }
 
-    async function loadSavedRotation() {
-        try {
-            const res = await fetch('/api/get-rotation');
-            const savedData = await res.json();
-
-            savedData.forEach(item => {
-                const weekIndex = weekNames.indexOf(item['الأسبوع']);
-                const dayIndex = days.findIndex(d => normalizeArabicText(d) === normalizeArabicText(item['اليوم']));
-
-                if (weekIndex !== -1 && dayIndex !== -1) {
-                    const selectEl = document.getElementById(`select-${weekIndex}-${dayIndex}`);
-                    if (selectEl && item['المناوب']) {
-                        selectEl.value = item['المناوب'];
-                    }
-                    if (item['التاريخ'] || item['تاريخ']) {
-                        const dateCell = document.getElementById(`date-${weekIndex}-${dayIndex}`);
-                        if (dateCell) dateCell.innerText = item['التاريخ'] || item['تاريخ'];
-                    }
-                }
-            });
-        } catch (err) {
-            console.error("تعذر جلب البيانات المحفوظة", err);
-        }
+    function toggleReportTypeSections() {
+        const type = document.getElementById('reportType').value;
+        document.getElementById('scheduleOptions').classList.toggle('d-none', type !== 'جدول');
+        document.getElementById('reportOptions').classList.toggle('d-none', type !== 'تقرير');
     }
 
-    async function saveWeekData(weekIndex) {
-        const weekTitle = weekNames[weekIndex];
-        const weekData = [];
-
-        for (let d = 0; d < 5; d++) {
-            const day = days[d];
-            const date = document.getElementById(`date-${weekIndex}-${d}`).innerText;
-            const teacher = document.getElementById(`select-${weekIndex}-${d}`).value;
-            weekData.push({ day, date, teacher });
-        }
-
-        try {
-            const res = await fetch('/api/save-rotation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ weekTitle, weekData })
-            });
-            const result = await res.json();
-            if (res.ok) {
-                showToast(result.message || "تم حفظ بيانات الأسبوع بنجاح");
-            } else {
-                showToast('خطأ: ' + (result.error || "تعذر الحفظ"), true);
-            }
-        } catch (err) {
-            showToast('تعذر الاتصال بالسيرفر للحفظ', true);
-        }
+    function toggleRangeInputs() {
+        const rangeType = document.getElementById('rangeType').value;
+        document.getElementById('weekWrapper').classList.toggle('d-none', rangeType !== 'week');
+        document.getElementById('monthWrapper').classList.toggle('d-none', rangeType !== 'month');
     }
 
-    function clearWeekData(weekIndex) {
-        if (confirm(`هل أنت تأكد من مسح خيارات ${weekNames[weekIndex]}؟`)) {
-            for (let d = 0; d < 5; d++) {
-                document.getElementById(`select-${weekIndex}-${d}`).value = "";
-            }
-            showToast(`تم مسح خيارات ${weekNames[weekIndex]}`);
+    function getSelectedWeeks() {
+        const rangeType = document.getElementById('rangeType').value;
+        if (rangeType === 'all') return weekNames.slice();
+        if (rangeType === 'week') {
+            const val = document.getElementById('weekSelect').value;
+            return val ? [val] : [];
         }
+        if (rangeType === 'month') {
+            const monthIndex = parseInt(document.getElementById('monthSelect').value);
+            const startIdx = monthIndex * 4;
+            const endIdx = Math.min(startIdx + 4, weekNames.length);
+            return weekNames.slice(startIdx, endIdx);
+        }
+        return [];
     }
 
     async function loadSchoolName() {
@@ -460,14 +240,361 @@
             const response = await fetch('/get-report-data');
             const data = await response.json();
             if (data.mainInfo && data.mainInfo.B2) {
-                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
+                document.getElementById('schoolName').textContent = "مدرسة " + toWesternDigits(data.mainInfo.B2);
             }
         } catch (e) {
             console.error("خطأ في جلب اسم المدرسة:", e);
         }
     }
 
-    document.addEventListener("DOMContentLoaded", initPage);
+    // ================= طباعة "جدول" المناوبة =================
+    async function printScheduleTable() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        const res = await fetch('/get-report-data');
+        const fullResponse = await res.json();
+        const mainInfo = fullResponse.mainInfo || {};
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.line(15, 35, 195, 35);
+
+        const selectedWeeks = getSelectedWeeks();
+        if (selectedWeeks.length === 0) {
+            showToast("يرجى تحديد نطاق صحيح للطباعة", true);
+            return;
+        }
+
+        const rotRes = await fetch('/api/get-rotation');
+        const rotationData = await rotRes.json();
+
+        doc.setFontSize(14);
+        doc.text("جدول المناوبة", 105, 42, { align: 'center' });
+
+        const tableRows = [];
+        selectedWeeks.forEach(weekName => {
+            days.forEach(day => {
+                const record = rotationData.find(r => r['الأسبوع'] === weekName && normalizeArabicText(r['اليوم']) === normalizeArabicText(day));
+                tableRows.push([
+                    toWesternDigits(record ? (record['المناوب'] || '') : ''),
+                    cleanDateYMD(record ? (record['التاريخ'] || '') : ''),
+                    day,
+                    toWesternDigits(weekName)
+                ]);
+            });
+        });
+
+        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+
+        doc.autoTable({
+            startY: 48,
+            theme: 'grid',
+            head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
+            body: tableRows,
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            columnStyles: {
+                1: { cellWidth: 30 }
+            },
+            margin: { left: 15, right: 15 }
+        });
+
+        finishAndSaveSchedule(doc, mainInfo);
+    }
+
+    function finishAndSaveSchedule(doc, mainInfo) {
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+
+            doc.setFontSize(11);
+            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
+            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
+        }
+
+        const rangeType = document.getElementById('rangeType').value;
+        const rangeLabel = rangeType === 'week'
+            ? document.getElementById('weekSelect').value
+            : rangeType === 'month'
+                ? document.getElementById('monthSelect').selectedOptions[0].text
+                : 'الكل';
+
+        doc.save(`جدول المناوبة - ${toWesternDigits(rangeLabel)}.pdf`);
+    }
+
+    // ================= طباعة "تقرير" المناوبة =================
+    async function printDutyReport() {
+        const teacherName = document.getElementById('teacherSelect').value;
+        const dayElement = document.getElementById('reportDay');
+        const day = dayElement ? dayElement.value : '';
+        const dateInput = document.getElementById('hijriDate');
+        let date = dateInput ? cleanDateYMD(dateInput.value.trim()) : '';
+
+        if (!teacherName) {
+            showToast("يرجى اختيار اسم المناوب أولاً", true);
+            return;
+        }
+        if (!day) {
+            showToast("يرجى اختيار اليوم", true);
+            return;
+        }
+        if (!date) {
+            showToast("يرجى تحديد التاريخ الهجري", true);
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        const res = await fetch('/get-report-data');
+        const fullResponse = await res.json();
+        const mainInfo = fullResponse.mainInfo || {};
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        // ===== الهيدر العلوي =====
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.line(15, 35, 195, 35);
+
+        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+
+        // ===== عنوان التقرير =====
+        doc.setFontSize(15);
+        doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
+
+        // ===== اليوم والتاريخ بصيغة 0-9 و YYYY/MM/DD =====
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
+        doc.text(`التاريخ : ${date} هـ`, 110, 48, { align: 'right' });
+
+        // ===== جدول اسم المناوب / التوقيع =====
+        doc.autoTable({
+            startY: 53,
+            theme: 'grid',
+            head: [['التوقيع', 'اسم المناوب']],
+            body: [['', toWesternDigits(teacherName)]],
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            margin: { left: 15, right: 15 }
+        });
+
+        // ===== جدول الطلاب المتأخرين بالانصراف =====
+        const lateStudentsBody = [];
+        for (let i = 1; i <= 5; i++) {
+            lateStudentsBody.push(['', '', '', String(i)]);
+        }
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 6,
+            theme: 'grid',
+            head: [['ملاحظات', 'الإجراء', 'أسماء الطلاب المتأخرين بالانصراف', 'الرقم']],
+            body: lateStudentsBody,
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                minCellHeight: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            columnStyles: {
+                3: { cellWidth: 15 }
+            },
+            margin: { left: 15, right: 15 }
+        });
+
+        // ===== جدول المخالفين سلوكياً =====
+        const violationsBody = [];
+        for (let i = 1; i <= 5; i++) {
+            violationsBody.push(['', '', '', String(i)]);
+        }
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 6,
+            theme: 'grid',
+            head: [['ملاحظات', 'الإجراء', 'المخالفين سلوكياً', 'الرقم']],
+            body: violationsBody,
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                minCellHeight: 8,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            columnStyles: {
+                3: { cellWidth: 15 }
+            },
+            margin: { left: 15, right: 15 }
+        });
+
+        // ===== إطار الصفحة والتوقيعات لكل الصفحات =====
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+
+            doc.setFontSize(11);
+            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
+
+            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
+            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
+        }
+
+        const safeDay = day ? day.trim() : 'اليوم';
+        const safeDate = date ? date.replace(/\//g, '-') : 'التاريخ';
+        const fileName = `تقرير المناوبة - ${teacherName} - ${safeDay} ${safeDate}.pdf`;
+
+        doc.save(fileName);
+    }
+
+    async function printReport() {
+        const reportType = document.getElementById('reportType').value;
+        if (!reportType) {
+            showToast("يرجى اختيار نوع العرض أولاً", true);
+            return;
+        }
+        if (reportType === 'جدول') {
+            await printScheduleTable();
+        } else {
+            await printDutyReport();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSchoolName();
+        populateWeekSelect();
+        populateTeacherSelect();
+        toggleReportTypeSections();
+        toggleRangeInputs();
+        document.getElementById('reportType').addEventListener('change', toggleReportTypeSections);
+        document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
+
+        // إعداد التاريخ الهجري (حرف i إلزامي للحفاظ على التقويم الهجري) بأرقام غربية
+        $("#hijriDate").hijriDatePicker({
+            hijri: true,
+            showSwitcher: false,
+            format: 'iYYYY/iMM/iDD',
+            hijriFormat: 'iYYYY/iMM/iDD',
+            locale: 'ar-sa'
+        }).on('dp.change change input', function () {
+            this.value = toWesternDigits(this.value);
+        });
+    });
 </script>
 
 </body>
