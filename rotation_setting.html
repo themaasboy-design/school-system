@@ -195,10 +195,10 @@
         }
 
         if (day && month && year) {
-            return `هـ ${year}-${month}-${day}`;
+            return ` ${year}-${month}-${day}هـ`;
         }
 
-        return str ? `هـ ${str}` : '';
+        return str ? ` ${str}هـ` : '';
     }
 
     function normalizeArabicText(str) {
