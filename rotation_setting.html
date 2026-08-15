@@ -155,47 +155,50 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ ليظهر بالشكل الصحيح من اليمين إلى اليسار (اليوم على اليمين والسنة على اليسار)
+    // 🗓️ تنسيق التاريخ ليظهر من اليمين إلى اليسار (اليوم على اليمين ثم الشهر ثم السنة هـ)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
-        let str = toWesternDigits(rawDate).trim().replace('هـ', '').trim();
+        let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
+        if (!str) return '';
 
-        let day, month, year;
+        let day = null, month = null, year = null;
 
-        if (typeof moment !== 'undefined') {
-            let m = moment(str, [
-                'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
-                'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iDD',
-                'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
-            ], true);
-
-            if (!m.isValid()) {
-                m = moment(str);
-            }
-
-            if (m.isValid()) {
-                day = m.iDate();
-                month = m.iMonth() + 1;
-                year = m.iYear();
-                return `هـ ${year}-${month}-${day}`;
-            }
-        }
-
-        const parts = str.split(/[\/-]/);
+        const parts = str.split(/[\/\-\.\s]+/);
         if (parts.length === 3) {
             let p1 = parseInt(parts[0], 10);
             let p2 = parseInt(parts[1], 10);
             let p3 = parseInt(parts[2], 10);
+
             if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
-                if (p1 > 1000) { year = p1; month = p2; day = p3; }
-                else if (p3 > 1000) { year = p3; month = p2; day = p1; }
-                if (year && month && day) {
-                    return `هـ ${year}-${month}-${day}`;
+                if (p1 > 1000) {
+                    year = p1; month = p2; day = p3;
+                } else if (p3 > 1000) {
+                    day = p1; month = p2; year = p3;
                 }
             }
         }
 
-        return str ? `هـ ${str}` : '';
+        if (!day || !month || !year) {
+            if (typeof moment !== 'undefined') {
+                let m = moment(str, [
+                    'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
+                    'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iDD',
+                    'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
+                ], true);
+                if (!m.isValid()) m = moment(str);
+                if (m.isValid()) {
+                    day = m.iDate();
+                    month = m.iMonth() + 1;
+                    year = m.iYear();
+                }
+            }
+        }
+
+        if (day && month && year) {
+            return `${year}-${month}-${day} هـ`;
+        }
+
+        return str ? `${str} هـ` : '';
     }
 
     function normalizeArabicText(str) {
