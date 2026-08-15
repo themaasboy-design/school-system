@@ -155,7 +155,7 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ لتكون (هـ) على أقصى اليسار بعد السنة
+    // 🗓️ تنسيق التاريخ ليقرأ من اليمين إلى اليسار (اليوم-الشهر-السنة)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
         let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
@@ -195,10 +195,10 @@
         }
 
         if (day && month && year) {
-            return ` ${year}-${month}-${day}`;
+            return `${day}-${month}-${year}`;
         }
 
-        return str ? ` ${str}هـ` : '';
+        return str;
     }
 
     function normalizeArabicText(str) {
