@@ -158,7 +158,7 @@
     // 🗓️ تنسيق التاريخ ليظهر من اليمين إلى اليسار (اليوم على اليمين ثم الشهر ثم السنة هـ)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
-        let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
+        let str = toWesternDigits(rawDate).toString().trim().replace('',/هـ/g).trim();
         if (!str) return '';
 
         let day = null, month = null, year = null;
