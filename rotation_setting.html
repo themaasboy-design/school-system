@@ -155,7 +155,41 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمطبوع
+    // 🗓️ تنسيق التاريخ ليظهر بصيغة (10-3-1448 هـ) بأرقام 0-9
+    function formatHijriDate(rawDate) {
+        if (!rawDate) return '';
+        let str = toWesternDigits(rawDate).trim().replace('هـ', '').trim();
+
+        if (typeof moment !== 'undefined') {
+            let m = moment(str, [
+                'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
+                'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iYYYY',
+                'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
+            ], true);
+
+            if (!m.isValid()) {
+                m = moment(str);
+            }
+
+            if (m.isValid()) {
+                return `${m.iDate()}-${m.iMonth() + 1}-${m.iYear()} هـ`;
+            }
+        }
+
+        const parts = str.split(/[\/-]/);
+        if (parts.length === 3) {
+            let p1 = parseInt(parts[0], 10);
+            let p2 = parseInt(parts[1], 10);
+            let p3 = parseInt(parts[2], 10);
+            if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
+                if (p1 > 1000) return `${p3}-${p2}-${p1} هـ`;
+                if (p3 > 1000) return `${p1}-${p2}-${p3} هـ`;
+            }
+        }
+
+        return str ? `${str} هـ` : '';
+    }
+
     function normalizeArabicText(str) {
         if (!str) return '';
         return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/\s+/g, '');
@@ -293,7 +327,7 @@
                 const record = rotationData.find(r => r['الأسبوع'] === weekName && normalizeArabicText(r['اليوم']) === normalizeArabicText(day));
                 tableRows.push([
                     toWesternDigits(record ? (record['المناوب'] || '') : ''),
-                    toWesternDigits(record ? (record['التاريخ'] || '') : ''),
+                    formatHijriDate(record ? record['التاريخ'] : ''),
                     day,
                     toWesternDigits(weekName)
                 ]);
@@ -363,7 +397,7 @@
         const dayElement = document.getElementById('reportDay');
         const day = dayElement ? dayElement.value : '';
         const dateInput = document.getElementById('hijriDate');
-        let date = dateInput ? toWesternDigits(dateInput.value.trim()) : '';
+        let date = dateInput ? formatHijriDate(dateInput.value.trim()) : '';
 
         if (!teacherName) {
             showToast("يرجى اختيار اسم المناوب أولاً", true);
@@ -422,11 +456,11 @@
         doc.setFontSize(15);
         doc.text("تقرير المناوبة", 105, 41, { align: 'center' });
 
-        // ===== اليوم والتاريخ بصيغة 0-9 و YYYY/MM/DD =====
+        // ===== اليوم والتاريخ =====
         doc.setFontSize(11);
         doc.setTextColor(0, 0, 0);
         doc.text(`اليوم : ${day}`, 185, 48, { align: 'right' });
-        doc.text(`التاريخ : ${date} هـ`, 110, 48, { align: 'right' });
+        doc.text(`التاريخ : ${date}`, 110, 48, { align: 'right' });
 
         // ===== جدول اسم المناوب / التوقيع =====
         doc.autoTable({
@@ -571,7 +605,6 @@
         document.getElementById('reportType').addEventListener('change', toggleReportTypeSections);
         document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
 
-        // إعداد التاريخ الهجري (حرف i إلزامي للحفاظ على التقويم الهجري) بأرقام غربية
         $("#hijriDate").hijriDatePicker({
             hijri: true,
             showSwitcher: false,
