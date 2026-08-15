@@ -155,6 +155,12 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
+    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمطبوع
+    function normalizeArabicText(str) {
+        if (!str) return '';
+        return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/\s+/g, '');
+    }
+
     function showToast(message, isError = false) {
         Toastify({
             text: message,
@@ -284,7 +290,7 @@
         const tableRows = [];
         selectedWeeks.forEach(weekName => {
             days.forEach(day => {
-                const record = rotationData.find(r => r['الأسبوع'] === weekName && (r['اليوم'] === day || r['اليوم'] === day.replace('إ', 'ا')));
+                const record = rotationData.find(r => r['الأسبوع'] === weekName && normalizeArabicText(r['اليوم']) === normalizeArabicText(day));
                 tableRows.push([
                     toWesternDigits(record ? (record['المناوب'] || '') : ''),
                     toWesternDigits(record ? (record['التاريخ'] || '') : ''),
@@ -565,12 +571,12 @@
         document.getElementById('reportType').addEventListener('change', toggleReportTypeSections);
         document.getElementById('rangeType').addEventListener('change', toggleRangeInputs);
 
-        // إعداد التاريخ الهجري بصيغة YYYY/MM/DD والأرقام الغربية
+        // إعداد التاريخ الهجري (حرف i إلزامي للحفاظ على التقويم الهجري) بأرقام غربية
         $("#hijriDate").hijriDatePicker({
             hijri: true,
             showSwitcher: false,
-            format: 'YYYY/MM/DD',
-            hijriFormat: 'YYYY/MM/DD',
+            format: 'iYYYY/iMM/iDD',
+            hijriFormat: 'iYYYY/iMM/iDD',
             locale: 'ar-sa'
         }).on('dp.change change input', function () {
             this.value = toWesternDigits(this.value);

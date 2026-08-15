@@ -177,6 +177,12 @@
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
     let teachersList = [];
 
+    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمعروض
+    function normalizeArabicText(str) {
+        if (!str) return '';
+        return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/\s+/g, '');
+    }
+
     function showToast(message, isError = false) {
         Toastify({
             text: message,
@@ -309,6 +315,18 @@
         return approxDate;
     }
 
+    // دالة تنسيق التاريخ الهجري بأرقام غربية (0-9) وصيغة YYYY/MM/DD
+    function formatHijriYMD(date) {
+        const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        const parts = formatter.formatToParts(date);
+        const y = parts.find(p => p.type === 'year').value;
+        const m = parts.find(p => p.type === 'month').value;
+        const d = parts.find(p => p.type === 'day').value;
+        return `${y}/${m}/${d}`;
+    }
+
     // تُستدعى عند الضغط على زر "تعبئة"
     function generateFromHijri() {
         const hDay = parseInt(document.getElementById("hijriDay").value);
@@ -317,10 +335,6 @@
 
         let startDate = hijriToGregorianDate(hYear, hMonth, hDay);
 
-        const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
-            day: 'numeric', month: 'numeric', year: 'numeric'
-        });
-
         for (let w = 0; w < 15; w++) {
             for (let d = 0; d < 5; d++) {
                 // إضافة الأيام بالتسلسل من تاريخ البداية المباشر
@@ -328,7 +342,7 @@
                 let curr = new Date(startDate.getTime() + offsetDays * 86400000);
 
                 const cell = document.getElementById(`date-${w}-${d}`);
-                if (cell) cell.innerText = hijriFormatter.format(curr);
+                if (cell) cell.innerText = formatHijriYMD(curr);
             }
         }
         showToast("تمت تعبئة التواريخ بنجاح");
@@ -386,7 +400,7 @@
 
             savedData.forEach(item => {
                 const weekIndex = weekNames.indexOf(item['الأسبوع']);
-                const dayIndex = days.indexOf(item['اليوم']);
+                const dayIndex = days.findIndex(d => normalizeArabicText(d) === normalizeArabicText(item['اليوم']));
 
                 if (weekIndex !== -1 && dayIndex !== -1) {
                     const selectEl = document.getElementById(`select-${weekIndex}-${dayIndex}`);
