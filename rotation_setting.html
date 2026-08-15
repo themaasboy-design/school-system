@@ -155,15 +155,17 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ ليظهر بصيغة (10-3-1448 هـ) بأرقام 0-9
+    // 🗓️ تنسيق التاريخ ليظهر بالشكل الصحيح من اليمين إلى اليسار (اليوم على اليمين والسنة على اليسار)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
         let str = toWesternDigits(rawDate).trim().replace('هـ', '').trim();
 
+        let day, month, year;
+
         if (typeof moment !== 'undefined') {
             let m = moment(str, [
                 'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
-                'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iYYYY',
+                'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iDD',
                 'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
             ], true);
 
@@ -172,7 +174,10 @@
             }
 
             if (m.isValid()) {
-                return `${m.iDate()}-${m.iMonth() + 1}-${m.iYear()} هـ`;
+                day = m.iDate();
+                month = m.iMonth() + 1;
+                year = m.iYear();
+                return `هـ ${year}-${month}-${day}`;
             }
         }
 
@@ -182,12 +187,15 @@
             let p2 = parseInt(parts[1], 10);
             let p3 = parseInt(parts[2], 10);
             if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
-                if (p1 > 1000) return `${p3}-${p2}-${p1} هـ`;
-                if (p3 > 1000) return `${p1}-${p2}-${p3} هـ`;
+                if (p1 > 1000) { year = p1; month = p2; day = p3; }
+                else if (p3 > 1000) { year = p3; month = p2; day = p1; }
+                if (year && month && day) {
+                    return `هـ ${year}-${month}-${day}`;
+                }
             }
         }
 
-        return str ? `${str} هـ` : '';
+        return str ? `هـ ${str}` : '';
     }
 
     function normalizeArabicText(str) {
