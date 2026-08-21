@@ -200,9 +200,9 @@ async function getUserExcelPath(req) {
     const templatePath = path.join(__dirname, 'template.xlsx');
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, userFilePath);
-    } else if (fs.existsSync(EXCEL_FILE)) {
-      fs.copyFileSync(EXCEL_FILE, userFilePath);
     } else {
+      // ⚠️ ملاحظة: تم إزالة أي رجوع لملف EXCEL_FILE المشترك (waiting_data.xlsx) عمداً
+      // لأنه كان يسبب تلوث بيانات المدارس الجديدة ببيانات مدرسة سابقة (نفس الملف لكل الحسابات)
       const newWb = xlsx.utils.book_new();
       xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
       xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
@@ -748,9 +748,10 @@ app.post('/register', upload.any(), async (req, res) => {
       const templatePath = path.join(__dirname, 'template.xlsx');
       if (fs.existsSync(templatePath)) {
         fs.copyFileSync(templatePath, userExcelPath);
-      } else if (fs.existsSync(EXCEL_FILE)) {
-        fs.copyFileSync(EXCEL_FILE, userExcelPath);
       } else {
+        // ⚠️ ملاحظة: تم إزالة أي رجوع لملف EXCEL_FILE المشترك (waiting_data.xlsx) عمداً
+        // لأنه ملف واحد قديم مشترك بين كل المدارس، وكان يسبب ظهور بيانات مدرسة سابقة
+        // عند تسجيل مدرسة جديدة بدون رفع ملف. كل مدرسة جديدة الآن تبدأ دائماً بملف فارغ خاص بها فقط.
         const newWb = xlsx.utils.book_new();
         xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
         xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
@@ -820,8 +821,9 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
-      fs.copyFileSync(uploadedPath, EXCEL_FILE);
+      // 🔒 لا يوجد اسم مستخدم = لا نعرف لأي مدرسة يتبع هذا الملف، نرفض الطلب بدل الكتابة على ملف مشترك
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+      return res.status(401).json({ success: false, message: "يرجى تسجيل الدخول أولاً لتحديث بيانات مدرستك." });
     }
 
     return res.json({ success: true, message: "تم تحديث واستبدال بيانات المدرسة بنجاح" });
