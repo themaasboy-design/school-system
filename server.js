@@ -211,8 +211,8 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
   return wb;
 }
 // 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة محدثة وآمنة)
+
 async function getUserExcelPath(req) {
-  // 1️⃣ الاعتماد الحصري على الجلسة لمنع تداخل الحسابات
   const username = req.session?.username;
   
   if (!username) {
@@ -228,17 +228,22 @@ async function getUserExcelPath(req) {
   const userFilePath = path.join(uploadsDir, `data_${cleanUsername}.xlsx`);
 
   try {
-    // 2️⃣ جلب البيانات من PostgreSQL
     const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [cleanUsername]);
     
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
-      // يوجد ملف في قاعدة البيانات: كتابته على القرص وتحديثه
+      // 🌟 تدمير الملف القديم إن وجد على القرص لمنع قراءة بيانات عالقة
+      if (fs.existsSync(userFilePath)) {
+        fs.unlinkSync(userFilePath);
+      }
+      // كتابة الملف الصحيح القادم من قاعدة البيانات الدائمة
       fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
       console.log(`⚡ تم تحديث الملف للمستخدم (${cleanUsername}) من PostgreSQL`);
       return userFilePath;
     } else {
-      // 3️⃣ الحساب موجود بالـ DB لكن لا يملك ملف إكسل (أو حساب جديد): 
-      // إجبار السيرفر على إنشاء ملف نظيف واستبدال أي ملف قديم على القرص
+      // إذا لم يكن هناك ملف بالـ DB، احذف أي ملف قديم على القرص أولاً
+      if (fs.existsSync(userFilePath)) {
+        fs.unlinkSync(userFilePath);
+      }
       console.log(`🧹 إنشاء ملف جديد نظيف تماماً للمستخدم (${cleanUsername})`);
       const cleanWb = createCleanSchoolWorkbook();
       xlsx.writeFile(cleanWb, userFilePath);
