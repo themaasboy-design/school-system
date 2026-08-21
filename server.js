@@ -211,44 +211,47 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
   return wb;
 }
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة آمنة ومصححة)
 async function getUserExcelPath(req) {
-  const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
-  
-  if (!rawUsername) {
+  // 1️⃣ الاعتماد الحصري والآمن على الجلسة النشطة فقط
+  const username = req.session?.username;
+
+  if (!username) {
     throw new Error("UNAUTHORIZED: يرجى تسجيل الدخول أولاً للوصول لبيانات المدرسة.");
   }
 
-  const username = String(rawUsername).trim();
+  const cleanUsername = String(username).trim();
   const uploadsDir = path.join(__dirname, 'uploads');
+  
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  const userFilePath = path.join(uploadsDir, `data_${username}.xlsx`);
+  const userFilePath = path.join(uploadsDir, `data_${cleanUsername}.xlsx`);
 
-  // 1️⃣ جلب أحدث بيانات الإكسل دائماً وأولاً من PostgreSQL إن وجدت
   try {
-    const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [username]);
+    // 2️⃣ الاستعلام عن ملف المستخدم من قاعدة البيانات
+    const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [cleanUsername]);
+    
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
+      // كتابة الملف ببيانات المستخدم الحقيقية المسجلة بالـ DB
       fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
-      console.log(`⚡ تم تحديث ومزامنة ملف الإكسل للمستخدم (${username}) مباشرة من PostgreSQL!`);
+      return userFilePath;
+    } else {
+      // 3️⃣ في حال كان الحساب جديداً أو لا يحتوي على excel_data بالـ DB: يتم إنشاء ملف نظيف فوراً ودون الاعتماد على القرص
+      console.log(`🧹 إنشاء ملف جديد نظيف للمستخدم الحديث: (${cleanUsername})`);
+      const cleanWb = createCleanSchoolWorkbook();
+      xlsx.writeFile(cleanWb, userFilePath);
+      
+      // حفظ الملف النظيف بداخل قاعدة البيانات لمنع استرجاع أي بيانات قديمة مستقبلاً
+      await syncExcelToDb(cleanUsername, userFilePath);
       return userFilePath;
     }
   } catch (err) {
-    console.error('خطأ في استعادة الملف من DB:', err.message);
+    console.error('❌ خطأ في معالجة ملف الإكسل:', err.message);
+    throw err;
   }
-
-  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد نظيف تماماً للمدرسة
-  if (!fs.existsSync(userFilePath)) {
-    const cleanWb = createCleanSchoolWorkbook();
-    xlsx.writeFile(cleanWb, userFilePath);
-    await syncExcelToDb(username, userFilePath);
-  }
-
-  return userFilePath;
 }
-
 function getSheet(workbook, sheetIdentifier) {
   if (typeof sheetIdentifier === 'number') {
     return workbook.Sheets[workbook.SheetNames[sheetIdentifier]];
