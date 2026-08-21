@@ -155,7 +155,7 @@ app.post('/logout', (req, res) => {
 });
 
 // =========================================================================
-// ⚙️ إعدادات أسماء الملف والورقات
+// ⚙️ إعدادات أسماء الملف والورقات ودوال إنشاء ملف نظيف
 // =========================================================================
 const EXCEL_FILE = path.join(__dirname, 'waiting_data.xlsx');
 
@@ -167,7 +167,51 @@ const MAIN_INFO_SHEET = 'maininfo';
 const MONITORING_SHEET = 'moni';
 const ROTATION_SHEET = 'rotation';
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (مُعدّلة לגلب أحدث ملف من PostgreSQL دائماً)
+// 🧹 دالة إنشاء ملف إكسل مخصص ونظيف تماماً بدون أي بيانات معلمين مسبقة
+function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') {
+  const wb = xlsx.utils.book_new();
+
+  // 1. sheet: teacher_name (العناوين فقط)
+  const teachersSheet = xlsx.utils.aoa_to_sheet([["الهوية", "اسم المعلم"]]);
+  xlsx.utils.book_append_sheet(wb, teachersSheet, TEACHERS_SHEET);
+
+  // 2. sheet: classes (العناوين فقط)
+  const classesSheet = xlsx.utils.aoa_to_sheet([["الفصل"]]);
+  xlsx.utils.book_append_sheet(wb, classesSheet, CLASSES_SHEET);
+
+  // 3. sheet: Waiting_table (جدول حصص فارغ)
+  const waitingSheet = xlsx.utils.aoa_to_sheet([
+    ["اليوم", "1", "2", "3", "4", "5", "6", "7"]
+  ]);
+  xlsx.utils.book_append_sheet(wb, waitingSheet, WAITING_SHEET);
+
+  // 4. sheet: report
+  const reportHeader = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
+  const reportSheet = xlsx.utils.aoa_to_sheet([reportHeader]);
+  xlsx.utils.book_append_sheet(wb, reportSheet, REPORT_SHEET);
+
+  // 5. sheet: maininfo (معلومات المدرسة المسجلة فقط)
+  const mainInfoSheet = xlsx.utils.aoa_to_sheet([
+    ["المدرسة", schoolName],
+    ["القطاع", region],
+    ["المدير", fullName]
+  ]);
+  xlsx.utils.book_append_sheet(wb, mainInfoSheet, MAIN_INFO_SHEET);
+
+  // 6. sheet: moni
+  const moniHeader = ["المهمة", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+  const moniSheet = xlsx.utils.aoa_to_sheet([moniHeader]);
+  xlsx.utils.book_append_sheet(wb, moniSheet, MONITORING_SHEET);
+
+  // 7. sheet: rotation
+  const rotationHeader = ["الأسبوع", "اليوم", "التاريخ", "المناوب"];
+  const rotationSheet = xlsx.utils.aoa_to_sheet([rotationHeader]);
+  xlsx.utils.book_append_sheet(wb, rotationSheet, ROTATION_SHEET);
+
+  return wb;
+}
+
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
 async function getUserExcelPath(req) {
   const rawUsername = req.session?.username || req.headers['x-username'] || req.query?.username || req.body?.username;
   
@@ -195,26 +239,10 @@ async function getUserExcelPath(req) {
     console.error('خطأ في استعادة الملف من DB:', err.message);
   }
 
-  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد من القالب النظيف
+  // 2️⃣ في حال عدم وجود ملف بالـ DB والملف غير موجود محلياً: إنشاء ملف جديد نظيف تماماً للمدرسة
   if (!fs.existsSync(userFilePath)) {
-    let templatePath = path.join(__dirname, 'templates', 'waiting_data.xlsx');
-    if (!fs.existsSync(templatePath)) {
-      templatePath = path.join(__dirname, 'template.xlsx');
-    }
-
-    if (fs.existsSync(templatePath)) {
-      fs.copyFileSync(templatePath, userFilePath);
-    } else {
-      const newWb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["اليوم"]]), WAITING_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), REPORT_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["", ""], ["", ""]]), MAIN_INFO_SHEET);
-      xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), MONITORING_SHEET);
-      xlsx.writeFile(newWb, userFilePath);
-    }
-
+    const cleanWb = createCleanSchoolWorkbook();
+    xlsx.writeFile(cleanWb, userFilePath);
     await syncExcelToDb(username, userFilePath);
   }
 
@@ -747,23 +775,9 @@ app.post('/register', upload.any(), async (req, res) => {
       fs.writeFileSync(userExcelPath, fileBuffer);
       if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
     } else {
-      let templatePath = path.join(__dirname, 'templates', 'waiting_data.xlsx');
-      if (!fs.existsSync(templatePath)) {
-        templatePath = path.join(__dirname, 'template.xlsx');
-      }
-
-      if (fs.existsSync(templatePath)) {
-        fs.copyFileSync(templatePath, userExcelPath);
-      } else {
-        const newWb = xlsx.utils.book_new();
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["المعلم", "الاسم"]]), TEACHERS_SHEET);
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["الفصل"]]), CLASSES_SHEET);
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["اليوم"]]), WAITING_SHEET);
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), REPORT_SHEET);
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([["", schoolName], ["", region], ["", fullName]]), MAIN_INFO_SHEET);
-        xlsx.utils.book_append_sheet(newWb, xlsx.utils.aoa_to_sheet([]), MONITORING_SHEET);
-        xlsx.writeFile(newWb, userExcelPath);
-      }
+      // 🛡️ إنشاء ملف إكسل مخصص ونظيف تماماً للمدرسة الجديدة بدون الاعتماد على أي ملفات مسبقة
+      const cleanWb = createCleanSchoolWorkbook(schoolName, region, fullName);
+      xlsx.writeFile(cleanWb, userExcelPath);
       fileBuffer = fs.readFileSync(userExcelPath);
     }
 
