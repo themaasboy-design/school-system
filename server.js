@@ -210,19 +210,17 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
 
   return wb;
 }
-
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة آمنة ومصححة)
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة محدثة وآمنة)
 async function getUserExcelPath(req) {
-  // 1️⃣ الاعتماد الحصري والآمن على الجلسة النشطة فقط
+  // 1️⃣ الاعتماد الحصري على الجلسة لمنع تداخل الحسابات
   const username = req.session?.username;
-
+  
   if (!username) {
     throw new Error("UNAUTHORIZED: يرجى تسجيل الدخول أولاً للوصول لبيانات المدرسة.");
   }
 
   const cleanUsername = String(username).trim();
   const uploadsDir = path.join(__dirname, 'uploads');
-  
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
@@ -230,20 +228,20 @@ async function getUserExcelPath(req) {
   const userFilePath = path.join(uploadsDir, `data_${cleanUsername}.xlsx`);
 
   try {
-    // 2️⃣ الاستعلام عن ملف المستخدم من قاعدة البيانات
+    // 2️⃣ جلب البيانات من PostgreSQL
     const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [cleanUsername]);
     
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
-      // كتابة الملف ببيانات المستخدم الحقيقية المسجلة بالـ DB
+      // يوجد ملف في قاعدة البيانات: كتابته على القرص وتحديثه
       fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
+      console.log(`⚡ تم تحديث الملف للمستخدم (${cleanUsername}) من PostgreSQL`);
       return userFilePath;
     } else {
-      // 3️⃣ في حال كان الحساب جديداً أو لا يحتوي على excel_data بالـ DB: يتم إنشاء ملف نظيف فوراً ودون الاعتماد على القرص
-      console.log(`🧹 إنشاء ملف جديد نظيف للمستخدم الحديث: (${cleanUsername})`);
+      // 3️⃣ الحساب موجود بالـ DB لكن لا يملك ملف إكسل (أو حساب جديد): 
+      // إجبار السيرفر على إنشاء ملف نظيف واستبدال أي ملف قديم على القرص
+      console.log(`🧹 إنشاء ملف جديد نظيف تماماً للمستخدم (${cleanUsername})`);
       const cleanWb = createCleanSchoolWorkbook();
       xlsx.writeFile(cleanWb, userFilePath);
-      
-      // حفظ الملف النظيف بداخل قاعدة البيانات لمنع استرجاع أي بيانات قديمة مستقبلاً
       await syncExcelToDb(cleanUsername, userFilePath);
       return userFilePath;
     }
