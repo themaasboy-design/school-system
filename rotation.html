@@ -7,6 +7,8 @@
 
     <!-- Bootstrap RTL CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Toastify CSS للرسائل التنبيهية -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
@@ -31,8 +33,7 @@
             font-weight: 600;
         }
         .form-select {
-            font-size: 0.82rem !important;
-            padding: 5px 8px !important;
+            font-size: 0.85rem !important;
         }
         .table th {
             font-size: 0.85rem !important;
@@ -45,6 +46,48 @@
         }
         .hijri-date {
             white-space: nowrap;
+        }
+
+        /* 🎨 تحسينات التنسيقات والأزرار الجديدة */
+        .toolbar-container {
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        .action-card-group {
+            background-color: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 6px 12px;
+        }
+
+        .btn-custom-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            border-radius: 8px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-custom-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .btn-fill-custom {
+            background-color: #112d4e;
+            border-color: #112d4e;
+            color: #ffffff;
+        }
+        .btn-fill-custom:hover {
+            background-color: #0b223c;
+            border-color: #0b223c;
+            color: #ffffff;
         }
 
         /* 🖨️ تنسيقات الطباعة المخصصة */
@@ -105,23 +148,31 @@
     </div>
 </nav>
 
-<!-- شريط الأدوات -->
-<div class="container-fluid py-3 mb-3 bg-white border-bottom shadow-sm no-print">
-    <div class="row align-items-center g-3">
-        <div class="col-md-3">
-            <h4 class="fw-bold mb-0 text-dark">
-                <i class="bi bi-calendar-week me-2" style="color: #112d4e;"></i>جدول المناوبة
-            </h4>
-        </div>
+<!-- شريط الأدوات المطور -->
+<div class="toolbar-container py-3 mb-4 no-print">
+    <div class="container-fluid px-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            
+            <!-- عنوان الصفحة -->
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-primary-subtle text-primary rounded-3 p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                    <i class="bi bi-calendar-week fs-4" style="color: #112d4e;"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-dark">جدول المناوبة والإشراف</h4>
+                    <small class="text-muted">تحديد التواريخ وتوزيع المناوبين للأسرّة والأسابيع</small>
+                </div>
+            </div>
 
-        <!-- اختيار بداية الأسبوع -->
-        <div class="col-md-7">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <label class="form-label mb-0 fw-semibold text-nowrap">بداية الأسبوع (1) الأحد:</label>
+            <!-- مجموعة تحديد التاريخ والأزرار -->
+            <div class="action-card-group d-flex align-items-center flex-wrap gap-2">
+                <span class="fw-bold text-dark me-1" style="font-size: 0.85rem;">
+                    <i class="bi bi-calendar-event me-1 text-primary"></i>بداية الأسبوع (1) الأحد:
+                </span>
 
-                <select id="hijriDay" class="form-select form-select-sm w-auto"></select>
+                <select id="hijriDay" class="form-select form-select-sm border-secondary-subtle" style="width: 70px;"></select>
 
-                <select id="hijriMonth" class="form-select form-select-sm w-auto">
+                <select id="hijriMonth" class="form-select form-select-sm border-secondary-subtle" style="width: 120px;">
                     <option value="1">محرم</option>
                     <option value="2">صفر</option>
                     <option value="3">ربيع الأول</option>
@@ -136,24 +187,28 @@
                     <option value="12">ذو الحجة</option>
                 </select>
 
-                <select id="hijriYear" class="form-select form-select-sm w-auto"></select>
+                <select id="hijriYear" class="form-select form-select-sm border-secondary-subtle" style="width: 85px;"></select>
+
+                <div class="vr mx-1 opacity-25 d-none d-sm-block" style="height: 24px;"></div>
 
                 <!-- زر تعبئة التواريخ -->
-                <button class="btn btn-primary btn-sm text-nowrap ms-1" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
-                    تعبئة
+                <button class="btn btn-fill-custom btn-custom-action" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
+                    <i class="bi bi-magic"></i> تعبئة التواريخ
                 </button>
 
                 <!-- زر مسح التواريخ -->
-                <button class="btn btn-outline-danger btn-sm text-nowrap ms-1" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
-                    مسح التواريخ
+                <button class="btn btn-outline-danger btn-custom-action" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
+                    <i class="bi bi-eraser"></i> مسح التواريخ
                 </button>
             </div>
-        </div>
 
-        <div class="col-md-2 text-start">
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> طباعة
-            </button>
+            <!-- زر الطباعة -->
+            <div>
+                <button class="btn btn-outline-secondary btn-custom-action px-3" onclick="window.print()">
+                    <i class="bi bi-printer fs-6"></i> طباعة الجدول
+                </button>
+            </div>
+
         </div>
     </div>
 </div>
@@ -177,7 +232,6 @@
     const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
     let teachersList = [];
 
-    // 🧹 تطبيع اسم اليوم (توحيد الهمزات) لضمان مطابقة دقيقة بين المحفوظ والمعروض
     function normalizeArabicText(str) {
         if (!str) return '';
         return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/\s+/g, '');
@@ -236,9 +290,9 @@
 
             grid.innerHTML += `
             <div class="col">
-                <div class="card week-card shadow-sm h-100 d-flex flex-column">
-                    <div class="card-header bg-white py-2 border-bottom">
-                        <h6 class="fw-bold mb-0 text-center" style="color: #112d4e;">${weekTitle}</h6>
+                <div class="card week-card shadow-sm h-100 d-flex flex-column border-0 rounded-3 overflow-hidden">
+                    <div class="card-header bg-white py-2 border-bottom text-center">
+                        <h6 class="fw-bold mb-0" style="color: #112d4e;">${weekTitle}</h6>
                     </div>
                     <div class="card-body p-2 flex-grow-1">
                         <table class="table table-bordered table-sm text-center mb-0">
@@ -253,11 +307,11 @@
                         </table>
                     </div>
                     <div class="card-footer bg-white border-top p-2 d-flex gap-2 no-print">
-                        <button class="btn btn-sm btn-success flex-fill" onclick="saveWeekData(${weekIndex})">
-                            <i class="bi bi-check-circle me-1"></i> حفظ
+                        <button class="btn btn-sm btn-success flex-fill rounded-2 d-inline-flex align-items-center justify-content-center gap-1" onclick="saveWeekData(${weekIndex})">
+                            <i class="bi bi-check-circle"></i> حفظ
                         </button>
-                        <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearWeekData(${weekIndex})">
-                            <i class="bi bi-x-circle me-1"></i> مسح
+                        <button class="btn btn-sm btn-outline-danger flex-fill rounded-2 d-inline-flex align-items-center justify-content-center gap-1" onclick="clearWeekData(${weekIndex})">
+                            <i class="bi bi-x-circle"></i> مسح
                         </button>
                     </div>
                 </div>
@@ -280,16 +334,14 @@
             yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
         }
 
-        // إعداد القيم الافتراضية لقوائم الاختيار (1 / محرم / 1448)
         daySelect.value = 1;
         document.getElementById("hijriMonth").value = 1;
         yearSelect.value = 1448;
     }
 
-    // دالة محولة محسنة ودقيقة لحساب التاريخ الميلادي من الهجري (تقويم أم القرى)
     function hijriToGregorianDate(hYear, hMonth, hDay) {
         const baseHijriYear = 1445;
-        const baseGregorian = new Date(2023, 6, 19); // 19 يوليو 2023م يوافق 1 محرم 1445هـ
+        const baseGregorian = new Date(2023, 6, 19);
         
         const yearDiff = hYear - baseHijriYear;
         const totalDaysApprox = Math.floor((yearDiff * 354.367) + ((hMonth - 1) * 29.53) + (hDay - 1));
@@ -300,7 +352,6 @@
             day: 'numeric', month: 'numeric', year: 'numeric'
         });
 
-        // البحث الدقيق في نطاق 15 يوماً حول التاريخ التقديري
         for (let offset = -15; offset <= 15; offset++) {
             let testDate = new Date(approxDate.getTime() + offset * 86400000);
             let parts = formatter.formatToParts(testDate);
@@ -315,7 +366,6 @@
         return approxDate;
     }
 
-    // دالة تنسيق التاريخ الهجري بأرقام غربية (0-9) وصيغة YYYY/MM/DD
     function formatHijriYMD(date) {
         const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
             day: '2-digit', month: '2-digit', year: 'numeric'
@@ -327,7 +377,6 @@
         return `${y}/${m}/${d}`;
     }
 
-    // تُستدعى عند الضغط على زر "تعبئة"
     function generateFromHijri() {
         const hDay = parseInt(document.getElementById("hijriDay").value);
         const hMonth = parseInt(document.getElementById("hijriMonth").value);
@@ -337,7 +386,6 @@
 
         for (let w = 0; w < 15; w++) {
             for (let d = 0; d < 5; d++) {
-                // إضافة الأيام بالتسلسل من تاريخ البداية المباشر
                 let offsetDays = (w * 7) + d;
                 let curr = new Date(startDate.getTime() + offsetDays * 86400000);
 
