@@ -48,7 +48,7 @@
             white-space: nowrap;
         }
 
-        /* 🎨 تحسينات التنسيقات والأزرار الجديدة */
+        /* 🎨 تحسينات التنسيقات والأزرار والحاوية المركزية */
         .toolbar-container {
             background: #ffffff;
             border-bottom: 1px solid #e9ecef;
@@ -58,8 +58,10 @@
         .action-card-group {
             background-color: #f8f9fa;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px 14px;
+            border-radius: 12px;
+            padding: 16px 20px;
+            max-width: 680px;
+            margin: 0 auto;
         }
 
         .btn-custom-action {
@@ -69,9 +71,10 @@
             gap: 6px;
             font-weight: 600;
             font-size: 0.85rem;
-            padding: 6px 14px;
+            padding: 7px 16px;
             border-radius: 8px;
             transition: all 0.2s ease-in-out;
+            text-decoration: none;
         }
 
         .btn-custom-action:hover {
@@ -88,6 +91,11 @@
             background-color: #0b223c;
             border-color: #0b223c;
             color: #ffffff;
+        }
+
+        /* منع التفاف النص في الخيارات */
+        .nowrap-label {
+            white-space: nowrap !important;
         }
 
         /* 🖨️ تنسيقات الطباعة المخصصة */
@@ -148,84 +156,93 @@
     </div>
 </nav>
 
-<!-- شريط الأدوات المطور -->
+<!-- شريط الأدوات المطور - يتمركز بالنص -->
 <div class="toolbar-container py-3 mb-4 no-print">
     <div class="container-fluid px-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        
+        <!-- عنوان الصفحة بالمنتصف -->
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <div class="bg-primary-subtle text-primary rounded-3 p-2 d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                <i class="bi bi-calendar-week fs-4" style="color: #112d4e;"></i>
+            </div>
+            <div class="text-center text-sm-start">
+                <h4 class="fw-bold mb-0 text-dark">جدول المناوبة</h4>
+                <small class="text-muted">تحديد التواريخ وتوزيع المناوبين</small>
+            </div>
+        </div>
+
+        <!-- الحاوية الرئيسية المركزة -->
+        <div class="action-card-group d-flex flex-column align-items-center gap-3">
             
-            <!-- عنوان الصفحة -->
-            <div class="d-flex align-items-center gap-3">
-                <div class="bg-primary-subtle text-primary rounded-3 p-2 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                    <i class="bi bi-calendar-week fs-4" style="color: #112d4e;"></i>
-                </div>
-                <div>
-                    <h4 class="fw-bold mb-0 text-dark">جدول المناوبة </h4>
-                    <small class="text-muted">تحديد التواريخ وتوزيع المناوبين  </small>
-                </div>
+            <!-- 1. صف تحديد بداية الأسبوع -->
+            <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 w-100">
+                <span class="fw-bold text-dark me-1 nowrap-label" style="font-size: 0.85rem;">
+                    <i class="bi bi-calendar-event me-1 text-primary"></i>بداية الأسبوع (1) الأحد:
+                </span>
+
+                <select id="hijriDay" class="form-select form-select-sm border-secondary-subtle" style="width: 70px;"></select>
+
+                <select id="hijriMonth" class="form-select form-select-sm border-secondary-subtle" style="width: 125px;">
+                    <option value="1">محرم</option>
+                    <option value="2">صفر</option>
+                    <option value="3">ربيع الأول</option>
+                    <option value="4">ربيع الآخر</option>
+                    <option value="5">جمادى الأولى</option>
+                    <option value="6">جمادى الآخرة</option>
+                    <option value="7">رجب</option>
+                    <option value="8">شعبان</option>
+                    <option value="9">رمضان</option>
+                    <option value="10">شوال</option>
+                    <option value="11">ذو القعدة</option>
+                    <option value="12">ذو الحجة</option>
+                </select>
+
+                <select id="hijriYear" class="form-select form-select-sm border-secondary-subtle" style="width: 85px;"></select>
             </div>
 
-            <!-- مجموعة تحديد التاريخ والأزرار -->
-            <div class="action-card-group d-flex flex-column gap-2">
-                <div class="d-flex align-items-center flex-wrap gap-2">
-                    <span class="fw-bold text-dark me-1" style="font-size: 0.85rem;">
-                        <i class="bi bi-calendar-event me-1 text-primary"></i>بداية الأسبوع (1) الأحد:
-                    </span>
+            <!-- 2. أزرار التاريخ تحت تحديد بداية الأسبوع -->
+            <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 w-100">
+                <button class="btn btn-fill-custom btn-custom-action" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
+                    <i class="bi bi-magic"></i> تعبئة التواريخ
+                </button>
 
-                    <select id="hijriDay" class="form-select form-select-sm border-secondary-subtle" style="width: 70px;"></select>
+                <button class="btn btn-outline-danger btn-custom-action" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
+                    <i class="bi bi-eraser"></i> مسح التواريخ
+                </button>
+            </div>
 
-                    <select id="hijriMonth" class="form-select form-select-sm border-secondary-subtle" style="width: 120px;">
-                        <option value="1">محرم</option>
-                        <option value="2">صفر</option>
-                        <option value="3">ربيع الأول</option>
-                        <option value="4">ربيع الآخر</option>
-                        <option value="5">جمادى الأولى</option>
-                        <option value="6">جمادى الآخرة</option>
-                        <option value="7">رجب</option>
-                        <option value="8">شعبان</option>
-                        <option value="9">رمضان</option>
-                        <option value="10">شوال</option>
-                        <option value="11">ذو القعدة</option>
-                        <option value="12">ذو الحجة</option>
-                    </select>
+            <hr class="w-100 my-1 opacity-25">
 
-                    <select id="hijriYear" class="form-select form-select-sm border-secondary-subtle" style="width: 85px;"></select>
-
-                    <div class="vr mx-1 opacity-25 d-none d-sm-block" style="height: 24px;"></div>
-
-                    <!-- زر تعبئة التواريخ -->
-                    <button class="btn btn-fill-custom btn-custom-action" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
-                        <i class="bi bi-magic"></i> تعبئة التواريخ
-                    </button>
-
-                    <!-- زر مسح التواريخ -->
-                    <button class="btn btn-outline-danger btn-custom-action" onclick="clearAllDates()" title="مسح التواريخ من كافة الأسابيع">
-                        <i class="bi bi-eraser"></i> مسح التواريخ
-                    </button>
-
-                    <!-- زر الطباعة -->
-                    <button class="btn btn-outline-secondary btn-custom-action px-3" onclick="window.print()">
-                        <i class="bi bi-printer fs-6"></i> طباعة الجدول
-                    </button>
-                </div>
-
-                <!-- 🔘 قسم خيارات Radio Buttons لتعبئة المعلمين -->
-                <div class="pt-2 mt-1 border-top d-flex align-items-center gap-3">
-                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">
-                        <i class="bi bi-person-gear me-1 text-primary"></i>تعبئة المعلمين المناوبين:
-                    </span>
-                    <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="radio" name="autoFillTeachers" id="radioAlpha" onchange="fillTeachersAlphabetically()">
-                        <label class="form-check-label fw-bold text-secondary" for="radioAlpha" style="font-size: 0.85rem; cursor: pointer;">
+            <!-- 3. خيارات تعبئة المعلمين (الكلمتان بجانب بعض دون التفاف) -->
+            <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 w-100">
+                <span class="fw-bold text-dark nowrap-label" style="font-size: 0.85rem;">
+                    <i class="bi bi-person-gear me-1 text-primary"></i>تعبئة المعلمين المناوبين:
+                </span>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-check-inline mb-0 d-flex align-items-center gap-1 ms-0">
+                        <input class="form-check-input mt-0" type="radio" name="autoFillTeachers" id="radioAlpha" onchange="fillTeachersAlphabetically()">
+                        <label class="form-check-label fw-bold text-secondary nowrap-label" for="radioAlpha" style="font-size: 0.85rem; cursor: pointer;">
                             <i class="bi bi-sort-alpha-down text-success me-1"></i>تعبئة أبجدياً
                         </label>
                     </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="radio" name="autoFillTeachers" id="radioRandom" onchange="fillTeachersRandomly()">
-                        <label class="form-check-label fw-bold text-secondary" for="radioRandom" style="font-size: 0.85rem; cursor: pointer;">
+
+                    <div class="form-check form-check-inline mb-0 d-flex align-items-center gap-1 ms-0">
+                        <input class="form-check-input mt-0" type="radio" name="autoFillTeachers" id="radioRandom" onchange="fillTeachersRandomly()">
+                        <label class="form-check-label fw-bold text-secondary nowrap-label" for="radioRandom" style="font-size: 0.85rem; cursor: pointer;">
                             <i class="bi bi-shuffle text-warning me-1"></i>تعبئة عشوائياً
                         </label>
                     </div>
                 </div>
+            </div>
+
+            <hr class="w-100 my-1 opacity-25">
+
+            <!-- 4. زر الطباعة بأسفل الكل ورابط لصفحة rotation_setting -->
+            <div class="d-flex justify-content-center w-100">
+                <a href="rotation_setting.html" class="btn btn-outline-secondary btn-custom-action px-4">
+                    <i class="bi bi-printer fs-6"></i> طباعة الجدول
+                </a>
             </div>
 
         </div>
@@ -440,7 +457,6 @@
         return extracted;
     }
 
-    /* 🔤 تعبئة المعلمين أبجديًا بكافة الجداول */
     function fillTeachersAlphabetically() {
         const names = extractTeacherNames();
         if (names.length === 0) {
@@ -463,7 +479,6 @@
         showToast("تمت تعبئة المعلمين المناوبين أبجدياً");
     }
 
-    /* 🎲 تعبئة المعلمين عشوائياً بكافة الجداول */
     function fillTeachersRandomly() {
         const names = extractTeacherNames();
         if (names.length === 0) {
