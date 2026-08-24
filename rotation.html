@@ -59,7 +59,7 @@
             background-color: #f8f9fa;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 16px 20px;
+            padding: 14px 18px;
             max-width: 680px;
             margin: 0 auto;
         }
@@ -156,7 +156,7 @@
     </div>
 </nav>
 
-<!-- شريط الأدوات المطور - يتمركز بالنص -->
+<!-- شريط الأدوات المطور -->
 <div class="toolbar-container py-3 mb-4 no-print">
     <div class="container-fluid px-4">
         
@@ -172,7 +172,7 @@
         </div>
 
         <!-- الحاوية الرئيسية المركزة -->
-        <div class="action-card-group d-flex flex-column align-items-center gap-3">
+        <div class="action-card-group d-flex flex-column align-items-center gap-2">
             
             <!-- 1. صف تحديد بداية الأسبوع -->
             <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 w-100">
@@ -200,8 +200,8 @@
                 <select id="hijriYear" class="form-select form-select-sm border-secondary-subtle" style="width: 85px;"></select>
             </div>
 
-            <!-- 2. أزرار التاريخ تحت تحديد بداية الأسبوع -->
-            <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 w-100">
+            <!-- 2. أزرار التاريخ تحت تحديد بداية الأسبوع مسافة مصغرة جداً -->
+            <div class="d-flex align-items-center justify-content-center flex-wrap gap-2 w-100 mt-1">
                 <button class="btn btn-fill-custom btn-custom-action" onclick="generateFromHijri()" title="توليد وتعبئة التواريخ لكل الأسابيع">
                     <i class="bi bi-magic"></i> تعبئة التواريخ
                 </button>
@@ -213,7 +213,7 @@
 
             <hr class="w-100 my-1 opacity-25">
 
-            <!-- 3. خيارات تعبئة المعلمين (الكلمتان بجانب بعض دون التفاف) -->
+            <!-- 3. خيارات تعبئة المعلمين -->
             <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 w-100">
                 <span class="fw-bold text-dark nowrap-label" style="font-size: 0.85rem;">
                     <i class="bi bi-person-gear me-1 text-primary"></i>تعبئة المعلمين المناوبين:
@@ -238,9 +238,12 @@
 
             <hr class="w-100 my-1 opacity-25">
 
-            <!-- 4. زر الطباعة بأسفل الكل ورابط لصفحة rotation_setting -->
-            <div class="d-flex justify-content-center w-100">
-                <a href="rotation_setting.html" class="btn btn-outline-secondary btn-custom-action px-4">
+            <!-- 4. أزرار حفظ الكل وطباعة الجدول بجانب بعضهما -->
+            <div class="d-flex justify-content-center align-items-center gap-2 w-100">
+                <button class="btn btn-success btn-custom-action px-3" onclick="saveAllWeeksData()">
+                    <i class="bi bi-floppy fs-6"></i> حفظ الكل
+                </button>
+                <a href="rotation_setting.html" class="btn btn-outline-secondary btn-custom-action px-3">
                     <i class="bi bi-printer fs-6"></i> طباعة الجدول
                 </a>
             </div>
@@ -589,6 +592,41 @@
             }
         } catch (err) {
             showToast('تعذر الاتصال بالسيرفر للحفظ', true);
+        }
+    }
+
+    /* 💾 دالة حفظ جميع الأسابيع دفعة واحدة */
+    async function saveAllWeeksData() {
+        showToast("جاري حفظ بيانات جميع الأسابيع...");
+        let hasError = false;
+
+        for (let w = 0; w < 15; w++) {
+            const weekTitle = weekNames[w];
+            const weekData = [];
+
+            for (let d = 0; d < 5; d++) {
+                const day = days[d];
+                const date = document.getElementById(`date-${w}-${d}`).innerText;
+                const teacher = document.getElementById(`select-${w}-${d}`).value;
+                weekData.push({ day, date, teacher });
+            }
+
+            try {
+                const res = await fetch('/api/save-rotation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ weekTitle, weekData })
+                });
+                if (!res.ok) hasError = true;
+            } catch (err) {
+                hasError = true;
+            }
+        }
+
+        if (hasError) {
+            showToast("حدث خطأ أثناء حفظ بعض الأسابيع", true);
+        } else {
+            showToast("تم حفظ جميع الأسابيع بنجاح ✨");
         }
     }
 
