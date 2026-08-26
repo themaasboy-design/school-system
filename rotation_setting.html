@@ -282,125 +282,53 @@
         }
     }
 
-    // ================= طباعة "جدول" المناوبة =================
-    async function printScheduleTable() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
+   function finishAndSaveSchedule(doc, mainInfo) {
+    const pageCount = doc.internal.getNumberOfPages();
 
-        const res = await fetch('/get-report-data');
-        const fullResponse = await res.json();
-        const mainInfo = fullResponse.mainInfo || {};
-
-        try {
-            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
-            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
-            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
-            doc.setFont("Noto", "normal");
-        } catch (e) {
-            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
-        }
-
-        try {
-            const img = new Image();
-            img.src = 'logo.png';
-            await img.decode();
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width; canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            const imgData = canvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
-        } catch (e) {
-            console.warn("لم يتم العثور على صورة الشعار logo.png");
-        }
-
-        doc.setFontSize(12);
-        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
-        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
-        doc.line(15, 35, 195, 35);
-
-        const selectedWeeks = getSelectedWeeks();
-        if (selectedWeeks.length === 0) {
-            showToast("يرجى تحديد نطاق صحيح للطباعة", true);
-            return;
-        }
-
-        const rotRes = await fetch('/api/get-rotation');
-        const rotationData = await rotRes.json();
-
-        doc.setFontSize(14);
-        doc.text("جدول المناوبة", 105, 42, { align: 'center' });
-
-        const tableRows = [];
-        selectedWeeks.forEach(weekName => {
-            days.forEach(day => {
-                const record = rotationData.find(r => r['الأسبوع'] === weekName && normalizeArabicText(r['اليوم']) === normalizeArabicText(day));
-                tableRows.push([
-                    toWesternDigits(record ? (record['المناوب'] || '') : ''),
-                    formatHijriDate(record ? record['التاريخ'] : ''),
-                    day,
-                    toWesternDigits(weekName)
-                ]);
-            });
-        });
-
-        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
-
-        doc.autoTable({
-            startY: 48,
-            theme: 'grid',
-            head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
-            body: tableRows,
-            styles: {
-                font: fontName,
-                halign: 'center',
-                fontSize: 10,
-                cellPadding: 3,
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.2,
-                fillColor: [255, 255, 255]
-            },
-            headStyles: {
-                fillColor: [230, 230, 230],
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                lineColor: [0, 0, 0],
-                lineWidth: 0.2
-            },
-            alternateRowStyles: { fillColor: [255, 255, 255] },
-            margin: { left: 15, right: 15 }
-        });
-
-        finishAndSaveSchedule(doc, mainInfo);
+    // 1. رسم الإطار في جميع الصفحات
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
     }
 
-    function finishAndSaveSchedule(doc, mainInfo) {
-        const pageCount = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.5);
-            doc.rect(5, 5, 200, 287);
+    // 2. الانتقال للصفحة الأخيرة وحساب الموضع بعد الجدول
+    doc.setPage(pageCount);
+    let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 250;
 
-            doc.setFontSize(11);
-            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
-            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
-            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
-            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
-        }
+    // في حال عدم وجود مساحة كافية في أسفل الصفحة الأخيرة، يتم إضافة صفحة جديدة للتوقيعات
+    if (finalY > 260) {
+        doc.addPage();
+        const lastPageIndex = doc.internal.getNumberOfPages();
+        doc.setPage(lastPageIndex);
 
-        const rangeType = document.getElementById('rangeType').value;
-        const rangeLabel = rangeType === 'week'
-            ? document.getElementById('weekSelect').value
-            : rangeType === 'month'
-                ? document.getElementById('monthSelect').selectedOptions[0].text
-                : 'الكل';
+        // رسم الإطار للصفحة الجديدة
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 287);
 
-        doc.save(`جدول المناوبة - ${toWesternDigits(rangeLabel)}.pdf`);
+        finalY = 30; // البدء من أعلى الصفحة الجديدة
     }
+
+    // 3. طباعة أسماء المدير والوكيل مرة واحدة فقط
+    doc.setFontSize(11);
+    doc.text("مدير المدرسة", 40, finalY, { align: 'center' });
+    doc.text(toWesternDigits(mainInfo.B3 || ""), 40, finalY + 6, { align: 'center' });
+
+    doc.text("وكيل المدرسة", 170, finalY, { align: 'center' });
+    doc.text(toWesternDigits(mainInfo.B4 || ""), 170, finalY + 6, { align: 'center' });
+
+    // 4. تنزيل ملف الـ PDF
+    const rangeType = document.getElementById('rangeType').value;
+    const rangeLabel = rangeType === 'week'
+        ? document.getElementById('weekSelect').value
+        : rangeType === 'month'
+            ? document.getElementById('monthSelect').selectedOptions[0].text
+            : 'الكل';
+
+    doc.save(`جدول المناوبة - ${toWesternDigits(rangeLabel)}.pdf`);
+}
 
     // ================= طباعة "تقرير" المناوبة =================
     async function printDutyReport() {
