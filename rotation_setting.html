@@ -282,6 +282,100 @@
         }
     }
 
+    // ================= طباعة "جدول" المناوبة =================
+    async function printScheduleTable() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        const res = await fetch('/get-report-data');
+        const fullResponse = await res.json();
+        const mainInfo = fullResponse.mainInfo || {};
+
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            const imgData = canvas.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        doc.setFontSize(12);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
+        doc.line(15, 35, 195, 35);
+
+        const selectedWeeks = getSelectedWeeks();
+        if (selectedWeeks.length === 0) {
+            showToast("يرجى تحديد نطاق صحيح للطباعة", true);
+            return;
+        }
+
+        const rotRes = await fetch('/api/get-rotation');
+        const rotationData = await rotRes.json();
+
+        doc.setFontSize(14);
+        doc.text("جدول المناوبة", 105, 42, { align: 'center' });
+
+        const tableRows = [];
+        selectedWeeks.forEach(weekName => {
+            days.forEach(day => {
+                const record = rotationData.find(r => r['الأسبوع'] === weekName && normalizeArabicText(r['اليوم']) === normalizeArabicText(day));
+                tableRows.push([
+                    toWesternDigits(record ? (record['المناوب'] || '') : ''),
+                    formatHijriDate(record ? record['التاريخ'] : ''),
+                    day,
+                    toWesternDigits(weekName)
+                ]);
+            });
+        });
+
+        const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+
+        doc.autoTable({
+            startY: 48,
+            theme: 'grid',
+            head: [['المناوب', 'التاريخ', 'اليوم', 'الأسبوع']],
+            body: tableRows,
+            styles: {
+                font: fontName,
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2,
+                fillColor: [255, 255, 255]
+            },
+            headStyles: {
+                fillColor: [230, 230, 230],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            },
+            alternateRowStyles: { fillColor: [255, 255, 255] },
+            margin: { left: 15, right: 15 }
+        });
+
+        finishAndSaveSchedule(doc, mainInfo);
+    }
+
    function finishAndSaveSchedule(doc, mainInfo) {
     const pageCount = doc.internal.getNumberOfPages();
 
