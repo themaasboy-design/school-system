@@ -493,20 +493,39 @@
         });
 
         const pageCount = doc.internal.getNumberOfPages();
+
+        // 1. رسم الإطار في جميع الصفحات
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        }
+
+        // 2. الانتقال للصفحة الأخيرة وحساب الموضع بعد نهاية آخر جدول (المخالفين سلوكياً)
+        doc.setPage(pageCount);
+        let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 250;
+
+        // في حال عدم وجود مساحة كافية بأسفل الصفحة الأخيرة، تُضاف صفحة جديدة للتوقيعات فقط
+        if (finalY > 260) {
+            doc.addPage();
+            const lastPageIndex = doc.internal.getNumberOfPages();
+            doc.setPage(lastPageIndex);
 
             doc.setDrawColor(0, 0, 0);
             doc.setLineWidth(0.5);
             doc.rect(5, 5, 200, 287);
 
-            doc.setFontSize(11);
-            doc.text("مدير المدرسة", 40, 275, { align: 'center' });
-            doc.text(toWesternDigits(mainInfo.B3 || ""), 40, 281, { align: 'center' });
-
-            doc.text("وكيل المدرسة", 170, 275, { align: 'center' });
-            doc.text(toWesternDigits(mainInfo.B4 || ""), 170, 281, { align: 'center' });
+            finalY = 30;
         }
+
+        // 3. طباعة أسماء المدير والوكيل مرة واحدة فقط
+        doc.setFontSize(11);
+        doc.text("مدير المدرسة", 40, finalY, { align: 'center' });
+        doc.text(toWesternDigits(mainInfo.B3 || ""), 40, finalY + 6, { align: 'center' });
+
+        doc.text("وكيل المدرسة", 170, finalY, { align: 'center' });
+        doc.text(toWesternDigits(mainInfo.B4 || ""), 170, finalY + 6, { align: 'center' });
 
         const safeDay = day ? day.trim() : 'اليوم';
         const safeDate = date ? date.replace(/[\/\s]/g, '-') : 'التاريخ';
