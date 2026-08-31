@@ -32,6 +32,25 @@
             border-right: 5px solid #0d6efd;
             padding-right: 12px;
             font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-delete-card {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+        .btn-delete-card:hover {
+            background-color: #bb2d3b;
         }
         .report-table {
             width: 100%;
@@ -306,9 +325,13 @@
                     return vals[0] === selectedDate && vals[1] === selectedDay;
                 });
 
-                currentFilteredReportData = filteredData;
+                // إضافة رقم معرّف فريد مؤقت لكل سجل لسهولة الحذف
+                currentFilteredReportData = filteredData.map((item, index) => ({
+                    ...item,
+                    _tempId: Date.now() + '_' + index
+                }));
 
-                if (filteredData.length === 0) { 
+                if (currentFilteredReportData.length === 0) { 
                     showNotification("🔍 عذراً، لا توجد بيانات مسجلة لهذا اليوم", "error"); 
                     document.getElementById('reportResult').style.display = 'none';
                     return; 
@@ -321,7 +344,7 @@
                 const subCols   = [4, 6, 8, 10, 12, 14, 16];
                 const periodNames = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
 
-                filteredData.forEach(row => { 
+                currentFilteredReportData.forEach(row => { 
                     const vals = Object.values(row);
                     const absentTeacher = row['المعلم الغائب'] || row['اسم المعلم'] || vals[2] || '---';
 
@@ -354,7 +377,12 @@
                     const cardHtml = `
                         <div class="teacher-report-card">
                             <div class="teacher-report-title">
-                                📌 المعلم الغائب: <span style="color: #d9534f;">${absentTeacher}</span>
+                                <div>
+                                    📌 المعلم الغائب: <span style="color: #d9534f;">${absentTeacher}</span>
+                                </div>
+                                <button type="button" class="btn-delete-card" onclick="removeTeacherCard('${row._tempId}', this)">
+                                    <i class="fas fa-trash-alt"></i> حذف المعلم
+                                </button>
                             </div>
                             <table class="report-table">
                                 <thead>
@@ -378,6 +406,26 @@
             } catch (error) {
                 console.error("خطأ في جلب البيانات:", error);
                 showNotification("❌ حدث خطأ أثناء جلب البيانات من السيرفر", "error");
+            }
+        }
+
+        // دالة حذف المعلم من التقرير المعروض
+        function removeTeacherCard(tempId, btnElement) {
+            // 1. إزالة المعلم من مصفوفة البيانات الحالية
+            currentFilteredReportData = currentFilteredReportData.filter(item => item._tempId !== tempId);
+
+            // 2. إزالة الكرت الخاص بالمعلم من الواجهة
+            const card = btnElement.closest('.teacher-report-card');
+            if (card) {
+                card.remove();
+            }
+
+            showNotification("🗑️ تم حذف المعلم من التقرير بنجاح", "success");
+
+            // 3. في حال تم حذف جميع المعلمين، إخفاء صندوق النتائج
+            if (currentFilteredReportData.length === 0) {
+                document.getElementById('reportResult').style.display = 'none';
+                showNotification("🔍 لا توجد بيانات متبقية في التقرير", "error");
             }
         }
 
@@ -542,6 +590,11 @@
         }
 
         async function previewPDF() {
+            if (!currentFilteredReportData || currentFilteredReportData.length === 0) {
+                showNotification("🔍 لا توجد بيانات لطباعتها", "error");
+                return;
+            }
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -562,19 +615,10 @@
 
             const res = await fetch('/get-report-data');
             const fullResponse = await res.json();
-            const allData = fullResponse.teachers || [];
             const mainInfo = fullResponse.mainInfo || {};
 
-            const dateInputVal = dateInput ? dateInput.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)) : '';
-            const filteredTeachers = allData.filter(item => {
-                const vals = Object.values(item);
-                return vals[0] === dateInputVal && vals[1] === day;
-            });
-
-            if (filteredTeachers.length === 0) {
-                showNotification("🔍 لا توجد بيانات لطباعتها", "error");
-                return;
-            }
+            // استخدام القائمة المفلتة المتبقية بعد أي عملية حذف
+            const filteredTeachers = currentFilteredReportData;
 
             try {
                 const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
@@ -612,7 +656,7 @@
 
             filteredTeachers.forEach((teacherData) => {
                 const vals = Object.values(teacherData);
-                const teacherName = vals[2] || '---';
+                const teacherName = teacherData['المعلم الغائب'] || teacherData['اسم المعلم'] || vals[2] || '---';
 
                 if (currentY > 220) {
                     doc.addPage();
