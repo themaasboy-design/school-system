@@ -8,8 +8,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
     <style>
         .hijri-datepicker-container,.datepicker { z-index: 99999 !important; }
+        .secondary-teacher-select {
+            margin-top: 8px;
+            display: none;
+            border-color: #3498db;
+            background-color: #f8f9fa;
+        }
     </style>
-
     <!-- ملف الستايل الخاص بالرسائل (CSS) -->
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <!-- ملف التشغيل الخاص بالرسائل (JavaScript) -->
@@ -86,7 +91,6 @@
     </div>
 
     <script>
-        // مصفوفة عالمية لحفظ القائمة الكاملة لمعلمي المدرسة
         let allTeachersList = [];
 
         const container = document.getElementById('classesContainer');
@@ -97,8 +101,11 @@
                     <select name="class${i}_room" id="roomSelect_${i}" onchange="checkAndEnableTeacher(${i})">
                         <option value="">-- اختر الفصل --</option>
                     </select>
-                    <select name="class${i}_teacher" id="teacherSelect_${i}" disabled>
+                    <select name="class${i}_teacher" id="teacherSelect_${i}" disabled onchange="handleTeacherSelectChange(${i})">
                         <option value="">-- اختر الفصل أولاً --</option>
+                    </select>
+                    <select id="allTeacherSelect_${i}" class="secondary-teacher-select">
+                        <option value="">-- اختر المعلم البديل --</option>
                     </select>
                 </div>
             `;
@@ -114,7 +121,14 @@
 
             for(let i=1; i<=7; i++) {
                 reportData[`class${i}_room`] = document.getElementById(`roomSelect_${i}`).value;
-                reportData[`class${i}_teacher`] = document.getElementById(`teacherSelect_${i}`).value;
+                
+                let selectedTeacher = document.getElementById(`teacherSelect_${i}`).value;
+                // إذا كان خيار المستخدم "معلم بديل آخر"، نأخذ القيمة من القائمة الثانية
+                if (selectedTeacher === "معلم بديل آخر") {
+                    const altTeacher = document.getElementById(`allTeacherSelect_${i}`).value;
+                    selectedTeacher = altTeacher !== "" ? altTeacher : "معلم بديل آخر";
+                }
+                reportData[`class${i}_teacher`] = selectedTeacher;
             }
 
             try {
@@ -156,8 +170,6 @@
             try {
                 const response = await fetch('/get-data');
                 const teachers = await response.json();
-                
-                // حفظ المعلمين في القائمة العامة لاستخدامها في قوائم الانتظار
                 allTeachersList = teachers;
 
                 const mainSelect = document.getElementById('teacherSelect');
@@ -167,13 +179,48 @@
                     opt.text = t["Name_teacher"];
                     mainSelect.appendChild(opt);
                 });
+
+                // تعبئة قائمة جميع المعلمين في القوائم الثانوية
+                populateSecondaryTeacherSelects();
             } catch (e) { console.error("خطأ في جلب المعلمين"); }
+        }
+
+        function populateSecondaryTeacherSelects() {
+            for (let i = 1; i <= 7; i++) {
+                const secSelect = document.getElementById(`allTeacherSelect_${i}`);
+                if (!secSelect) continue;
+                
+                secSelect.innerHTML = '<option value="">-- اختر من كافة المعلمين --</option>';
+
+                // خيارات عامة (منتظر 1 - 4)
+                let groupGeneric = document.createElement('optgroup');
+                groupGeneric.label = "خيارات عامة";
+                for (let m = 1; m <= 4; m++) {
+                    let opt = document.createElement('option');
+                    opt.value = `منتظر ${m}`;
+                    opt.text = `منتظر ${m}`;
+                    groupGeneric.appendChild(opt);
+                }
+                secSelect.appendChild(groupGeneric);
+
+                // قائمة كافة معلمي المدرسة
+                let groupAll = document.createElement('optgroup');
+                groupAll.label = "جميع معلمي المدرسة";
+                allTeachersList.forEach(t => {
+                    let opt = document.createElement('option');
+                    opt.value = t["Name_teacher"];
+                    opt.text = t["Name_teacher"];
+                    groupAll.appendChild(opt);
+                });
+                secSelect.appendChild(groupAll);
+            }
         }
 
         async function loadWaitingTeachers(i) {
             const day = document.getElementById('daySelect').value;
             const roomSelect = document.getElementById(`roomSelect_${i}`);
             const teacherSelect = document.getElementById(`teacherSelect_${i}`);
+            const secondarySelect = document.getElementById(`allTeacherSelect_${i}`);
 
             if (!day) { 
                 showNotification("يرجى اختيار اليوم أولا", "error"); 
@@ -182,6 +229,7 @@
             }
             if (roomSelect.value === "") { 
                 teacherSelect.disabled = true; 
+                if (secondarySelect) secondarySelect.style.display = "none";
                 return; 
             }
 
@@ -191,46 +239,43 @@
                 
                 teacherSelect.innerHTML = '<option value="">-- اختر المعلم البديل --</option>';
 
-                // 1️⃣ المعلمون المتاحون في جدول الانتظار لهذه الحصة (إن وجدوا)
+                // 1️⃣ إظهار المعلمين المتاحين فقط لهذه الحصة حسب الجدول
                 if (data.teachers && data.teachers.length > 0) {
-                    let groupWaiting = document.createElement('optgroup');
-                    groupWaiting.label = "المعلمون المتاحون للانتظار (حسب الجدول)";
                     data.teachers.forEach(teacherCode => {
                         let opt = document.createElement('option');
                         opt.value = teacherCode;
                         opt.text = teacherCode; 
-                        groupWaiting.appendChild(opt);
+                        teacherSelect.appendChild(opt);
                     });
-                    teacherSelect.appendChild(groupWaiting);
                 }
 
-                // 2️⃣ خيارات افتراضية (منتظر 1 إلى منتظر 4)
-                let groupGeneric = document.createElement('optgroup');
-                groupGeneric.label = "خيارات عامة";
-                for (let m = 1; m <= 4; m++) {
-                    let opt = document.createElement('option');
-                    opt.value = `منتظر ${m}`;
-                    opt.text = `منتظر ${m}`;
-                    groupGeneric.appendChild(opt);
-                }
-                teacherSelect.appendChild(groupGeneric);
-
-                // 3️⃣ القائمة الكاملة لمعلمي المدرسة من ملف الإكسل
-                if (allTeachersList && allTeachersList.length > 0) {
-                    let groupAll = document.createElement('optgroup');
-                    groupAll.label = "جميع معلمي المدرسة";
-                    allTeachersList.forEach(t => {
-                        let opt = document.createElement('option');
-                        opt.value = t["Name_teacher"];
-                        opt.text = t["Name_teacher"];
-                        groupAll.appendChild(opt);
-                    });
-                    teacherSelect.appendChild(groupAll);
-                }
+                // 2️⃣ إدراج خيار "معلم بديل آخر" دائماً في الأسفل
+                let optOther = document.createElement('option');
+                optOther.value = "معلم بديل آخر";
+                optOther.text = "معلم بديل آخر";
+                teacherSelect.appendChild(optOther);
 
                 teacherSelect.disabled = false;
+                
+                // إعادة إخفاء وتصفير القائمة الثانوية عند التغيير
+                if (secondarySelect) {
+                    secondarySelect.style.display = "none";
+                    secondarySelect.value = "";
+                }
             } catch (e) { 
                 console.error("خطأ في جلب المعلمين البدلاء"); 
+            }
+        }
+
+        function handleTeacherSelectChange(i) {
+            const teacherSelect = document.getElementById(`teacherSelect_${i}`);
+            const secondarySelect = document.getElementById(`allTeacherSelect_${i}`);
+            
+            if (teacherSelect.value === "معلم بديل آخر") {
+                secondarySelect.style.display = "block";
+            } else {
+                secondarySelect.style.display = "none";
+                secondarySelect.value = "";
             }
         }
 
@@ -270,6 +315,12 @@
                     input.value = '';
                 }
             });
+
+            // إخفاء كافة القوائم الثانوية للمعلمين
+            for(let i=1; i<=7; i++) {
+                const secSelect = document.getElementById(`allTeacherSelect_${i}`);
+                if (secSelect) secSelect.style.display = "none";
+            }
         }
 
         function showNotification(message, type = 'success') {
