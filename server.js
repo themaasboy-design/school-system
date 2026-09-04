@@ -79,9 +79,24 @@ async function initDb() {
     await client.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS excel_data BYTEA;
     `);
+
+    // 🟢 إضافة جدول المساءلات إلى PostgreSQL
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accountability (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255),
+        teacher_name TEXT NOT NULL,
+        violation_type TEXT NOT NULL,
+        hijri_date TEXT NOT NULL,
+        delay_minutes INTEGER DEFAULT 0,
+        details TEXT,
+        status TEXT DEFAULT 'بانتظار الرد',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     
     client.release();
-    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجدول وتأمين التخزين الدائم بنجاح!");
+    console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجداول وتأمين التخزين الدائم بنجاح!");
   } catch (err) {
     console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
   }
@@ -210,8 +225,8 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
 
   return wb;
 }
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة محدثة وآمنة)
 
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة محدثة وآمنة)
 async function getUserExcelPath(req) {
   const username = req.session?.username;
   
@@ -231,16 +246,13 @@ async function getUserExcelPath(req) {
     const dbResult = await pool.query('SELECT excel_data FROM users WHERE username = $1', [cleanUsername]);
     
     if (dbResult.rows.length > 0 && dbResult.rows[0].excel_data) {
-      // 🌟 تدمير الملف القديم إن وجد على القرص لمنع قراءة بيانات عالقة
       if (fs.existsSync(userFilePath)) {
         fs.unlinkSync(userFilePath);
       }
-      // كتابة الملف الصحيح القادم من قاعدة البيانات الدائمة
       fs.writeFileSync(userFilePath, dbResult.rows[0].excel_data);
       console.log(`⚡ تم تحديث الملف للمستخدم (${cleanUsername}) من PostgreSQL`);
       return userFilePath;
     } else {
-      // إذا لم يكن هناك ملف بالـ DB، احذف أي ملف قديم على القرص أولاً
       if (fs.existsSync(userFilePath)) {
         fs.unlinkSync(userFilePath);
       }
@@ -255,6 +267,7 @@ async function getUserExcelPath(req) {
     throw err;
   }
 }
+
 function getSheet(workbook, sheetIdentifier) {
   if (typeof sheetIdentifier === 'number') {
     return workbook.Sheets[workbook.SheetNames[sheetIdentifier]];
@@ -262,16 +275,13 @@ function getSheet(workbook, sheetIdentifier) {
   return workbook.Sheets[sheetIdentifier];
 }
 
-// 🧹 دالة تطبيع النص العربي (توحيد الهمزات والمسافات) لمنع مشاكل عدم تطابق أسماء الأيام
 function normalizeArabicText(str) {
   if (!str) return '';
   return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
 }
 
-// 📅 قائمة الأيام الرسمية المعتمدة لتخزين جدول الانتظار (الشكل القياسي المستخدم داخل ملف الإكسل)
 const CANONICAL_WAITING_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
-// 🔁 دالة تحويل أي تهجئة ليوم (مثل "الاثنين" أو "الإثنين") إلى الاسم القياسي الموحّد
 function canonicalizeDayName(day) {
   const normalizedInput = normalizeArabicText(day);
   const match = CANONICAL_WAITING_DAYS.find(d => normalizeArabicText(d) === normalizedInput);
@@ -334,7 +344,6 @@ app.get('/get-waiting-teachers', async (req, res) => {
   }
 });
 
-// 💾 مسار حفظ جدول الانتظار ليوم محدد (يُستخدم في صفحة waiting_setting)
 app.post('/save-waiting-schedule-day', async (req, res) => {
   const { day, schedule } = req.body;
   try {
@@ -355,7 +364,6 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
 
     let dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(canonicalDay));
 
-    // إذا اليوم غير موجود بالشيت، أنشئ له بلوك جديد بالاسم القياسي الموحّد (عنوان اليوم + 4 صفوف فارغة)
     if (dayIndex === -1) {
       dayIndex = data.length;
       data.push([canonicalDay]);
@@ -387,7 +395,6 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
   }
 });
 
-// 📥 مسار جلب جدول الانتظار الكامل لكل الأيام (يُستخدم في صفحة waiting_setting)
 app.get('/get-waiting-schedule-full', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
@@ -419,7 +426,6 @@ app.get('/get-waiting-schedule-full', async (req, res) => {
   }
 });
 
-// 👩‍🏫 مسار جلب أسماء المعلمين (يُستخدم في صفحة rotation)
 app.get('/api/teachers', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
@@ -427,7 +433,6 @@ app.get('/api/teachers', async (req, res) => {
     const sheet = getSheet(workbook, TEACHERS_SHEET);
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-    // استهداف العمود الثاني (index 1) تحديداً وهو اسم المعلم، وتجاهل عمود السجل المدني (index 0)
     const teachersNames = data.slice(1)
       .map(row => row[1])
       .filter(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "");
@@ -438,7 +443,6 @@ app.get('/api/teachers', async (req, res) => {
   }
 });
 
-// 📥 مسار جلب بيانات جدول المناوبة المحفوظة (rotation)
 app.get('/api/get-rotation', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
@@ -455,7 +459,6 @@ app.get('/api/get-rotation', async (req, res) => {
   }
 });
 
-// 💾 مسار حفظ بيانات أسبوع من جدول المناوبة (rotation)
 app.post('/api/save-rotation', async (req, res) => {
   const { weekTitle, weekData } = req.body;
   try {
@@ -742,7 +745,6 @@ app.get('/register', (req, res) => {
   res.sendFile(path.join(__dirname, 'register.html'));
 });
 
-// 📌 مسار تسجيل مدرسة جديدة (يدعم استقبال الملف بأي اسم حقل وحفظه بالـ PostgreSQL)
 app.post('/register', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -781,7 +783,6 @@ app.post('/register', upload.any(), async (req, res) => {
       fs.writeFileSync(userExcelPath, fileBuffer);
       if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
     } else {
-      // 🛡️ إنشاء ملف إكسل مخصص ونظيف تماماً للمدرسة الجديدة بدون الاعتماد على أي ملفات مسبقة
       const cleanWb = createCleanSchoolWorkbook(schoolName, region, fullName);
       xlsx.writeFile(cleanWb, userExcelPath);
       fileBuffer = fs.readFileSync(userExcelPath);
@@ -807,7 +808,6 @@ app.post('/register', upload.any(), async (req, res) => {
   }
 });
 
-// 📌 مسار تحديث واستبدال ملف الإكسل للمدرسة من صفحة الإعدادات
 app.post('/update-school-excel', upload.any(), async (req, res) => {
   const cleanFiles = () => {
     if (req.files && req.files.length > 0) {
@@ -844,7 +844,6 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
     } else {
-      // 🔒 لا يوجد اسم مستخدم = لا نعرف لأي مدرسة يتبع هذا الملف، نرفض الطلب بدل الكتابة على ملف مشترك
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
       return res.status(401).json({ success: false, message: "يرجى تسجيل الدخول أولاً لتحديث بيانات مدرستك." });
     }
@@ -858,7 +857,111 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
 });
 
 // =========================================================================
-// 🛠️ 4. مسارات لوحة تحكم الأدمن (Admin Routes)
+// ⚖️ 4. مسارات نظام المساءلات (Accountability API Routes)
+// =========================================================================
+
+// 💾 1. إضافة مساءلة جديدة
+app.post('/api/accountability', async (req, res) => {
+  try {
+    const { teacher_name, violation_type, hijri_date, delay_minutes, details, status } = req.body;
+    const username = req.session?.username || req.body?.username || null;
+
+    if (!teacher_name || !violation_type || !hijri_date) {
+      return res.status(400).json({ success: false, message: 'يرجى تعبئة الحقول الأساسية: اسم المعلم، نوع المخالفة، والتاريخ' });
+    }
+
+    const queryText = `
+      INSERT INTO accountability (username, teacher_name, violation_type, hijri_date, delay_minutes, details, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
+    const values = [
+      username,
+      teacher_name,
+      violation_type,
+      hijri_date,
+      parseInt(delay_minutes) || 0,
+      details || '',
+      status || 'بانتظار الرد'
+    ];
+
+    const result = await pool.query(queryText, values);
+    return res.json({
+      success: true,
+      message: 'تم حفظ المساءلة بنجاح',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('خطأ في حفظ المساءلة:', error);
+    return res.status(500).json({ success: false, message: 'حدث خطأ أثناء حفظ المساءلة: ' + error.message });
+  }
+});
+
+// 📥 2. جلب المساءلات الخاصة بالمدرسة
+app.get('/api/accountability', async (req, res) => {
+  try {
+    const username = req.session?.username || req.query?.username || null;
+    let queryText = 'SELECT * FROM accountability ORDER BY id DESC';
+    let values = [];
+
+    if (username) {
+      queryText = 'SELECT * FROM accountability WHERE username = $1 OR username IS NULL ORDER BY id DESC';
+      values = [username];
+    }
+
+    const result = await pool.query(queryText, values);
+    return res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('خطأ في جلب المساءلات:', error);
+    return res.status(500).json({ success: false, message: 'حدث خطأ أثناء جلب المساءلات: ' + error.message });
+  }
+});
+
+// 🔄 3. تحديث حالة أو تفاصيل مساءلة
+app.put('/api/accountability/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, details } = req.body;
+
+    const queryText = `
+      UPDATE accountability 
+      SET status = COALESCE($1, status),
+          details = COALESCE($2, details)
+      WHERE id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(queryText, [status, details, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'لم يتم العثور على المساءلة المطلوب تحديثها' });
+    }
+
+    return res.json({ success: true, message: 'تم تحديث المساءلة بنجاح', data: result.rows[0] });
+  } catch (error) {
+    console.error('خطأ في تحديث المساءلة:', error);
+    return res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحديث المساءلة: ' + error.message });
+  }
+});
+
+// ❌ 4. حذف مساءلة
+app.delete('/api/accountability/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM accountability WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'لم يتم العثور على المساءلة' });
+    }
+
+    return res.json({ success: true, message: 'تم حذف المساءلة بنجاح' });
+  } catch (error) {
+    console.error('خطأ في حذف المساءلة:', error);
+    return res.status(500).json({ success: false, message: 'حدث خطأ أثناء حذف المساءلة: ' + error.message });
+  }
+});
+
+// =========================================================================
+// 🛠️ 5. مسارات لوحة تحكم الأدمن (Admin Routes)
 // =========================================================================
 
 function requireAdmin(req, res, next) {
@@ -901,122 +1004,16 @@ app.post('/api/admin/logout', (req, res) => {
 
 app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, full_name, school_name, region, username, password, school_excel_file AS excel_path, (excel_data IS NOT NULL) AS has_excel FROM users ORDER BY id DESC');
+    const result = await pool.query('SELECT id, username, full_name, region, school_name, school_excel_file FROM users ORDER BY id DESC');
     res.json({ success: true, schools: result.rows });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
   }
-});
-
-app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { full_name, school_name, region, username, password } = req.body;
-    const cleanUsername = String(username).trim();
-
-    let finalPassword = password;
-    if (password && !password.startsWith('$2a$') && !password.startsWith('$2b$')) {
-      finalPassword = bcrypt.hashSync(password, 10);
-    }
-
-    if (req.file) {
-      const excelFileName = req.file.filename;
-      const fileBuffer = fs.readFileSync(req.file.path);
-
-      if (cleanUsername) {
-        const uploadsDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-        const userFilePath = path.join(uploadsDir, `data_${cleanUsername}.xlsx`);
-        fs.writeFileSync(userFilePath, fileBuffer);
-      }
-
-      await pool.query(
-        `UPDATE users 
-         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5, school_excel_file = $6, excel_data = $7 
-         WHERE id = $8`,
-        [full_name, school_name, region, cleanUsername, finalPassword, excelFileName, fileBuffer, id]
-      );
-
-      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    } else {
-      await pool.query(
-        `UPDATE users 
-         SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5 
-         WHERE id = $6`,
-        [full_name, school_name, region, cleanUsername, finalPassword, id]
-      );
-    }
-
-    res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
-  } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get('/check-db', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT username, school_name, OCTET_LENGTH(excel_data) AS excel_size_bytes FROM users;');
-    res.json({ 
-      success: true, 
-      schools: result.rows 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 📥 مسار تنزيل ملف الإكسل المباشر من PostgreSQL للأدمن
-app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      'SELECT username, school_name, excel_data FROM users WHERE id = $1',
-      [id]
-    );
-
-    if (result.rows.length === 0 || !result.rows[0].excel_data) {
-      return res.status(404).json({ success: false, message: 'عذراً، لا يوجد ملف إكسل مخزن لهذه المدرسة.' });
-    }
-
-    const school = result.rows[0];
-    const fileName = `school_${school.username || id}_data.xlsx`;
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-
-    return res.send(school.excel_data);
-  } catch (error) {
-    console.error('خطأ في تنزيل ملف الإكسل للأدمن:', error);
-    res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);
-  }
-});
-
-// مسار تنزيل ملف الإكسل waiting_data.xlsx من المجلد الرئيسي
-app.get('/download-template', (req, res) => {
-    const filePath = path.join(__dirname,'templates', 'waiting_data.xlsx');
-    res.download(filePath, 'waiting_data.xlsx', (err) => {
-        if (err) {
-            console.error('خطأ في تحميل الملف:', err);
-            res.status(404).send('تعذر العثور على ملف النموذج');
-        }
-    });
 });
 
 // =========================================================================
 // 🚀 تشغيل السيرفر
 // =========================================================================
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);
 });

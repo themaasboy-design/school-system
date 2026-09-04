@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة المساءلات والغياب</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+    <h2 id="schoolName">المدرسة</h2>
+    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+    <div class="navbar-links">
+        <a href="index.html">الرئيسية</a>
+        <a href="dashboard.html">الانتظار</a>
+        <a href="/monitoring">الإشراف</a>
+        <a href="accountability.html" class="active">المساءلة</a>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
+    </div>
+</nav>
+
+<div class="container-fluid px-lg-5 my-4">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-primary">نظام إدارة المساءلات والإفادات</h2>
+        <p class="text-muted">تسجيل مخالفات المعلمين وحفظها مباشرة في قاعدة البيانات</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- 1️⃣ نموذج إضافة المساءلة -->
+        <div class="col-12 col-lg-4">
+            <div class="card p-4 shadow-sm border-0 rounded-3">
+                <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">📝 إصدار مساءلة جديدة</h5>
+                
+                <form id="accountabilityForm">
+                    <!-- اسم المعلم -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم المعلم:</label>
+                        <select id="teacherSelect" class="form-select" required>
+                            <option value="">-- اختر المعلم --</option>
+                        </select>
+                    </div>
+
+                    <!-- نوع الحالة / المساءلة -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">نوع الحالة / المساءلة:</label>
+                        <select id="violationType" class="form-select" required>
+                            <option value="">-- اختر نوع المساءلة --</option>
+                            <option value="التأخر عن الطابور الصباحي">التأخر عن الطابور الصباحي</option>
+                            <option value="التأخر عن الحصة الدراسية">التأخر عن الحصة الدراسية</option>
+                            <option value="التأخر عن إشراف الفسحة">التأخر عن إشراف الفسحة</option>
+                            <option value="التأخر عن إشراف الصلاة">التأخر عن إشراف الصلاة</option>
+                            <option value="التأخر عن حصة الانتظار">التأخر عن حصة الانتظار</option>
+                            <option value="الخروج قبل نهاية الحصة الدراسية">الخروج قبل نهاية الحصة الدراسية</option>
+                            <option value="الغياب عن الحصة الدراسية">الغياب عن الحصة الدراسية</option>
+                            <option value="الغياب عن حصة الانتظار">الغياب عن حصة الانتظار</option>
+                            <option value="عدم التواجد أثناء الدوام">عدم التواجد أثناء الدوام</option>
+                            <option value="عدم الإشراف على الصلاة">عدم الإشراف على الصلاة</option>
+                            <option value="عدم الإشراف في الفسحة">عدم الإشراف في الفسحة</option>
+                            <option value="عدم حضور الطابور الصباحي">عدم حضور الطابور الصباحي</option>
+                            <option value="عدم حضور المناوبة الصباحية">عدم حضور المناوبة الصباحية</option>
+                            <option value="عدم حضور المناوبة المسائية">عدم حضور المناوبة المسائية</option>
+                        </select>
+                    </div>
+
+                    <!-- مدة التأخير بالدقائق (يظهر شرطياً فقط عند اختيار التأخر) -->
+                    <div class="mb-3 d-none" id="delayMinutesContainer">
+                        <label class="form-label fw-bold text-danger">مدة التأخير (بالدقائق):</label>
+                        <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
+                    </div>
+
+                    <!-- التاريخ بالتقويم الهجري -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">التاريخ (بالتقويم الهجري):</label>
+                        <input type="text" id="hijriDate" class="form-control" placeholder="مثال: 1445/08/15" required>
+                    </div>
+
+                    <!-- التفاصيل / الملاحظات -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">تفاصيل أو ملاحظات إضافية:</label>
+                        <textarea id="details" class="form-control" rows="3" placeholder="اكتب التفاصيل هنا (اختياري)..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">حفظ المساءلة 💾</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2️⃣ جدول عرض المساءلات المسجلة -->
+        <div class="col-12 col-lg-8">
+            <div class="card p-4 shadow-sm border-0 rounded-3">
+                <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">📋 سجل المساءلات المحفوظة</h5>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover text-center align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>اسم المعلم</th>
+                                <th>نوع المساءلة</th>
+                                <th>مدة التأخير</th>
+                                <th>التاريخ الهجري</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody">
+                            <tr><td colspan="6" class="text-muted">جاري تحميل البيانات...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+<script>
+    // 1️⃣ حساب التاريخ الهجري لليوم تلقائياً وتعبئته بالنموذج
+    function setTodayHijriDate() {
+        try {
+            const today = new Date();
+            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-uma', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            // تحويل الصيغة لتكون بالرقم المباشر (مثل 1445/08/20)
+            const formatted = formatter.format(today).replace(/[\u200E\u200F]/g, '');
+            document.getElementById('hijriDate').value = formatted;
+        } catch (e) {
+            console.error("خطأ في توليد التاريخ الهجري:", e);
+        }
+    }
+
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق حسب الخيار
+    const violationSelect = document.getElementById('violationType');
+    const delayContainer = document.getElementById('delayMinutesContainer');
+    const delayInput = document.getElementById('delayMinutes');
+
+    violationSelect.addEventListener('change', () => {
+        const val = violationSelect.value;
+        if (val.includes("التأخر")) {
+            delayContainer.classList.remove('d-none');
+            delayInput.required = true;
+        } else {
+            delayContainer.classList.add('d-none');
+            delayInput.required = false;
+            delayInput.value = "";
+        }
+    });
+
+    // 3️⃣ جلب قائمة المعلمين من السيرفر
+    async function loadTeachers() {
+        try {
+            const res = await fetch('/get-monitoring-teachers');
+            const data = await res.json();
+            const select = document.getElementById('teacherSelect');
+            
+            if (data.success && Array.isArray(data.teachers)) {
+                data.teachers.forEach(t => {
+                    const name = typeof t === 'string' ? t.trim() : (t.name || t['اسم المعلم']);
+                    if (name) {
+                        select.innerHTML += `<option value="${name}">${name}</option>`;
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("خطأ في تحميل المعلمين:", e);
+        }
+    }
+
+    // 4️⃣ جلب سجلات المساءلات من سيرفر Node.js
+    async function loadAccountabilityRecords() {
+        try {
+            const res = await fetch('/api/accountability');
+            const result = await res.json();
+            const tbody = document.getElementById('recordsTableBody');
+
+            if (result.success && result.data.length > 0) {
+                tbody.innerHTML = "";
+                result.data.forEach((item, index) => {
+                    const delayText = item.delay_minutes > 0 ? `${item.delay_minutes} دقيقة` : '-';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td class="fw-bold">${item.teacher_name}</td>
+                            <td><span class="badge bg-danger p-2">${item.violation_type}</span></td>
+                            <td>${delayText}</td>
+                            <td>${item.hijri_date}</td>
+                            <td><span class="badge bg-warning text-dark">${item.status || 'بانتظار الرد'}</span></td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد مساءلات مسجلة في قاعدة البيانات</td></tr>`;
+            }
+        } catch (e) {
+            console.error("خطأ في جلب السجلات:", e);
+        }
+    }
+
+    // 5️⃣ حفظ المساءلة الجديدة
+    document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const payload = {
+            teacher_name: document.getElementById('teacherSelect').value,
+            violation_type: document.getElementById('violationType').value,
+            delay_minutes: document.getElementById('delayMinutes').value || 0,
+            hijri_date: document.getElementById('hijriDate').value,
+            details: document.getElementById('details').value
+        };
+
+        try {
+            const res = await fetch('/api/accountability', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+
+            if (result.success) {
+                Toastify({
+                    text: result.message,
+                    duration: 3000,
+                    style: { background: "linear-gradient(to left, #2ecc71, #27ae60)" }
+                }).showToast();
+
+                // إعادة ضبط النموذج
+                document.getElementById('accountabilityForm').reset();
+                delayContainer.classList.add('d-none');
+                setTodayHijriDate();
+                
+                // تحديث الجدول
+                loadAccountabilityRecords();
+            } else {
+                Toastify({
+                    text: "خطأ: " + result.error,
+                    style: { background: "#e74c3c" }
+                }).showToast();
+            }
+        } catch (err) {
+            Toastify({ text: "فشل الاتصال بالسيرفر", style: { background: "#e74c3c" } }).showToast();
+        }
+    });
+
+    window.onload = () => {
+        setTodayHijriDate();
+        loadTeachers();
+        loadAccountabilityRecords();
+    };
+</script>
+</body>
+</html>
