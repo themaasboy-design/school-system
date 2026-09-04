@@ -105,7 +105,7 @@
                         <option value="">-- اختر الفصل أولاً --</option>
                     </select>
                     <select id="allTeacherSelect_${i}" class="secondary-teacher-select">
-                        <option value="">-- اختر المعلم البديل --</option>
+                        <option value="">-- اختر المعلم --</option>
                     </select>
                 </div>
             `;
@@ -123,7 +123,7 @@
                 reportData[`class${i}_room`] = document.getElementById(`roomSelect_${i}`).value;
                 
                 let selectedTeacher = document.getElementById(`teacherSelect_${i}`).value;
-                // إذا كان خيار المستخدم "معلم بديل آخر"، نأخذ القيمة من القائمة الثانية
+                // إذا كان خيار المستخدم "معلم بديل آخر"، نأخذ القيمة من قائمة المعلمين الثانية
                 if (selectedTeacher === "معلم بديل آخر") {
                     const altTeacher = document.getElementById(`allTeacherSelect_${i}`).value;
                     selectedTeacher = altTeacher !== "" ? altTeacher : "معلم بديل آخر";
@@ -190,29 +190,15 @@
                 const secSelect = document.getElementById(`allTeacherSelect_${i}`);
                 if (!secSelect) continue;
                 
-                secSelect.innerHTML = '<option value="">-- اختر من كافة المعلمين --</option>';
+                secSelect.innerHTML = '<option value="">-- اختر المعلم --</option>';
 
-                // خيارات عامة (منتظر 1 - 4)
-                let groupGeneric = document.createElement('optgroup');
-                groupGeneric.label = "خيارات عامة";
-                for (let m = 1; m <= 4; m++) {
-                    let opt = document.createElement('option');
-                    opt.value = `منتظر ${m}`;
-                    opt.text = `منتظر ${m}`;
-                    groupGeneric.appendChild(opt);
-                }
-                secSelect.appendChild(groupGeneric);
-
-                // قائمة كافة معلمي المدرسة
-                let groupAll = document.createElement('optgroup');
-                groupAll.label = "جميع معلمي المدرسة";
+                // تعبئة أسماء كافة معلمي المدرسة فقط
                 allTeachersList.forEach(t => {
                     let opt = document.createElement('option');
                     opt.value = t["Name_teacher"];
                     opt.text = t["Name_teacher"];
-                    groupAll.appendChild(opt);
+                    secSelect.appendChild(opt);
                 });
-                secSelect.appendChild(groupAll);
             }
         }
 
