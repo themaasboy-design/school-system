@@ -99,7 +99,7 @@
         <a href="index.html">الرئيسية</a>
         <a href="dashboard.html#">الانتظار</a>
         <a href="/monitoring">الإشراف</a>
-       
+        
         <div class="dropdown-container">
             <a href="#" class="dropdown-trigger">التقارير</a>
             <div class="dropdown-menu">
@@ -412,11 +412,22 @@
         });
     }
 
+    // 🟢 التعديل الجوهري هنا: عرض المهام المحددة فقط
     function renderSummaryTable() {
         const tbody = document.getElementById('summaryTableBody');
         tbody.innerHTML = "";
 
+        let hasAnyTask = false;
+
         tasks.forEach(task => {
+            // التحقق مما إذا كانت هذه المهمة بها معلم واحد على الأقل في أي يوم من أيام الأسبوع
+            const isTaskAssigned = daysKeys.some(day => (weeklySchedule[day][task] || []).length > 0);
+
+            // إذا لم يتم تحديد أي معلم لهذه المهمة طوال الأسبوع، نتخطى عرض الصف
+            if (!isTaskAssigned) return;
+
+            hasAnyTask = true;
+
             let rowHtml = `<tr><td class="fw-bold bg-light text-start ps-3">${task}</td>`;
             daysKeys.forEach(day => {
                 const namesArray = weeklySchedule[day][task] || [];
@@ -430,6 +441,11 @@
             rowHtml += `</tr>`;
             tbody.innerHTML += rowHtml;
         });
+
+        // إذا لم تكن هناك أي مهمة مسند إليها معلمون عبر الأسبوع، يُعرض رسالة تنبيهية بالجدول
+        if (!hasAnyTask) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center py-3">لم يتم إسناد أي معلم لأي مهمة بعد</td></tr>`;
+        }
     }
 
     document.getElementById('btnSave').addEventListener('click', async () => {
