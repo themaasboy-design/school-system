@@ -9,38 +9,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
 
     <style>
-        /* تنسيق التقويم الهجري التفاعلي */
-        .hijri-picker-wrapper {
-            position: relative;
-        }
-        .hijri-calendar-popup {
-            display: none;
-            position: absolute;
-            top: 100%;
-            right: 0;
-            z-index: 1050;
-            width: 320px;
-            background: #ffffff;
-            border: 1px solid #dee2e6;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            padding: 15px;
-            margin-top: 5px;
-        }
-        .hijri-calendar-popup.show {
-            display: block;
-        }
-        .hijri-day-btn {
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .hijri-day-btn:hover {
-            background-color: #0d6efd;
-            color: #fff;
-        }
+        .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
     </style>
 </head>
 <body>
@@ -106,19 +78,15 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- اختيار التاريخ بالتقويم الهجري (تفاعلي ومغلق يدويًا) -->
-                    <div class="mb-3 hijri-picker-wrapper">
+                    <!-- اختيار التاريخ بالتقويم الهجري (نفس تقويم report.html) -->
+                    <div class="mb-3" style="position: relative;">
                         <label class="form-label fw-bold">اختر التاريخ الهجري (من التقويم):</label>
-                        <input type="text" 
-                               id="hijriPicker" 
-                               class="form-control bg-white" 
-                               placeholder="اضغط لاختيار التاريخ الهجري..." 
-                               required 
-                               readonly 
-                               style="cursor: pointer;">
-                        
-                        <!-- نافذة التقويم الهجري المنبثقة -->
-                        <div id="hijriCalendarPopup" class="hijri-calendar-popup"></div>
+                        <input type="text"
+                               id="hijriPicker"
+                               class="form-control"
+                               placeholder="اختر التاريخ الهجري"
+                               autocomplete="off"
+                               required>
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -163,136 +131,24 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
     // 0️⃣ جلب اسم المدرسة
     async function loadSchoolName() {
         try {
-            const res = await fetch('/api/school-info');
-            const data = await res.json();
-            if (data.success && data.schoolName) {
-                document.getElementById('schoolName').textContent = data.schoolName;
-            } else if (data.name) {
-                document.getElementById('schoolName').textContent = data.name;
+            const response = await fetch('/get-report-data');
+            const data = await response.json();
+            if (data.mainInfo && data.mainInfo.B2) {
+                document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
             } else {
                 document.getElementById('schoolName').textContent = "المدرسة";
             }
         } catch (e) {
+            console.error("خطأ في جلب اسم المدرسة:", e);
             document.getElementById('schoolName').textContent = "المدرسة";
         }
-    }
-
-    // 1️⃣ بناء محرك التقويم الهجري التفاعلي
-    let currentHijriYear = moment().iYear();
-    let currentHijriMonth = moment().iMonth(); // 0 إلى 11
-
-    const hijriMonthNames = [
-        "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
-        "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
-        "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
-    ];
-
-    function renderHijriCalendar(year, month) {
-        const daysInMonth = moment.iDaysInMonth(year, month);
-        
-        // معرفة اليوم الأول من الشهر الهجري لضبط أيام الأسبوع
-        const firstDayGregorian = moment(`${year}/${month + 1}/1`, 'iYYYY/iM/iD');
-        const startDayOfWeek = firstDayGregorian.day(); // 0: الأحد ... 6: السبت
-
-        let html = `
-            <div class="d-flex justify-content-between align-items-center mb-3 bg-primary text-white p-2 rounded">
-                <button type="button" class="btn btn-sm btn-light py-0 fw-bold" id="prevHijriMonth">«</button>
-                <span class="fw-bold">${hijriMonthNames[month]} ${year} هـ</span>
-                <button type="button" class="btn btn-sm btn-light py-0 fw-bold" id="nextHijriMonth">»</button>
-            </div>
-            <div class="text-center">
-                <div class="d-flex text-muted fw-bold border-bottom pb-1 mb-2 small">
-                    <div style="width: 14.28%">أحد</div>
-                    <div style="width: 14.28%">إثن</div>
-                    <div style="width: 14.28%">ثلا</div>
-                    <div style="width: 14.28%">أرب</div>
-                    <div style="width: 14.28%">خميس</div>
-                    <div style="width: 14.28%">جمعة</div>
-                    <div style="width: 14.28%">سبت</div>
-                </div>
-                <div class="d-flex flex-wrap">
-        `;
-
-        // إضافة خانات فارغة لأيام الأسبوع قبل بداية الشهر
-        for (let i = 0; i < startDayOfWeek; i++) {
-            html += `<div style="width: 14.28%" class="p-1"></div>`;
-        }
-
-        // بناء الأيام
-        for (let d = 1; d <= daysInMonth; d++) {
-            const formattedMonth = String(month + 1).padStart(2, '0');
-            const formattedDay = String(d).padStart(2, '0');
-            const dateStr = `${year}/${formattedMonth}/${formattedDay}`;
-            
-            html += `
-                <div style="width: 14.28%" class="p-1">
-                    <button type="button" class="btn btn-sm btn-outline-primary w-100 p-1 hijri-day-btn" data-date="${dateStr}">
-                        ${d}
-                    </button>
-                </div>
-            `;
-        }
-
-        html += `</div></div>`;
-        $('#hijriCalendarPopup').html(html);
-    }
-
-    function initHijriPicker() {
-        const pickerInput = $('#hijriPicker');
-        const popup = $('#hijriCalendarPopup');
-
-        // تعيين تاريخ اليوم هجرياً كافتراضي
-        const todayStr = moment().format('iYYYY/iMM/iDD');
-        pickerInput.val(todayStr);
-
-        // فتح/إغلاق التقويم عند النقر
-        pickerInput.on('click', function (e) {
-            e.stopPropagation();
-            renderHijriCalendar(currentHijriYear, currentHijriMonth);
-            popup.toggleClass('show');
-        });
-
-        // التنقل بين الشهور الهجرية
-        popup.on('click', '#prevHijriMonth', function (e) {
-            e.stopPropagation();
-            currentHijriMonth--;
-            if (currentHijriMonth < 0) {
-                currentHijriMonth = 11;
-                currentHijriYear--;
-            }
-            renderHijriCalendar(currentHijriYear, currentHijriMonth);
-        });
-
-        popup.on('click', '#nextHijriMonth', function (e) {
-            e.stopPropagation();
-            currentHijriMonth++;
-            if (currentHijriMonth > 11) {
-                currentHijriMonth = 0;
-                currentHijriYear++;
-            }
-            renderHijriCalendar(currentHijriYear, currentHijriMonth);
-        });
-
-        // اختيار اليوم
-        popup.on('click', '.hijri-day-btn', function (e) {
-            e.stopPropagation();
-            const selectedDate = $(this).data('date');
-            pickerInput.val(selectedDate);
-            popup.removeClass('show');
-        });
-
-        // إغلاق التقويم عند النقر في أي مكان خارج التقويم
-        $(document).on('click', function (e) {
-            if (!$(e.target).closest('.hijri-picker-wrapper').length) {
-                popup.removeClass('show');
-            }
-        });
     }
 
     // 2️⃣ إظهار / إخفاء حقل مدة التأخير
@@ -441,9 +297,16 @@
     // التشغيل عند تحميل الصفحة
     $(document).ready(() => {
         loadSchoolName();
-        initHijriPicker();
         loadTeachers();
         loadAccountabilityRecords();
+
+        $("#hijriPicker").hijriDatePicker({
+            hijri: true,
+            showSwitcher: false,
+            format: 'iYYYY/iMM/iDD',
+            hijriFormat: 'iYYYY/iMM/iDD',
+            locale: 'ar-sa'
+        });
     });
 </script>
 </body>
