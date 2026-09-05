@@ -7,6 +7,8 @@
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <!-- مكتبة التقويم الهجري CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@0.7.1/dist/css/bootstrap-hijri-datepicker.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -72,12 +74,10 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- اختيار التاريخ بالتقويم وحسابه هجرياً -->
+                    <!-- تقويم اختيار التاريخ الهجري فقط -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اختر التاريخ (من التقويم):</label>
-                        <input type="date" id="gregorianPicker" class="form-control mb-2" required>
-                        <label class="form-label fw-bold text-secondary small">التاريخ الهجري المقابل:</label>
-                        <input type="text" id="hijriDate" class="form-control bg-light" readonly placeholder="يتم تحويله تلقائياً...">
+                        <label class="form-label fw-bold">اختر التاريخ الهجري:</label>
+                        <input type="text" id="hijriDate" class="form-control hijri-date-input" placeholder="اختر التاريخ الهجري..." required autocomplete="off">
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -117,10 +117,15 @@
     </div>
 </div>
 
+<!-- المكتبات المطلوبة للتقويم الهجري والتنبيهات -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@0.7.1/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
-    // 0️⃣ جلب اسم المدرسة من ورقة mininfo عبر السيرفر
+    // 0️⃣ جلب اسم المدرسة من ورقة mininfo
     async function loadSchoolName() {
         try {
             const res = await fetch('/api/school-info');
@@ -138,54 +143,23 @@
         }
     }
 
-    // 1️⃣ تحويل التاريخ الميلادي إلى هجري (أم القرى) بشكل أليم ودقيق
-    function convertToHijri(dateObj) {
-        try {
-            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-            
-            const parts = formatter.formatToParts(dateObj);
-            let day = '', month = '', year = '';
-
-            parts.forEach(p => {
-                if (p.type === 'day') day = p.value;
-                if (p.type === 'month') month = p.value;
-                if (p.type === 'year') year = p.value;
-            });
-
-            return `${year}/${month}/${day}`;
-        } catch (e) {
-            console.error("خطأ في تحويل التاريخ الهجري:", e);
-            return "";
-        }
-    }
-
-    // تعيين تاريخ اليوم افتراضياً عند فتح الصفحة وتفعيل مستمع التغيير
-    function initDatePicker() {
-        const picker = document.getElementById('gregorianPicker');
-        const hijriInput = document.getElementById('hijriDate');
-
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        
-        picker.value = `${yyyy}-${mm}-${dd}`;
-        hijriInput.value = convertToHijri(today);
-
-        picker.addEventListener('change', (e) => {
-            if (e.target.value) {
-                // إضافة التوقيت T12:00:00 لمنع حدوث إزاحة أعياد أو فرق منطقة زمنية
-                const selectedDate = new Date(e.target.value + 'T12:00:00');
-                hijriInput.value = convertToHijri(selectedDate);
-            }
+    // 1️⃣ تفعيل التقويم الهجري التفاعلي المباشر
+    function initHijriDatePicker() {
+        $(".hijri-date-input").hijriDatePicker({
+            hijri: true,
+            showGregorian: false,
+            format: 'iYYYY/iMM/iDD',
+            hijriFormat: 'iYYYY/iMM/iDD',
+            showSwitcher: false,
+            locale: 'ar-sa'
         });
+
+        // تعيين تاريخ اليوم الهجري افتراضياً
+        const todayHijri = moment().format('iYYYY/iMM/iDD');
+        document.getElementById('hijriDate').value = todayHijri;
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -258,7 +232,6 @@
         }
     }
 
-    // دالة فتح صفحة طباعة التقرير
     function printAccountabilityReport(id) {
         window.open(`/print-accountability?id=${id}`, '_blank');
     }
@@ -291,12 +264,13 @@
                     style: { background: "linear-gradient(to left, #2ecc71, #27ae60)" }
                 }).showToast();
 
-                // إعادة ضبط النموذج وتعيين تاريخ اليوم هجرياً من جديد
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
-                initDatePicker();
                 
-                // تحديث جدول المساءلات
+                // إعادة تعيين تاريخ اليوم الهجري
+                const todayHijri = moment().format('iYYYY/iMM/iDD');
+                document.getElementById('hijriDate').value = todayHijri;
+                
                 loadAccountabilityRecords();
             } else {
                 Toastify({
@@ -311,7 +285,7 @@
 
     window.onload = () => {
         loadSchoolName();
-        initDatePicker();
+        initHijriDatePicker();
         loadTeachers();
         loadAccountabilityRecords();
     };
