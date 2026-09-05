@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <!-- مكتبة التقويم الهجري CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@0.7.1/dist/css/bootstrap-hijri-datepicker.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.7/dist/css/bootstrap-hijri-datepicker.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -74,10 +74,10 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- تقويم اختيار التاريخ الهجري فقط -->
+                    <!-- اختيار التاريخ بالتقويم الهجري (تم حذف المزدوج والأكتفاء بالتقويم الهجري) -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">اختر التاريخ الهجري:</label>
-                        <input type="text" id="hijriDate" class="form-control hijri-date-input" placeholder="اختر التاريخ الهجري..." required autocomplete="off">
+                        <label class="form-label fw-bold">اختر التاريخ الهجري (من التقويم):</label>
+                        <input type="text" id="hijriPicker" class="form-control hijri-date-input" placeholder="اختر التاريخ الهجري..." required autocomplete="off">
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -119,13 +119,13 @@
 
 <!-- المكتبات المطلوبة للتقويم الهجري والتنبيهات -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@0.7.1/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.7/dist/js/bootstrap-hijri-datepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
-    // 0️⃣ جلب اسم المدرسة من ورقة mininfo
+    // 0️⃣ جلب اسم المدرسة
     async function loadSchoolName() {
         try {
             const res = await fetch('/api/school-info');
@@ -143,23 +143,51 @@
         }
     }
 
-    // 1️⃣ تفعيل التقويم الهجري التفاعلي المباشر
-    function initHijriDatePicker() {
-        $(".hijri-date-input").hijriDatePicker({
-            hijri: true,
-            showGregorian: false,
-            format: 'iYYYY/iMM/iDD',
-            hijriFormat: 'iYYYY/iMM/iDD',
-            showSwitcher: false,
-            locale: 'ar-sa'
-        });
-
-        // تعيين تاريخ اليوم الهجري افتراضياً
-        const todayHijri = moment().format('iYYYY/iMM/iDD');
-        document.getElementById('hijriDate').value = todayHijri;
+    // حساب التاريخ الهجري اليوم بصيغة (YYYY/MM/DD)
+    function getTodayHijri() {
+        try {
+            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const parts = formatter.formatToParts(new Date());
+            let day = '', month = '', year = '';
+            parts.forEach(p => {
+                if (p.type === 'day') day = p.value;
+                if (p.type === 'month') month = p.value;
+                if (p.type === 'year') year = p.value;
+            });
+            return `${year}/${month}/${day}`;
+        } catch (e) {
+            return "";
+        }
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
+    // 1️⃣ تفعيل التقويم الهجري التفاعلي
+    function initHijriDatePicker() {
+        const pickerInput = $('#hijriPicker');
+        
+        // إعداد التقويم الهجري
+        if ($.fn.hijriDatePicker) {
+            pickerInput.hijriDatePicker({
+                hijri: true,
+                showSwitcher: false, // الاعتماد الكلي على التقويم الهجري
+                format: 'iYYYY/iMM/iDD',
+                hijriFormat: 'iYYYY/iMM/iDD',
+                showTodayButton: true,
+                showClear: false,
+                locale: 'ar-sa'
+            });
+        }
+
+        // تعيين تاريخ اليوم هجرياً كقيمة افتراضية
+        if (!pickerInput.val()) {
+            pickerInput.val(getTodayHijri());
+        }
+    }
+
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -176,62 +204,96 @@
         }
     });
 
-    // 3️⃣ جلب قائمة المعلمين
+    // 3️⃣ جلب قائمة المعلمين (معالجة مرنة تمنع حدوث أخطاء)
     async function loadTeachers() {
         try {
             const res = await fetch('/get-monitoring-teachers');
             const data = await res.json();
             const select = document.getElementById('teacherSelect');
             
-            if (data.success && Array.isArray(data.teachers)) {
-                data.teachers.forEach(t => {
-                    const name = typeof t === 'string' ? t.trim() : (t.name || t['اسم المعلم']);
+            let teachersList = [];
+            if (Array.isArray(data)) {
+                teachersList = data;
+            } else if (data && Array.isArray(data.teachers)) {
+                teachersList = data.teachers;
+            } else if (data && Array.isArray(data.data)) {
+                teachersList = data.data;
+            }
+
+            select.innerHTML = '<option value="">-- اختر المعلم --</option>';
+
+            if (teachersList.length > 0) {
+                teachersList.forEach(t => {
+                    const name = typeof t === 'string' ? t.trim() : (t.name || t['اسم المعلم'] || t.teacher_name);
                     if (name) {
-                        select.innerHTML += `<option value="${name}">${name}</option>`;
+                        const opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        select.appendChild(opt);
                     }
                 });
+            } else {
+                console.warn("لم يتم العثور على معلمين في استجابة السيرفر");
             }
         } catch (e) {
-            console.error("خطأ في تحميل المعلمين:", e);
+            console.error("خطأ في تحميل قائمة المعلمين:", e);
         }
     }
 
-    // 4️⃣ جلب سجلات المساءلات وعرض زر الطباعة
+    // 4️⃣ جلب سجلات المساءلات (معالجة مرنة تمنع توقف الجدول)
     async function loadAccountabilityRecords() {
         try {
             const res = await fetch('/api/accountability');
             const result = await res.json();
             const tbody = document.getElementById('recordsTableBody');
 
-            if (result.success && result.data.length > 0) {
+            let recordsList = [];
+            if (Array.isArray(result)) {
+                recordsList = result;
+            } else if (result && Array.isArray(result.data)) {
+                recordsList = result.data;
+            } else if (result && Array.isArray(result.records)) {
+                recordsList = result.records;
+            }
+
+            if (recordsList.length > 0) {
                 tbody.innerHTML = "";
-                result.data.forEach((item, index) => {
-                    const delayText = item.delay_minutes > 0 ? `${item.delay_minutes} دقيقة` : '-';
+                recordsList.forEach((item, index) => {
+                    const delayVal = item.delay_minutes || item.delay || 0;
+                    const delayText = delayVal > 0 ? `${delayVal} دقيقة` : '-';
                     const recordId = item._id || item.id || index;
-                    
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${index + 1}</td>
-                            <td class="fw-bold">${item.teacher_name}</td>
-                            <td><span class="badge bg-danger p-2">${item.violation_type}</span></td>
-                            <td>${delayText}</td>
-                            <td>${item.hijri_date}</td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
-                                    🖨️ طباعة
-                                </button>
-                            </td>
-                        </tr>
+                    const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
+                    const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
+                    const hijriDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td class="fw-bold">${teacherName}</td>
+                        <td><span class="badge bg-danger p-2">${violationType}</span></td>
+                        <td>${delayText}</td>
+                        <td>${hijriDate}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
+                                🖨️ طباعة
+                            </button>
+                        </td>
                     `;
+                    tbody.appendChild(tr);
                 });
             } else {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد مساءلات مسجلة في قاعدة البيانات</td></tr>`;
             }
         } catch (e) {
             console.error("خطأ في جلب السجلات:", e);
+            const tbody = document.getElementById('recordsTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-3">خطأ في جلب البيانات من السيرفر</td></tr>`;
+            }
         }
     }
 
+    // دالة فتح صفحة طباعة التقرير
     function printAccountabilityReport(id) {
         window.open(`/print-accountability?id=${id}`, '_blank');
     }
@@ -244,7 +306,7 @@
             teacher_name: document.getElementById('teacherSelect').value,
             violation_type: document.getElementById('violationType').value,
             delay_minutes: document.getElementById('delayMinutes').value || 0,
-            hijri_date: document.getElementById('hijriDate').value,
+            hijri_date: document.getElementById('hijriPicker').value,
             details: document.getElementById('details').value
         };
 
@@ -257,20 +319,19 @@
 
             const result = await res.json();
 
-            if (result.success) {
+            if (result.success || res.ok) {
                 Toastify({
                     text: result.message || "تم حفظ المساءلة بنجاح",
                     duration: 3000,
                     style: { background: "linear-gradient(to left, #2ecc71, #27ae60)" }
                 }).showToast();
 
+                // إعادة ضبط النموذج وتعيين تاريخ اليوم هجرياً
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
+                $('#hijriPicker').val(getTodayHijri());
                 
-                // إعادة تعيين تاريخ اليوم الهجري
-                const todayHijri = moment().format('iYYYY/iMM/iDD');
-                document.getElementById('hijriDate').value = todayHijri;
-                
+                // تحديث جدول المساءلات
                 loadAccountabilityRecords();
             } else {
                 Toastify({
@@ -283,12 +344,13 @@
         }
     });
 
-    window.onload = () => {
+    // التشغيل عند تحميل الصفحة
+    $(document).ready(() => {
         loadSchoolName();
         initHijriDatePicker();
         loadTeachers();
         loadAccountabilityRecords();
-    };
+    });
 </script>
 </body>
 </html>
