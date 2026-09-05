@@ -74,10 +74,16 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- اختيار التاريخ بالتقويم الهجري (تم حذف المزدوج والأكتفاء بالتقويم الهجري) -->
+                    <!-- اختيار التاريخ بالتقويم الهجري (مغلق للكتابة اليدوية + يفتح عند النقر) -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">اختر التاريخ الهجري (من التقويم):</label>
-                        <input type="text" id="hijriPicker" class="form-control hijri-date-input" placeholder="اختر التاريخ الهجري..." required autocomplete="off">
+                        <input type="text" 
+                               id="hijriPicker" 
+                               class="form-control hijri-date-input" 
+                               placeholder="اضغط لاختيار التاريخ..." 
+                               required 
+                               readonly 
+                               style="background-color: #ffffff; cursor: pointer;">
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -172,12 +178,18 @@
         if ($.fn.hijriDatePicker) {
             pickerInput.hijriDatePicker({
                 hijri: true,
-                showSwitcher: false, // الاعتماد الكلي على التقويم الهجري
+                showSwitcher: false,       // الاعتماد الكلي على التقويم الهجري
                 format: 'iYYYY/iMM/iDD',
                 hijriFormat: 'iYYYY/iMM/iDD',
                 showTodayButton: true,
                 showClear: false,
-                locale: 'ar-sa'
+                locale: 'ar-sa',
+                allowInputToggle: true     // فتح التقويم عند الضغط على الخانة
+            });
+
+            // فتح التقويم عند النقر على الحقل مباشرة
+            pickerInput.on('click', function () {
+                $(this).hijriDatePicker('show');
             });
         }
 
@@ -204,7 +216,7 @@
         }
     });
 
-    // 3️⃣ جلب قائمة المعلمين (معالجة مرنة تمنع حدوث أخطاء)
+    // 3️⃣ جلب قائمة المعلمين (معالجة مرنة تمنع أخطاء التنسيق)
     async function loadTeachers() {
         try {
             const res = await fetch('/get-monitoring-teachers');
@@ -240,7 +252,7 @@
         }
     }
 
-    // 4️⃣ جلب سجلات المساءلات (معالجة مرنة تمنع توقف الجدول)
+    // 4️⃣ جلب سجلات المساءلات
     async function loadAccountabilityRecords() {
         try {
             const res = await fetch('/api/accountability');
