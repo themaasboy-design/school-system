@@ -138,22 +138,32 @@
         }
     }
 
-    // 1️⃣ تحويل أي تاريخ ميلادي من التقويم إلى هجري تلقائياً
+    // 1️⃣ تحويل التاريخ الميلادي إلى هجري (أم القرى) بشكل أليم ودقيق
     function convertToHijri(dateObj) {
         try {
-            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-uma', {
+            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
             });
-            return formatter.format(dateObj).replace(/[\u200E\u200F]/g, '');
+            
+            const parts = formatter.formatToParts(dateObj);
+            let day = '', month = '', year = '';
+
+            parts.forEach(p => {
+                if (p.type === 'day') day = p.value;
+                if (p.type === 'month') month = p.value;
+                if (p.type === 'year') year = p.value;
+            });
+
+            return `${year}/${month}/${day}`;
         } catch (e) {
             console.error("خطأ في تحويل التاريخ الهجري:", e);
             return "";
         }
     }
 
-    // تعيين تاريخ اليوم افتراضياً في التقويم وحساب الهجري
+    // تعيين تاريخ اليوم افتراضياً عند فتح الصفحة وتفعيل مستمع التغيير
     function initDatePicker() {
         const picker = document.getElementById('gregorianPicker');
         const hijriInput = document.getElementById('hijriDate');
@@ -166,16 +176,16 @@
         picker.value = `${yyyy}-${mm}-${dd}`;
         hijriInput.value = convertToHijri(today);
 
-        // عند تغيير التاريخ من التقويم
         picker.addEventListener('change', (e) => {
             if (e.target.value) {
-                const selectedDate = new Date(e.target.value);
+                // إضافة التوقيت T12:00:00 لمنع حدوث إزاحة أعياد أو فرق منطقة زمنية
+                const selectedDate = new Date(e.target.value + 'T12:00:00');
                 hijriInput.value = convertToHijri(selectedDate);
             }
         });
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -248,13 +258,12 @@
         }
     }
 
-    // 5️⃣ دالة طباعة التقرير (يتم استدعاؤها عند الضغط على زر طباعة)
+    // دالة فتح صفحة طباعة التقرير
     function printAccountabilityReport(id) {
-        // يمكنك توجيه المستخدم لصفحة الطباعة الخاصة بالمساءلة
         window.open(`/print-accountability?id=${id}`, '_blank');
     }
 
-    // 6️⃣ حفظ المساءلة الجديدة
+    // 5️⃣ حفظ المساءلة الجديدة
     document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -282,12 +291,12 @@
                     style: { background: "linear-gradient(to left, #2ecc71, #27ae60)" }
                 }).showToast();
 
-                // إعادة ضبط النموذج وتجديد التاريخ
+                // إعادة ضبط النموذج وتعيين تاريخ اليوم هجرياً من جديد
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
                 initDatePicker();
                 
-                // تحديث الجدول
+                // تحديث جدول المساءلات
                 loadAccountabilityRecords();
             } else {
                 Toastify({
