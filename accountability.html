@@ -8,15 +8,38 @@
     <!-- Bootstrap 5 CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    
-    <!-- مكتبة التقويم الهجري CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.7/dist/css/bootstrap-hijri-datepicker.min.css">
     <link rel="stylesheet" href="/style.css">
 
     <style>
-        /* ضمان ظهور التقويم فوق جميع العناصر والبطاقات */
-        .hijri-datepicker-container {
-            z-index: 99999 !important;
+        /* تنسيق التقويم الهجري التفاعلي */
+        .hijri-picker-wrapper {
+            position: relative;
+        }
+        .hijri-calendar-popup {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            z-index: 1050;
+            width: 320px;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            padding: 15px;
+            margin-top: 5px;
+        }
+        .hijri-calendar-popup.show {
+            display: block;
+        }
+        .hijri-day-btn {
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .hijri-day-btn:hover {
+            background-color: #0d6efd;
+            color: #fff;
         }
     </style>
 </head>
@@ -83,16 +106,19 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- اختيار التاريخ بالتقويم الهجري -->
-                    <div class="mb-3 position-relative">
+                    <!-- اختيار التاريخ بالتقويم الهجري (تفاعلي ومغلق يدويًا) -->
+                    <div class="mb-3 hijri-picker-wrapper">
                         <label class="form-label fw-bold">اختر التاريخ الهجري (من التقويم):</label>
                         <input type="text" 
                                id="hijriPicker" 
-                               class="form-control hijri-date-input" 
-                               placeholder="اضغط لاختيار التاريخ..." 
+                               class="form-control bg-white" 
+                               placeholder="اضغط لاختيار التاريخ الهجري..." 
                                required 
                                readonly 
-                               style="background-color: #ffffff; cursor: pointer;">
+                               style="cursor: pointer;">
+                        
+                        <!-- نافذة التقويم الهجري المنبثقة -->
+                        <div id="hijriCalendarPopup" class="hijri-calendar-popup"></div>
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -132,12 +158,11 @@
     </div>
 </div>
 
-<!-- المكتبات المطلوبة بالترتيب الصحيح (ضروري لعمل التقويم) -->
+<!-- المكتبات البرمجية -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.7/dist/js/bootstrap-hijri-datepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
@@ -154,62 +179,123 @@
                 document.getElementById('schoolName').textContent = "المدرسة";
             }
         } catch (e) {
-            console.error("خطأ في جلب اسم المدرسة:", e);
             document.getElementById('schoolName').textContent = "المدرسة";
         }
     }
 
-    // حساب التاريخ الهجري اليوم بصيغة (YYYY/MM/DD)
-    function getTodayHijri() {
-        try {
-            const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-            const parts = formatter.formatToParts(new Date());
-            let day = '', month = '', year = '';
-            parts.forEach(p => {
-                if (p.type === 'day') day = p.value;
-                if (p.type === 'month') month = p.value;
-                if (p.type === 'year') year = p.value;
-            });
-            return `${year}/${month}/${day}`;
-        } catch (e) {
-            return "";
-        }
-    }
+    // 1️⃣ بناء محرك التقويم الهجري التفاعلي
+    let currentHijriYear = moment().iYear();
+    let currentHijriMonth = moment().iMonth(); // 0 إلى 11
 
-    // 1️⃣ تفعيل التقويم الهجري التفاعلي
-    function initHijriDatePicker() {
-        const $picker = $('#hijriPicker');
+    const hijriMonthNames = [
+        "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
+        "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
+        "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+    ];
+
+    function renderHijriCalendar(year, month) {
+        const daysInMonth = moment.iDaysInMonth(year, month);
         
-        // إعداد مكتبة التقويم الهجري
-        if ($.fn.hijriDatePicker) {
-            $picker.hijriDatePicker({
-                hijri: true,
-                showSwitcher: false,       // اعتماد التقويم الهجري فقط
-                format: 'iYYYY/iMM/iDD',
-                hijriFormat: 'iYYYY/iMM/iDD',
-                showTodayButton: true,
-                showClear: false,
-                locale: 'ar-sa',
-                allowInputToggle: true
-            });
+        // معرفة اليوم الأول من الشهر الهجري لضبط أيام الأسبوع
+        const firstDayGregorian = moment(`${year}/${month + 1}/1`, 'iYYYY/iM/iD');
+        const startDayOfWeek = firstDayGregorian.day(); // 0: الأحد ... 6: السبت
 
-            // إجبار فتح التقويم عند النقر على الحقل
-            $picker.on('click focus', function () {
-                $(this).hijriDatePicker('show');
-            });
+        let html = `
+            <div class="d-flex justify-content-between align-items-center mb-3 bg-primary text-white p-2 rounded">
+                <button type="button" class="btn btn-sm btn-light py-0 fw-bold" id="prevHijriMonth">«</button>
+                <span class="fw-bold">${hijriMonthNames[month]} ${year} هـ</span>
+                <button type="button" class="btn btn-sm btn-light py-0 fw-bold" id="nextHijriMonth">»</button>
+            </div>
+            <div class="text-center">
+                <div class="d-flex text-muted fw-bold border-bottom pb-1 mb-2 small">
+                    <div style="width: 14.28%">أحد</div>
+                    <div style="width: 14.28%">إثن</div>
+                    <div style="width: 14.28%">ثلا</div>
+                    <div style="width: 14.28%">أرب</div>
+                    <div style="width: 14.28%">خميس</div>
+                    <div style="width: 14.28%">جمعة</div>
+                    <div style="width: 14.28%">سبت</div>
+                </div>
+                <div class="d-flex flex-wrap">
+        `;
+
+        // إضافة خانات فارغة لأيام الأسبوع قبل بداية الشهر
+        for (let i = 0; i < startDayOfWeek; i++) {
+            html += `<div style="width: 14.28%" class="p-1"></div>`;
         }
 
-        // تعيين تاريخ اليوم هجرياً كقيمة افتراضية إذا كان فارغاً
-        if (!$picker.val()) {
-            $picker.val(getTodayHijri());
+        // بناء الأيام
+        for (let d = 1; d <= daysInMonth; d++) {
+            const formattedMonth = String(month + 1).padStart(2, '0');
+            const formattedDay = String(d).padStart(2, '0');
+            const dateStr = `${year}/${formattedMonth}/${formattedDay}`;
+            
+            html += `
+                <div style="width: 14.28%" class="p-1">
+                    <button type="button" class="btn btn-sm btn-outline-primary w-100 p-1 hijri-day-btn" data-date="${dateStr}">
+                        ${d}
+                    </button>
+                </div>
+            `;
         }
+
+        html += `</div></div>`;
+        $('#hijriCalendarPopup').html(html);
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق
+    function initHijriPicker() {
+        const pickerInput = $('#hijriPicker');
+        const popup = $('#hijriCalendarPopup');
+
+        // تعيين تاريخ اليوم هجرياً كافتراضي
+        const todayStr = moment().format('iYYYY/iMM/iDD');
+        pickerInput.val(todayStr);
+
+        // فتح/إغلاق التقويم عند النقر
+        pickerInput.on('click', function (e) {
+            e.stopPropagation();
+            renderHijriCalendar(currentHijriYear, currentHijriMonth);
+            popup.toggleClass('show');
+        });
+
+        // التنقل بين الشهور الهجرية
+        popup.on('click', '#prevHijriMonth', function (e) {
+            e.stopPropagation();
+            currentHijriMonth--;
+            if (currentHijriMonth < 0) {
+                currentHijriMonth = 11;
+                currentHijriYear--;
+            }
+            renderHijriCalendar(currentHijriYear, currentHijriMonth);
+        });
+
+        popup.on('click', '#nextHijriMonth', function (e) {
+            e.stopPropagation();
+            currentHijriMonth++;
+            if (currentHijriMonth > 11) {
+                currentHijriMonth = 0;
+                currentHijriYear++;
+            }
+            renderHijriCalendar(currentHijriYear, currentHijriMonth);
+        });
+
+        // اختيار اليوم
+        popup.on('click', '.hijri-day-btn', function (e) {
+            e.stopPropagation();
+            const selectedDate = $(this).data('date');
+            pickerInput.val(selectedDate);
+            popup.removeClass('show');
+        });
+
+        // إغلاق التقويم عند النقر في أي مكان خارج التقويم
+        $(document).on('click', function (e) {
+            if (!$(e.target).closest('.hijri-picker-wrapper').length) {
+                popup.removeClass('show');
+            }
+        });
+    }
+
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -234,13 +320,9 @@
             const select = document.getElementById('teacherSelect');
             
             let teachersList = [];
-            if (Array.isArray(data)) {
-                teachersList = data;
-            } else if (data && Array.isArray(data.teachers)) {
-                teachersList = data.teachers;
-            } else if (data && Array.isArray(data.data)) {
-                teachersList = data.data;
-            }
+            if (Array.isArray(data)) teachersList = data;
+            else if (data && Array.isArray(data.teachers)) teachersList = data.teachers;
+            else if (data && Array.isArray(data.data)) teachersList = data.data;
 
             select.innerHTML = '<option value="">-- اختر المعلم --</option>';
 
@@ -256,7 +338,7 @@
                 });
             }
         } catch (e) {
-            console.error("خطأ في تحميل قائمة المعلمين:", e);
+            console.error("خطأ في تحميل المعلمين:", e);
         }
     }
 
@@ -268,13 +350,9 @@
             const tbody = document.getElementById('recordsTableBody');
 
             let recordsList = [];
-            if (Array.isArray(result)) {
-                recordsList = result;
-            } else if (result && Array.isArray(result.data)) {
-                recordsList = result.data;
-            } else if (result && Array.isArray(result.records)) {
-                recordsList = result.records;
-            }
+            if (Array.isArray(result)) recordsList = result;
+            else if (result && Array.isArray(result.data)) recordsList = result.data;
+            else if (result && Array.isArray(result.records)) recordsList = result.records;
 
             if (recordsList.length > 0) {
                 tbody.innerHTML = "";
@@ -305,7 +383,6 @@
                 tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد مساءلات مسجلة في قاعدة البيانات</td></tr>`;
             }
         } catch (e) {
-            console.error("خطأ في جلب السجلات:", e);
             const tbody = document.getElementById('recordsTableBody');
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-3">خطأ في جلب البيانات من السيرفر</td></tr>`;
@@ -347,7 +424,7 @@
 
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
-                $('#hijriPicker').val(getTodayHijri());
+                $('#hijriPicker').val(moment().format('iYYYY/iMM/iDD'));
                 
                 loadAccountabilityRecords();
             } else {
@@ -364,7 +441,7 @@
     // التشغيل عند تحميل الصفحة
     $(document).ready(() => {
         loadSchoolName();
-        initHijriDatePicker();
+        initHijriPicker();
         loadTeachers();
         loadAccountabilityRecords();
     });
