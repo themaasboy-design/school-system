@@ -12,7 +12,7 @@
 <body>
 
 <nav class="navbar">
-    <h2 id="schoolName">المدرسة</h2>
+    <h2 id="schoolName">جاري تحميل اسم المدرسة...</h2>
     <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
     <div class="navbar-links">
         <a href="index.html">الرئيسية</a>
@@ -66,16 +66,18 @@
                         </select>
                     </div>
 
-                    <!-- مدة التأخير بالدقائق (يظهر شرطياً فقط عند اختيار التأخر) -->
+                    <!-- مدة التأخير بالدقائق -->
                     <div class="mb-3 d-none" id="delayMinutesContainer">
                         <label class="form-label fw-bold text-danger">مدة التأخير (بالدقائق):</label>
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- التاريخ بالتقويم الهجري -->
+                    <!-- اختيار التاريخ بالتقويم وحسابه هجرياً -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">التاريخ (بالتقويم الهجري):</label>
-                        <input type="text" id="hijriDate" class="form-control" placeholder="مثال: 1445/08/15" required>
+                        <label class="form-label fw-bold">اختر التاريخ (من التقويم):</label>
+                        <input type="date" id="gregorianPicker" class="form-control mb-2" required>
+                        <label class="form-label fw-bold text-secondary small">التاريخ الهجري المقابل:</label>
+                        <input type="text" id="hijriDate" class="form-control bg-light" readonly placeholder="يتم تحويله تلقائياً...">
                     </div>
 
                     <!-- التفاصيل / الملاحظات -->
@@ -102,7 +104,7 @@
                                 <th>نوع المساءلة</th>
                                 <th>مدة التأخير</th>
                                 <th>التاريخ الهجري</th>
-                                <th>الحالة</th>
+                                <th>التقرير</th>
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
@@ -118,24 +120,62 @@
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
-    // 1️⃣ حساب التاريخ الهجري لليوم تلقائياً وتعبئته بالنموذج
-    function setTodayHijriDate() {
+    // 0️⃣ جلب اسم المدرسة من ورقة mininfo عبر السيرفر
+    async function loadSchoolName() {
         try {
-            const today = new Date();
+            const res = await fetch('/api/school-info');
+            const data = await res.json();
+            if (data.success && data.schoolName) {
+                document.getElementById('schoolName').textContent = data.schoolName;
+            } else if (data.name) {
+                document.getElementById('schoolName').textContent = data.name;
+            } else {
+                document.getElementById('schoolName').textContent = "المدرسة";
+            }
+        } catch (e) {
+            console.error("خطأ في جلب اسم المدرسة:", e);
+            document.getElementById('schoolName').textContent = "المدرسة";
+        }
+    }
+
+    // 1️⃣ تحويل أي تاريخ ميلادي من التقويم إلى هجري تلقائياً
+    function convertToHijri(dateObj) {
+        try {
             const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-uma', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
             });
-            // تحويل الصيغة لتكون بالرقم المباشر (مثل 1445/08/20)
-            const formatted = formatter.format(today).replace(/[\u200E\u200F]/g, '');
-            document.getElementById('hijriDate').value = formatted;
+            return formatter.format(dateObj).replace(/[\u200E\u200F]/g, '');
         } catch (e) {
-            console.error("خطأ في توليد التاريخ الهجري:", e);
+            console.error("خطأ في تحويل التاريخ الهجري:", e);
+            return "";
         }
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير بالدقائق حسب الخيار
+    // تعيين تاريخ اليوم افتراضياً في التقويم وحساب الهجري
+    function initDatePicker() {
+        const picker = document.getElementById('gregorianPicker');
+        const hijriInput = document.getElementById('hijriDate');
+
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        
+        picker.value = `${yyyy}-${mm}-${dd}`;
+        hijriInput.value = convertToHijri(today);
+
+        // عند تغيير التاريخ من التقويم
+        picker.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const selectedDate = new Date(e.target.value);
+                hijriInput.value = convertToHijri(selectedDate);
+            }
+        });
+    }
+
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -152,7 +192,7 @@
         }
     });
 
-    // 3️⃣ جلب قائمة المعلمين من السيرفر
+    // 3️⃣ جلب قائمة المعلمين
     async function loadTeachers() {
         try {
             const res = await fetch('/get-monitoring-teachers');
@@ -172,7 +212,7 @@
         }
     }
 
-    // 4️⃣ جلب سجلات المساءلات من سيرفر Node.js
+    // 4️⃣ جلب سجلات المساءلات وعرض زر الطباعة
     async function loadAccountabilityRecords() {
         try {
             const res = await fetch('/api/accountability');
@@ -183,6 +223,8 @@
                 tbody.innerHTML = "";
                 result.data.forEach((item, index) => {
                     const delayText = item.delay_minutes > 0 ? `${item.delay_minutes} دقيقة` : '-';
+                    const recordId = item._id || item.id || index;
+                    
                     tbody.innerHTML += `
                         <tr>
                             <td>${index + 1}</td>
@@ -190,7 +232,11 @@
                             <td><span class="badge bg-danger p-2">${item.violation_type}</span></td>
                             <td>${delayText}</td>
                             <td>${item.hijri_date}</td>
-                            <td><span class="badge bg-warning text-dark">${item.status || 'بانتظار الرد'}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
+                                    🖨️ طباعة
+                                </button>
+                            </td>
                         </tr>
                     `;
                 });
@@ -202,7 +248,13 @@
         }
     }
 
-    // 5️⃣ حفظ المساءلة الجديدة
+    // 5️⃣ دالة طباعة التقرير (يتم استدعاؤها عند الضغط على زر طباعة)
+    function printAccountabilityReport(id) {
+        // يمكنك توجيه المستخدم لصفحة الطباعة الخاصة بالمساءلة
+        window.open(`/print-accountability?id=${id}`, '_blank');
+    }
+
+    // 6️⃣ حفظ المساءلة الجديدة
     document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -225,21 +277,21 @@
 
             if (result.success) {
                 Toastify({
-                    text: result.message,
+                    text: result.message || "تم حفظ المساءلة بنجاح",
                     duration: 3000,
                     style: { background: "linear-gradient(to left, #2ecc71, #27ae60)" }
                 }).showToast();
 
-                // إعادة ضبط النموذج
+                // إعادة ضبط النموذج وتجديد التاريخ
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
-                setTodayHijriDate();
+                initDatePicker();
                 
                 // تحديث الجدول
                 loadAccountabilityRecords();
             } else {
                 Toastify({
-                    text: "خطأ: " + result.error,
+                    text: "خطأ: " + (result.error || "فشل الحفظ"),
                     style: { background: "#e74c3c" }
                 }).showToast();
             }
@@ -249,7 +301,8 @@
     });
 
     window.onload = () => {
-        setTodayHijriDate();
+        loadSchoolName();
+        initDatePicker();
         loadTeachers();
         loadAccountabilityRecords();
     };
