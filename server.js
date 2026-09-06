@@ -186,15 +186,15 @@ const ROTATION_SHEET = 'rotation';
 function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') {
   const wb = xlsx.utils.book_new();
 
-  // 1. sheet: teacher_name (العناوين فقط)
+  // 1. sheet: teacher_name
   const teachersSheet = xlsx.utils.aoa_to_sheet([["الهوية", "اسم المعلم"]]);
   xlsx.utils.book_append_sheet(wb, teachersSheet, TEACHERS_SHEET);
 
-  // 2. sheet: classes (العناوين فقط)
+  // 2. sheet: classes
   const classesSheet = xlsx.utils.aoa_to_sheet([["الفصل"]]);
   xlsx.utils.book_append_sheet(wb, classesSheet, CLASSES_SHEET);
 
-  // 3. sheet: Waiting_table (جدول حصص فارغ)
+  // 3. sheet: Waiting_table
   const waitingSheet = xlsx.utils.aoa_to_sheet([
     ["اليوم", "1", "2", "3", "4", "5", "6", "7"]
   ]);
@@ -205,7 +205,7 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
   const reportSheet = xlsx.utils.aoa_to_sheet([reportHeader]);
   xlsx.utils.book_append_sheet(wb, reportSheet, REPORT_SHEET);
 
-  // 5. sheet: maininfo (معلومات المدرسة المسجلة فقط)
+  // 5. sheet: maininfo
   const mainInfoSheet = xlsx.utils.aoa_to_sheet([
     ["المدرسة", schoolName],
     ["القطاع", region],
@@ -226,7 +226,7 @@ function createCleanSchoolWorkbook(schoolName = '', region = '', fullName = '') 
   return wb;
 }
 
-// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة (نسخة محدثة وآمنة)
+// 🛠️ دالة تحديد وإعادة بناء ملف المدرسة
 async function getUserExcelPath(req) {
   const username = req.session?.username;
   
@@ -540,6 +540,51 @@ app.post('/save-report', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "خطأ أثناء الحفظ: " + e.message });
+  }
+});
+
+// 🗑️ مسار جديد: حذف معلم غائب من جدول التقرير والإكسل وقاعدة البيانات
+app.post('/delete-report-teacher', async (req, res) => {
+  const { absentTeacher, date } = req.body;
+
+  try {
+    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+
+    if (!workbook.SheetNames.includes(REPORT_SHEET)) {
+      return res.status(400).json({ success: false, message: 'ورقة التقرير غير موجودة' });
+    }
+
+    let data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
+
+    if (data.length <= 1) {
+      return res.json({ success: true, message: 'لا توجد بيانات للحذف' });
+    }
+
+    const header = data[0];
+    const rows = data.slice(1);
+
+    const updatedRows = rows.filter(row => {
+      const rowDate = row[0];
+      const rowTeacher = row[2];
+      if (date) {
+        return !(rowTeacher === absentTeacher && rowDate === date);
+      }
+      return rowTeacher !== absentTeacher;
+    });
+
+    const newData = [header, ...updatedRows];
+    const newSheet = xlsx.utils.aoa_to_sheet(newData);
+    workbook.Sheets[REPORT_SHEET] = newSheet;
+
+    xlsx.writeFile(workbook, userExcel);
+    if (username) await syncExcelToDb(username, userExcel);
+
+    return res.json({ success: true, message: 'تم حذف المعلم الغائب وحفظ التغييرات بنجاح' });
+  } catch (e) {
+    console.error('خطأ أثناء الحذف:', e);
+    res.status(500).json({ success: false, error: "حدث خطأ أثناء الحذف: " + e.message });
   }
 });
 
@@ -930,27 +975,33 @@ app.put('/api/accountability/:id', async (req, res) => {
       WHERE id = $3
       RETURNING *
     `;
-    const result = await pool.query(queryText, [status, details, id]);
+    const values = [status, details, id];
 
+    const result = await pool.query(queryText, values);
+    
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'لم يتم العثور على المساءلة المطلوب تحديثها' });
+      return res.status(404).json({ success: false, message: 'المساءلة غير موجودة' });
     }
 
-    return res.json({ success: true, message: 'تم تحديث المساءلة بنجاح', data: result.rows[0] });
+    return res.json({
+      success: true,
+      message: 'تم تحديث المساءلة بنجاح',
+      data: result.rows[0]
+    });
   } catch (error) {
     console.error('خطأ في تحديث المساءلة:', error);
     return res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحديث المساءلة: ' + error.message });
   }
 });
 
-// ❌ 4. حذف مساءلة
+// 🗑️ 4. حذف مساءلة
 app.delete('/api/accountability/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query('DELETE FROM accountability WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'لم يتم العثور على المساءلة' });
+      return res.status(404).json({ success: false, message: 'المساءلة غير موجودة' });
     }
 
     return res.json({ success: true, message: 'تم حذف المساءلة بنجاح' });
@@ -961,58 +1012,7 @@ app.delete('/api/accountability/:id', async (req, res) => {
 });
 
 // =========================================================================
-// 🛠️ 5. مسارات لوحة تحكم الأدمن (Admin Routes)
-// =========================================================================
-
-function requireAdmin(req, res, next) {
-  if (req.session && req.session.isAdmin) {
-    return next();
-  }
-  return res.status(401).json({ success: false, message: 'غير مصرح بالوصول! يرجى تسجيل الدخول كمسؤول للنظام.' });
-}
-
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
-});
-
-app.post('/api/admin/login', (req, res) => {
-  const { username, password } = req.body;
-  const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-  const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
-
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    req.session.isAdmin = true;
-    return res.json({ success: true, message: 'تم تسجيل دخول الأدمن بنجاح' });
-  } else {
-    return res.status(401).json({ success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة!' });
-  }
-});
-
-app.get('/api/admin/check-auth', (req, res) => {
-  if (req.session && req.session.isAdmin) {
-    return res.json({ authenticated: true });
-  }
-  return res.json({ authenticated: false });
-});
-
-app.post('/api/admin/logout', (req, res) => {
-  if (req.session) {
-    req.session.isAdmin = false;
-  }
-  return res.json({ success: true, message: 'تم تسجيل خروج الأدمن بنجاح' });
-});
-
-app.get('/api/admin/schools', requireAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, username, full_name, region, school_name, school_excel_file FROM users ORDER BY id DESC');
-    res.json({ success: true, schools: result.rows });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-// =========================================================================
-// 🚀 تشغيل السيرفر
+// 🚀 5. تشغيل السيرفر
 // =========================================================================
 app.listen(PORT, () => {
   console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);

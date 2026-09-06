@@ -539,23 +539,69 @@
             doc.save(fileName);
         }
 
-        // دالة حذف المعلم من التقرير المعروض
-        function removeTeacherCard(tempId, btnElement) {
-            // 1. إزالة المعلم من مصفوفة البيانات الحالية
-            currentFilteredReportData = currentFilteredReportData.filter(item => item._tempId !== tempId);
-
-            // 2. إزالة الكرت الخاص بالمعلم من الواجهة
-            const card = btnElement.closest('.teacher-report-card');
-            if (card) {
-                card.remove();
+        // دالة حذف المعلم الغائب نهائياً من قاعدة البيانات والتقرير
+        async function removeTeacherCard(tempId, btnElement) {
+            const itemToDelete = currentFilteredReportData.find(item => item._tempId === tempId);
+            if (!itemToDelete) {
+                showNotification("🔍 لم يتم العثور على بيانات المعلم", "error");
+                return;
             }
 
-            showNotification("🗑️ تم حذف المعلم من التقرير بنجاح", "success");
+            const vals = Object.values(itemToDelete);
+            const absentTeacher = itemToDelete['المعلم الغائب'] || itemToDelete['اسم المعلم'] || vals[2] || '---';
+            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+            const date = itemToDelete['التاريخ'] || vals[0] || (dateInput ? dateInput.value : '');
+            const day = itemToDelete['اليوم'] || vals[1] || document.getElementById('reportDay').value;
 
-            // 3. في حال تم حذف جميع المعلمين، إخفاء صندوق النتائج
-            if (currentFilteredReportData.length === 0) {
-                document.getElementById('reportResult').style.display = 'none';
-                showNotification("🔍 لا توجد بيانات متبقية في التقرير", "error");
+            // تأكيد العملية من قبل المستخدم
+            if (!confirm(`هل أنت تأكد من حذف سجل غياب المعلم (${absentTeacher}) نهائياً من قاعدة البيانات؟`)) {
+                return;
+            }
+
+            const originalText = btnElement.innerHTML;
+            btnElement.disabled = true;
+            btnElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري الحذف...`;
+
+            try {
+                // إرسال طلب الحذف إلى السيرفر
+                const response = await fetch('/delete-absence-record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        teacherName: absentTeacher,
+                        date: date,
+                        day: day,
+                        id: itemToDelete.id || itemToDelete._id || null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && (result.success || result.status === 'ok')) {
+                    // 1. إزالة المعلم من مصفوفة البيانات الحالية
+                    currentFilteredReportData = currentFilteredReportData.filter(item => item._tempId !== tempId);
+
+                    // 2. إزالة الكرت الخاص بالمعلم من الواجهة
+                    const card = btnElement.closest('.teacher-report-card');
+                    if (card) {
+                        card.remove();
+                    }
+
+                    showNotification("🗑️ تم حذف سجل المعلم من قاعدة البيانات بنجاح", "success");
+
+                    // 3. في حال تم حذف جميع المعلمين، إخفاء صندوق النتائج
+                    if (currentFilteredReportData.length === 0) {
+                        document.getElementById('reportResult').style.display = 'none';
+                        showNotification("🔍 لا توجد بيانات متبقية في التقرير", "error");
+                    }
+                } else {
+                    throw new Error(result.message || result.error || 'فشل الحذف من السيرفر');
+                }
+            } catch (error) {
+                console.error("خطأ أثناء الحذف من قاعدة البيانات:", error);
+                btnElement.disabled = false;
+                btnElement.innerHTML = originalText;
+                showNotification(`❌ فشل في حذف المعلم من قاعدة البيانات: ${error.message}`, "error");
             }
         }
 
@@ -606,7 +652,7 @@
             const listContainer = document.getElementById('whatsappList');
             listContainer.innerHTML = '';
 
-            subNames.forEach((subName, idx) => {
+            subNames.forEach((subName) => {
                 const tasks = substituteMap[subName];
                 const phone = teachersPhoneMap[subName] || '';
 
