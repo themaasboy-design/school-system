@@ -52,6 +52,25 @@
         .btn-delete-card:hover {
             background-color: #bb2d3b;
         }
+        
+        /* زر طباعة التقرير لمعلم واحد */
+        .btn-print-card {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+        .btn-print-card:hover {
+            background-color: #0b5ed7;
+        }
+
         .report-table {
             width: 100%;
             border-collapse: collapse;
@@ -325,7 +344,7 @@
                     return vals[0] === selectedDate && vals[1] === selectedDay;
                 });
 
-                // إضافة رقم معرّف فريد مؤقت لكل سجل لسهولة الحذف
+                // إضافة رقم معرّف فريد مؤقت لكل سجل لسهولة الحذف والطباعة المنفردة
                 currentFilteredReportData = filteredData.map((item, index) => ({
                     ...item,
                     _tempId: Date.now() + '_' + index
@@ -380,9 +399,14 @@
                                 <div>
                                     📌 المعلم الغائب: <span style="color: #d9534f;">${absentTeacher}</span>
                                 </div>
-                                <button type="button" class="btn-delete-card" onclick="removeTeacherCard('${row._tempId}', this)">
-                                    <i class="fas fa-trash-alt"></i> حذف المعلم
-                                </button>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" class="btn-print-card" onclick="printSingleTeacherPDF('${row._tempId}')">
+                                        <i class="fas fa-file-pdf"></i> طباعة التقرير
+                                    </button>
+                                    <button type="button" class="btn-delete-card" onclick="removeTeacherCard('${row._tempId}', this)">
+                                        <i class="fas fa-trash-alt"></i> حذف المعلم
+                                    </button>
+                                </div>
                             </div>
                             <table class="report-table">
                                 <thead>
@@ -407,6 +431,112 @@
                 console.error("خطأ في جلب البيانات:", error);
                 showNotification("❌ حدث خطأ أثناء جلب البيانات من السيرفر", "error");
             }
+        }
+
+        // دالة طباعة تقرير PDF لمعلم واحد فقط
+        async function printSingleTeacherPDF(tempId) {
+            const teacherData = currentFilteredReportData.find(item => item._tempId === tempId);
+            if (!teacherData) {
+                showNotification("🔍 لم يتم العثور على بيانات المعلم", "error");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            const addBorder = () => {
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.rect(5, 5, 200, 287);
+            };
+            addBorder();
+
+            const dayElement = document.getElementById('reportDay');
+            const day = dayElement ? dayElement.value : '';
+
+            const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
+            let date = dateInput ? dateInput.value.trim() : '';
+            if (date) date = date.replace(/\//g, ' - ');
+
+            const res = await fetch('/get-report-data');
+            const fullResponse = await res.json();
+            const mainInfo = fullResponse.mainInfo || {};
+
+            try {
+                const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+                const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), '' ));
+
+                doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+                doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+                doc.setFont("Noto", "normal");
+            } catch (e) {
+                console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+            }
+            
+            try {
+                const img = new Image();
+                img.src = 'logo.png';
+                await img.decode();
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const imgData = canvas.toDataURL('image/png');
+                doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+            } catch(e) {
+                console.warn("لم يتم العثور على صورة الشعار logo.png");
+            }
+
+            doc.setFontSize(12);
+            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+            doc.text("الإدارة العامة للتعليم بمنطقة " + (mainInfo.B1 || ""), 170, 21, { align: 'center' });
+            doc.text("مدرسة " + (mainInfo.B2 || ""), 170, 27, { align: 'center' });
+            doc.line(15, 35, 195, 35);
+
+            let currentY = 43;
+            const classCols = [3, 5, 7, 9, 11, 13, 15];
+            const subCols = [4, 6, 8, 10, 12, 14, 16];
+
+            const vals = Object.values(teacherData);
+            const teacherName = teacherData['المعلم الغائب'] || teacherData['اسم المعلم'] || vals[2] || '---';
+
+            doc.setFontSize(10.5);
+            doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
+            doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });
+
+            const tableBody = [];
+            for (let i = 0; i < 7; i++) {
+                tableBody.push([
+                    '', '', 
+                    vals[subCols[i]] || '', 
+                    '', 
+                    vals[classCols[i]] || '', 
+                    (i + 1).toString()
+                ]);
+            }
+
+            doc.autoTable({
+                startY: currentY + 10,
+                head: [['ما تم تنفيذه', 'التوقيع', 'المعلم المنتظر', 'المادة', 'الفصل', 'الحصة']],
+                body: tableBody,
+                theme: 'grid',
+                columnStyles: { 0: {cellWidth: 25}, 1: {cellWidth: 25}, 2: {cellWidth: 60}, 3: {cellWidth: 20}, 4: {cellWidth: 20}, 5: {cellWidth: 20} },
+                styles: {font: 'Noto', halign: 'center', cellPadding: 2, minCellHeight: 6, fontSize: 9, textColor: 0},
+                headStyles: {fillColor: [44, 62, 80], textColor: 255, font: 'Noto', fontSize: 9, cellPadding: 1, minCellHeight: 5} 
+            });
+
+            // التوقيعات في أسفل الصفحة
+            doc.setFontSize(11);
+            doc.text("مدير المدرسة", 40, 279, { align: 'center' });
+            doc.text((mainInfo.B3 || ""), 40, 285, { align: 'center' });
+            
+            doc.text("وكيل المدرسة", 170, 279, { align: 'center' });
+            doc.text((mainInfo.B4 || ""), 170, 285, { align: 'center' });
+
+            const safeDay = day ? day.trim() : 'اليوم';
+            const safeDate = date ? date.replace(/\s+/g, '') : 'التاريخ';
+            const fileName = `تقرير انتظار - ${teacherName} ${safeDay} ${safeDate}.pdf`;
+
+            doc.save(fileName);
         }
 
         // دالة حذف المعلم من التقرير المعروض
