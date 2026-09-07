@@ -111,9 +111,12 @@ async function syncExcelToDb(username, filePath) {
       const fileBuffer = fs.readFileSync(filePath);
       await pool.query('UPDATE users SET excel_data = $1 WHERE username = $2', [fileBuffer, String(username).trim()]);
       console.log(`💾 تم مزامنة وحفظ ملف الإكسل للمستخدم (${username}) في قاعدة البيانات الدائمة.`);
+      return true;
     }
+    return false;
   } catch (e) {
     console.error(`❌ فشل مزامنة ملف الإكسل لقاعدة البيانات: ${e.message}`);
+    return false;
   }
 }
 
@@ -563,21 +566,49 @@ app.post('/delete-absence-record', async (req, res) => {
     const header = data[0];
     const rows = data.slice(1);
 
-    const cleanStr = (s) => (s || '').toString().trim();
+    // 🧹 مقارنة قوية: تتجاهل نوع البيانات (نص/رقم) وفروقات المسافات والأرقام العربية،
+    // لأن ملف الإكسل ممكن يتحول تلقائياً لصيغة تاريخ داخلية لو انفتح ببرنامج Excel
+    const cleanStr = (s) => {
+      if (s === null || s === undefined) return '';
+      return s.toString().trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    };
 
-    // تصفية السجلات واستبعاد السجل المطابق لاسم المعلم والتاريخ
+    const targetDate = cleanStr(date);
+    const targetTeacher = cleanStr(teacherName);
+
     const filteredRows = rows.filter(row => {
       const rowDate = cleanStr(row[0]);
       const rowTeacher = cleanStr(row[2]);
-      return !(rowDate === cleanStr(date) && rowTeacher === cleanStr(teacherName));
+      return !(rowDate === targetDate && rowTeacher === targetTeacher);
     });
+
+    // ⚠️ لو ما انحذف أي صف فعلياً (نفس العدد قبل وبعد الفلترة)، لا نرجّع نجاح كاذب
+    if (filteredRows.length === rows.length) {
+      console.warn(`⚠️ لم يتم إيجاد أي سجل مطابق للحذف. teacherName="${teacherName}" date="${date}"`);
+      return res.status(404).json({
+        success: false,
+        message: 'لم يتم العثور على السجل المطلوب حذفه في قاعدة البيانات (قد يكون التاريخ محفوظاً بصيغة مختلفة).'
+      });
+    }
 
     const newData = [header, ...filteredRows];
     const newSheet = xlsx.utils.aoa_to_sheet(newData);
     workbook.Sheets[REPORT_SHEET] = newSheet;
 
     xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
+
+    // ✅ التأكد الفعلي من نجاح المزامنة لقاعدة البيانات قبل الرد بنجاح للمستخدم
+    let syncOk = true;
+    if (username) {
+      syncOk = await syncExcelToDb(username, userExcel);
+    }
+
+    if (!syncOk) {
+      return res.status(500).json({
+        success: false,
+        message: 'تم الحذف محلياً لكن فشلت مزامنة الحذف مع قاعدة البيانات الدائمة. يرجى المحاولة مرة أخرى.'
+      });
+    }
 
     res.json({ success: true, message: 'تم حذف السجل بنجاح' });
   } catch (e) {
@@ -1047,7 +1078,7 @@ app.post('/api/admin/logout', (req, res) => {
 
 app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, full_name, region, school_name, school_excel_file FROM users ORDER BY id DESC');
+    const result = await pool.query('SELECT id, username, full_name, region, school_name, school_excel_file, (excel_data IS NOT NULL) AS has_excel FROM users ORDER BY id DESC');
     res.json({ success: true, schools: result.rows });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
