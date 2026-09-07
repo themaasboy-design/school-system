@@ -546,7 +546,7 @@ app.post('/save-report', async (req, res) => {
   }
 });
 
-// 🗑️ مسار حذف سجل غياب معين من ورقة التقرير report
+// 🗑️ مسار حذف سجل غياب معين من ورقة التقرير report (مُحدّث ودقيق)
 app.post('/delete-absence-record', async (req, res) => {
   const { teacherName, date } = req.body;
   try {
@@ -566,11 +566,13 @@ app.post('/delete-absence-record', async (req, res) => {
     const header = data[0];
     const rows = data.slice(1);
 
-    // 🧹 مقارنة قوية: تتجاهل نوع البيانات (نص/رقم) وفروقات المسافات والأرقام العربية،
-    // لأن ملف الإكسل ممكن يتحول تلقائياً لصيغة تاريخ داخلية لو انفتح ببرنامج Excel
+    // 🧹 دالة تنظيف مرنة جداً: تتجاهل الأرقام العربية، الفواصل (/ و -)، والمسافات للمطابقة الدقيقة
     const cleanStr = (s) => {
       if (s === null || s === undefined) return '';
-      return s.toString().trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+      return s.toString()
+        .trim()
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[\/\-\s]/g, '');
     };
 
     const targetDate = cleanStr(date);
@@ -582,7 +584,6 @@ app.post('/delete-absence-record', async (req, res) => {
       return !(rowDate === targetDate && rowTeacher === targetTeacher);
     });
 
-    // ⚠️ لو ما انحذف أي صف فعلياً (نفس العدد قبل وبعد الفلترة)، لا نرجّع نجاح كاذب
     if (filteredRows.length === rows.length) {
       console.warn(`⚠️ لم يتم إيجاد أي سجل مطابق للحذف. teacherName="${teacherName}" date="${date}"`);
       return res.status(404).json({
@@ -597,7 +598,6 @@ app.post('/delete-absence-record', async (req, res) => {
 
     xlsx.writeFile(workbook, userExcel);
 
-    // ✅ التأكد الفعلي من نجاح المزامنة لقاعدة البيانات قبل الرد بنجاح للمستخدم
     let syncOk = true;
     if (username) {
       syncOk = await syncExcelToDb(username, userExcel);
