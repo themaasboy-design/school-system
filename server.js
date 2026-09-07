@@ -546,16 +546,20 @@ app.post('/save-report', async (req, res) => {
   }
 });
 
-// 🗑️ مسار حذف سجل غياب معين من ورقة التقرير report (مُحدّث ودقيق)
+// 🗑️ مسار حذف سجل غياب (يدعم المطابقة عبر التاريخ أو اسم اليوم)
 app.post('/delete-absence-record', async (req, res) => {
-  const { teacherName, date } = req.body;
+  const teacherName = req.body.teacherName || req.body.absentTeacher || req.body.teacher;
+  const date = req.body.date || req.body.hijriDate || req.body.day;
+
+  console.log(`🔍 طلب حذف وارد -> المعلم: "${teacherName}" | التاريخ/اليوم: "${date}"`);
+
   try {
     const username = req.session?.username || req.headers['x-username'] || req.body?.username;
     const userExcel = await getUserExcelPath(req);
     const workbook = xlsx.readFile(userExcel);
 
     if (!workbook.SheetNames.includes(REPORT_SHEET)) {
-      return res.json({ success: true, message: 'لا توجد سجلات للحذف' });
+      return res.status(404).json({ success: false, message: 'ورقة التقرير غير موجودة في الملف' });
     }
 
     let data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
@@ -566,53 +570,60 @@ app.post('/delete-absence-record', async (req, res) => {
     const header = data[0];
     const rows = data.slice(1);
 
-    // 🧹 دالة تنظيف مرنة جداً: تتجاهل الأرقام العربية، الفواصل (/ و -)، والمسافات للمطابقة الدقيقة
+    // 🧹 دالة تنظيف وتوحيد الأحرف والمسافات
     const cleanStr = (s) => {
       if (s === null || s === undefined) return '';
       return s.toString()
         .trim()
         .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-        .replace(/[\/\-\s]/g, '');
+        .replace(/[أإآا]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .replace(/[\/\-\s\u200f\u200e]/g, '');
     };
 
-    const targetDate = cleanStr(date);
+    const targetDateOrDay = cleanStr(date);
     const targetTeacher = cleanStr(teacherName);
 
-    const filteredRows = rows.filter(row => {
-      const rowDate = cleanStr(row[0]);
-      const rowTeacher = cleanStr(row[2]);
-      return !(rowDate === targetDate && rowTeacher === targetTeacher);
+    let matchFound = false;
+
+    const filteredRows = rows.filter((row) => {
+      const rowDate = cleanStr(row[0]);   // العمود الأول: التاريخ الرقمي
+      const rowDay = cleanStr(row[1]);    // العمود الثاني: اسم اليوم (الأحد، الإثنين...)
+      const rowTeacher = cleanStr(row[2]);// العمود الثالث: اسم المعلم
+
+      // المطابقة المرنة: يفحص التاريخ أو اليوم + اسم المعلم
+      const isDateOrDayMatch = (rowDate === targetDateOrDay || rowDay === targetDateOrDay);
+      const isTeacherMatch = (rowTeacher === targetTeacher);
+
+      if (isDateOrDayMatch && isTeacherMatch && !matchFound) {
+        matchFound = true; // حذف السجل المطابق
+        return false;
+      }
+      return true;
     });
 
-    if (filteredRows.length === rows.length) {
-      console.warn(`⚠️ لم يتم إيجاد أي سجل مطابق للحذف. teacherName="${teacherName}" date="${date}"`);
+    if (!matchFound) {
+      console.warn(`❌ لم يتم العثور على سجل مطابق للمعلم "${teacherName}" والتاريخ/اليوم "${date}".`);
       return res.status(404).json({
         success: false,
-        message: 'لم يتم العثور على السجل المطلوب حذفه في قاعدة البيانات (قد يكون التاريخ محفوظاً بصيغة مختلفة).'
+        message: 'لم يتم العثور على السجل المطلوب حذفه.'
       });
     }
 
     const newData = [header, ...filteredRows];
-    const newSheet = xlsx.utils.aoa_to_sheet(newData);
-    workbook.Sheets[REPORT_SHEET] = newSheet;
-
+    workbook.Sheets[REPORT_SHEET] = xlsx.utils.aoa_to_sheet(newData);
     xlsx.writeFile(workbook, userExcel);
 
-    let syncOk = true;
     if (username) {
-      syncOk = await syncExcelToDb(username, userExcel);
+      await syncExcelToDb(username, userExcel);
     }
 
-    if (!syncOk) {
-      return res.status(500).json({
-        success: false,
-        message: 'تم الحذف محلياً لكن فشلت مزامنة الحذف مع قاعدة البيانات الدائمة. يرجى المحاولة مرة أخرى.'
-      });
-    }
-
+    console.log(`✅ تم حذف سجل المعلم (${teacherName}) بنجاح.`);
     res.json({ success: true, message: 'تم حذف السجل بنجاح' });
+
   } catch (e) {
-    console.error("خطأ أثناء حذف سجل الغياب:", e);
+    console.error("❌ خطأ أثناء حذف سجل الغياب:", e);
     res.status(500).json({ success: false, message: "حدث خطأ أثناء الحذف: " + e.message });
   }
 });
@@ -1042,7 +1053,7 @@ function requireAdmin(req, res, next) {
   if (req.session && req.session.isAdmin) {
     return next();
   }
-  return res.status(401).json({ success: false, message: 'غير مصرح بالوصول! يرجى تسجيل الدخول كمسؤول للنظام.' });
+  return res.status(401).json({ success: false, message: 'غير مصرح بالوصول! يرجى تسجيل الدخول كمسؤول بالنظام.' });
 }
 
 app.get('/admin', (req, res) => {
