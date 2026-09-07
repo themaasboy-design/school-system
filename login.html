@@ -47,6 +47,7 @@
             font-weight: 600;
             margin: 0 5px;
             transition: color 0.2s;
+            cursor: pointer;
         }
         .links a:hover {
             text-decoration: underline;
@@ -58,7 +59,7 @@
             top: 20px;
             right: 50%;
             transform: translateX(50%) translateY(-20px);
-            background-color: #e74c3c; /* لون أحمر للخطأ/التنبيه */
+            background-color: #e74c3c;
             color: #ffffff;
             padding: 12px 24px;
             border-radius: 8px;
@@ -77,10 +78,95 @@
             transform: translateX(50%) translateY(0);
         }
         #notification.success {
-            background-color: #2ecc71; /* لون أخضر للنجاح */
+            background-color: #2ecc71;
         }
         #notification.warning {
-            background-color: #e67e22; /* لون برتقالي للتنبيهات */
+            background-color: #e67e22;
+        }
+
+        /* 💬 تنسيق نافذة "نسيت كلمة المرور" المنبثقة (Modal) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 2000;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .close-btn:hover {
+            color: #333;
+        }
+        .modal-content h3 {
+            margin-top: 5px;
+            margin-bottom: 15px;
+            color: var(--primary-color, #2c3e50);
+            font-size: 18px;
+        }
+        .modal-content p {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .whatsapp-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background-color: #25D366;
+            color: #ffffff !important;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none !important;
+            font-weight: bold;
+            font-size: 15px;
+            transition: background-color 0.2s, transform 0.2s;
+            box-shadow: 0 3px 8px rgba(37, 211, 102, 0.3);
+        }
+        .whatsapp-btn:hover {
+            background-color: #128C7E;
+            transform: translateY(-2px);
+        }
+        .whatsapp-icon {
+            width: 20px;
+            height: 20px;
+            fill: #ffffff;
         }
     </style>
 </head>
@@ -110,7 +196,22 @@
         </form>
 
         <div class="links">
-            <a href="register.html">تسجيل جديد</a> | <a href="#">نسيت كلمة المرور؟</a>
+            <a href="register.html">تسجيل جديد</a> | <a href="#" id="forgotPasswordLink">نسيت كلمة المرور؟</a>
+        </div>
+    </div>
+
+    <!-- 💬 نافذة "نسيت كلمة المرور" المنبثقة -->
+    <div id="forgotPasswordModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeForgotPasswordModal()">&times;</span>
+            <h3>استرجاع كلمة المرور</h3>
+            <p>لاسترجاع كلمة المرور الرجاء التواصل مع الدعم عبر الواتساب</p>
+            <a href="https://wa.me/966551934592" target="_blank" class="whatsapp-btn">
+                <svg class="whatsapp-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
+                    <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3 18.6-68.1-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
+                </svg>
+                التواصل عبر الواتساب
+            </a>
         </div>
     </div>
 
@@ -134,6 +235,26 @@
             }, 3500);
         }
 
+        // 💬 فتح وإغلاق النافذة المنبثقة
+        const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+
+        forgotPasswordLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            forgotPasswordModal.classList.add('active');
+        });
+
+        function closeForgotPasswordModal() {
+            forgotPasswordModal.classList.remove('active');
+        }
+
+        // إغلاق النافذة عند النقر على الخلفية المظلمة
+        window.addEventListener('click', function(e) {
+            if (e.target === forgotPasswordModal) {
+                closeForgotPasswordModal();
+            }
+        });
+
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -155,23 +276,19 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // 1️⃣ حفظ بيانات المستخدم والمدرسة في LocalStorage لاستخدامها في باقي الصفحات
                     localStorage.setItem('username', result.username || usernameInput);
                     localStorage.setItem('schoolExcelFile', result.excelFile || '');
                     localStorage.setItem('schoolName', result.schoolName || '');
                     localStorage.setItem('fullName', result.fullName || '');
 
-                    // 2️⃣ الفحص: هل يوجد ملف إكسل مسجل لهذا المستخدم؟
                     const hasExcel = result.excelFile && result.excelFile.trim() !== '';
 
                     if (!hasExcel) {
-                        // مستخدم جديد لا يملك ملف إكسل 👈 توجيه للإعدادات
                         showNotification('مرحباً بك! يرجى رفع ملف إكسل المدرسة من صفحة الإعدادات للبدء.', 'warning');
                         setTimeout(() => {
                             window.location.href = 'index.html';
                         }, 2000);
                     } else {
-                        // مستخدم لديه ملف إكسل 👈 توجيه للصفحة الرئيسية
                         showNotification('تم تسجيل الدخول بنجاح!', 'success');
                         setTimeout(() => {
                             window.location.href = 'index.html';
