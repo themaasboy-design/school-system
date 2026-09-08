@@ -390,22 +390,6 @@
             y += (gapAfter - 6);
         }
 
-        // دالة مساعدة: طباعة سطر مكوّن من عدة أجزاء (تسمية + قيمة) كل جزء بموضعه الصحيح يدوياً
-        // بدل خلطها بسطر نصي واحد، لأن jsPDF لا يطبّق خوارزمية اتجاه النص (Bidi) تلقائياً
-        // segments: مصفوفة بترتيب القراءة من اليمين لليسار (أول عنصر = أقصى اليمين)
-        function printRTLSegments(segments, fontSize = 11, gapAfter = 7) {
-            doc.setFontSize(fontSize);
-            if (y > 280) { doc.addPage(); y = 20; }
-            let x = RX;
-            segments.forEach(seg => {
-                const text = (seg === null || seg === undefined) ? '' : seg.toString();
-                if (!text) return;
-                doc.text(text, x, y, { align: 'right' });
-                x -= doc.getTextWidth(text);
-            });
-            y += gapAfter;
-        }
-
         // ===== عنوان "مسائلة" =====
         doc.setFontSize(16);
         doc.setFont(fontName, 'normal');
@@ -448,20 +432,19 @@
         doc.text("طلب إفادة", 105, y, { align: 'center' });
         y += 10;
 
-        printRTLSegments(["المكرم: ", teacherName], 12);
+        printRTLLine(`المكرم: ${teacherName}`, 12);
         printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 11);
 
-        printRTLSegments(["من خلال متابعة سير العمل ليوم : ", dayName], 11);
-        printRTLSegments(["الموافق ", hijriDate], 11);
-        printRTLSegments(["لوحظ عليكم ما يلي ", violationType], 11);
+        let line3 = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق ${hijriDate} لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
-            printRTLSegments(["بإجمالي عدد دقائق ", delayMinutes.toString()], 11);
+            line3 += ` بإجمالي عدد دقائق ${delayMinutes}`;
         }
+        printRTLLine(line3, 11);
 
         printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما يؤيد عذركم ،،، ولكم تحياتي", 11);
         y += 4;
 
-        printRTLSegments(["مدير المدرسة : ", toWesternDigits(mainInfo.B3 || ""), "     التاريخ: ", hijriDate, "     التوقيع:............................."], 11);
+        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")}     التاريخ: ${hijriDate}     التوقيع:.............................`, 11);
 
         // ===== الإفادة =====
         y += 8;
@@ -470,7 +453,7 @@
         doc.text("الإفادة", 105, y, { align: 'center' });
         y += 10;
 
-        printRTLSegments(["المكرم مدير : ", toWesternDigits(mainInfo.B2 || ""), " حفظه الله"], 12);
+        printRTLLine(`المكرم مدير : ${toWesternDigits(mainInfo.B2 || "")} حفظه الله`, 12);
         printRTLLine("السلام عليكم ورحمة الله وبركاته        وبعد", 11);
         printRTLLine("أفيدكم أن أسباب ذلك ما يلي:", 11);
 
@@ -485,7 +468,7 @@
         doc.setDrawColor(0, 0, 0);
         y += 2;
 
-        printRTLSegments(["الاسم :...........................................", "   التاريخ:.......................", "   التوقيع:........................"], 11);
+        printRTLLine("الاسم :........................................................... التاريخ:....................... التوقيع:........................", 11);
 
         // ===== قرار مدير المدرسة =====
         y += 8;
@@ -506,7 +489,7 @@
         doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 8, y, { align: 'right' });
         y += 10;
 
-        printRTLSegments(["مدير المدرسة : ", toWesternDigits(mainInfo.B3 || ""), " التاريخ:............................. التوقيع :........................................"], 11);
+        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")} التاريخ:............................. التوقيع :........................................`, 11);
 
         // ===== صفحة أخيرة: ملحوظات هامة =====
         doc.addPage();
