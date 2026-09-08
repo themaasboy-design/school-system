@@ -446,6 +446,23 @@ app.get('/api/teachers', async (req, res) => {
   }
 });
 
+// 📋 مسار يرجّع بيانات المعلمين كاملة (كل الأعمدة بترتيبها الخام) - يُستخدم بتقرير المساءلة
+app.get('/api/teachers-raw', async (req, res) => {
+  try {
+    const userExcel = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(userExcel);
+    const sheet = getSheet(workbook, TEACHERS_SHEET);
+    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+    const rows = data.slice(1)
+      .filter(row => row && row[1] !== undefined && row[1] !== null && row[1].toString().trim() !== "");
+
+    res.json(rows);
+  } catch (e) {
+    res.status(401).json({ error: e.message });
+  }
+});
+
 app.get('/api/get-rotation', async (req, res) => {
   try {
     const userExcel = await getUserExcelPath(req);
