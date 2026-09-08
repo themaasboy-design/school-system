@@ -143,22 +143,64 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 📅 استخراج أرقام التاريخ فقط وإعادة تركيبها بصيغة نظيفة YYYY/MM/DD بأرقام غربية
-    function cleanDateYMD(str) {
-        if (!str) return '';
-        const westernized = toWesternDigits(str);
-        const groups = westernized.match(/\d+/g);
-        if (!groups || groups.length === 0) return '';
-        return groups.join('/');
+    // 🗓️ تفكيك التاريخ الهجري إلى أجزاء (يوم/شهر/سنة) بشكل قوي بغض النظر عن الصيغة أو الفواصل
+    function parseHijriParts(rawDate) {
+        if (!rawDate) return null;
+        let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
+        if (!str) return null;
+
+        let day = null, month = null, year = null;
+
+        const parts = str.split(/[\/\-\.\s]+/);
+        if (parts.length === 3) {
+            let p1 = parseInt(parts[0], 10);
+            let p2 = parseInt(parts[1], 10);
+            let p3 = parseInt(parts[2], 10);
+
+            if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
+                if (p1 > 1000) {
+                    year = p1; month = p2; day = p3;
+                } else if (p3 > 1000) {
+                    day = p1; month = p2; year = p3;
+                }
+            }
+        }
+
+        if (!day || !month || !year) {
+            if (typeof moment !== 'undefined') {
+                let m = moment(str, [
+                    'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
+                    'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iDD',
+                    'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
+                ], true);
+                if (!m.isValid()) m = moment(str);
+                if (m.isValid()) {
+                    day = m.iDate();
+                    month = m.iMonth() + 1;
+                    year = m.iYear();
+                }
+            }
+        }
+
+        return (day && month && year) ? { day, month, year } : null;
     }
 
-    // 📆 اسم اليوم بالعربي من تاريخ هجري (YYYY/MM/DD بأرقام غربية)
+    // 🗓️ تنسيق التاريخ ليظهر كاملاً وبشكل صحيح (اليوم-الشهر-السنة) - نفس الحل المجرب بصفحة rotation_setting
+    function formatHijriDate(rawDate) {
+        const parts = parseHijriParts(rawDate);
+        if (parts) return `${parts.day}-${parts.month}-${parts.year}`;
+        return rawDate ? toWesternDigits(rawDate).toString().trim() : '';
+    }
+
+    // 📆 اسم اليوم بالعربي من تاريخ هجري (أي صيغة)
     function getArabicDayName(hijriDateStr) {
         const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
         try {
-            const clean = cleanDateYMD(hijriDateStr);
-            const m = moment(clean, 'iYYYY/iMM/iDD');
-            if (m.isValid()) return dayNames[m.day()];
+            const parts = parseHijriParts(hijriDateStr);
+            if (parts) {
+                const m = moment(`${parts.year}/${parts.month}/${parts.day}`, 'iYYYY/iM/iD');
+                if (m.isValid()) return dayNames[m.day()];
+            }
         } catch (e) { /* تجاهل */ }
         return '';
     }
@@ -290,7 +332,7 @@
         const violationType = record.violation_type || record.violation || record['نوع المساءلة'] || '';
         const delayMinutes = parseInt(record.delay_minutes || record.delay || 0) || 0;
         const hijriDateRaw = record.hijri_date || record.date || record['التاريخ الهجري'] || '';
-        const hijriDate = cleanDateYMD(hijriDateRaw);
+        const hijriDate = formatHijriDate(hijriDateRaw);
         const dayName = getArabicDayName(hijriDateRaw);
 
         const { jsPDF } = window.jspdf;
