@@ -1113,6 +1113,80 @@ app.get('/api/admin/schools', requireAdmin, async (req, res) => {
   }
 });
 
+// ✏️ مسار تعديل بيانات مدرسة (مع إمكانية رفع/استبدال ملف الإكسل الخاص بها)
+app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { full_name, school_name, region, username, password } = req.body;
+
+    // 🔒 كلمة المرور: نشفّرها فقط لو الأدمن كتب واحدة جديدة فعلاً، وإلا نبقي القديمة كما هي
+    let hashedPassword = null;
+    if (password && password.trim() !== '') {
+      hashedPassword = bcrypt.hashSync(password.trim(), 10);
+    }
+
+    if (req.file) {
+      // 📁 تم رفع ملف إكسل جديد: نقرأه من القرص ونخزنه بقاعدة البيانات مباشرة
+      const fileBuffer = fs.readFileSync(req.file.path);
+
+      if (hashedPassword) {
+        await pool.query(
+          `UPDATE users
+           SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5,
+               school_excel_file = $6, excel_data = $7
+           WHERE id = $8`,
+          [full_name, school_name, region, username, hashedPassword, req.file.originalname, fileBuffer, id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE users
+           SET full_name = $1, school_name = $2, region = $3, username = $4,
+               school_excel_file = $5, excel_data = $6
+           WHERE id = $7`,
+          [full_name, school_name, region, username, req.file.originalname, fileBuffer, id]
+        );
+      }
+
+      // تنظيف الملف المؤقت من القرص بعد تخزينه بقاعدة البيانات
+      fs.unlink(req.file.path, () => {});
+    } else {
+      // ✏️ تعديل البيانات فقط بدون رفع ملف جديد
+      if (hashedPassword) {
+        await pool.query(
+          `UPDATE users
+           SET full_name = $1, school_name = $2, region = $3, username = $4, password = $5
+           WHERE id = $6`,
+          [full_name, school_name, region, username, hashedPassword, id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE users
+           SET full_name = $1, school_name = $2, region = $3, username = $4
+           WHERE id = $5`,
+          [full_name, school_name, region, username, id]
+        );
+      }
+    }
+
+    res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
+  } catch (e) {
+    console.error('خطأ أثناء تعديل بيانات المدرسة:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 🗑️ مسار حذف مدرسة بالكامل
+app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
+  } catch (e) {
+    console.error('خطأ أثناء حذف المدرسة:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // 📥 مسار تنزيل ملف الإكسل المباشر من PostgreSQL للأدمن
 app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
   try {
