@@ -469,3 +469,6 @@ button:active { transform: scale(0.98); }
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15) !important;
   cursor: pointer;
 }
+h1, h2, h3,p, .navbar h2 {
+    font-family: 'Thmanyah Serif Display', 'Cairo', sans-serif;
+}
