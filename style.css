@@ -104,7 +104,7 @@ select:focus, input:focus { border-color: var(--secondary-color); outline: none;
 /* --- تعريف الخط المحلي --- */
 @font-face {
     font-family: 'Thmanyah Serif Display';
-    src: url('thmanyahserifdisplay-Medium.ttf') format('truetype');
+    src: url('thmanyahserifdisplay-Medium.otf') format('truetype');
     /* إذا كان الملف بصيغة woff2 قم بتغيير الامتداد إلى woff2 والفرومات إلى format('woff2') */
     font-weight: 500;
     font-style: normal;
