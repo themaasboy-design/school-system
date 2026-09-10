@@ -295,6 +295,21 @@ function canonicalizeDayName(day) {
 // 📊 مسارات جلب وحفظ البيانات الأساسية
 // =========================================================================
 
+// 📥 مسار تنزيل نموذج الإكسل النظيف
+app.get('/download-template', (req, res) => {
+  try {
+    const wb = createCleanSchoolWorkbook();
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="school_template.xlsx"');
+    return res.send(buffer);
+  } catch (error) {
+    console.error("خطأ أثناء تنزيل النموذج:", error);
+    return res.status(500).send("حدث خطأ أثناء إنشاء النموذج وتنزيله");
+  }
+});
+
 app.get('/monitoring', (req, res) => {
   res.sendFile(path.join(__dirname, 'monitoring.html'));
 });
