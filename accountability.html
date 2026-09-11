@@ -78,7 +78,7 @@
                         <input type="number" id="delayMinutes" class="form-control" min="1" placeholder="مثال: 15">
                     </div>
 
-                    <!-- اختيار التاريخ بالتقويم الهجري (نفس تقويم report.html) -->
+                    <!-- اختيار التاريخ بالتقويم الهجري -->
                     <div class="mb-3" style="position: relative;">
                         <label class="form-label fw-bold">اختر التاريخ الهجري (من التقويم):</label>
                         <input type="text"
@@ -143,7 +143,7 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تفكيك التاريخ الهجري إلى أجزاء (يوم/شهر/سنة) بشكل قوي بغض النظر عن الصيغة أو الفواصل
+    // 🗓️ تفكيك التاريخ الهجري إلى أجزاء
     function parseHijriParts(rawDate) {
         if (!rawDate) return null;
         let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
@@ -185,14 +185,14 @@
         return (day && month && year) ? { day, month, year } : null;
     }
 
-    // 🗓️ تنسيق التاريخ ليظهر كاملاً وبشكل صحيح (اليوم-الشهر-السنة) - نفس الحل المجرب بصفحة rotation_setting
+    // 🗓️ تنسيق التاريخ الهجري
     function formatHijriDate(rawDate) {
         const parts = parseHijriParts(rawDate);
         if (parts) return `${parts.day}-${parts.month}-${parts.year}`;
         return rawDate ? toWesternDigits(rawDate).toString().trim() : '';
     }
 
-    // 📆 اسم اليوم بالعربي من تاريخ هجري (أي صيغة)
+    // 📆 اسم اليوم بالعربي من تاريخ هجري
     function getArabicDayName(hijriDateStr) {
         const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
         try {
@@ -238,7 +238,7 @@
         }
     });
 
-    // 3️⃣ جلب قائمة المعلمين
+    // 3️⃣ جلب قائمة المعلمين (تم التطوير لدعم كافة أشكال الاستجابات)
     async function loadTeachers() {
         try {
             const res = await fetch('/get-monitoring-teachers');
@@ -254,7 +254,15 @@
 
             if (teachersList.length > 0) {
                 teachersList.forEach(t => {
-                    const name = typeof t === 'string' ? t.trim() : (t.name || t['اسم المعلم'] || t.teacher_name);
+                    let name = "";
+                    if (typeof t === 'string') {
+                        name = t.trim();
+                    } else if (Array.isArray(t)) {
+                        name = t[1] || t[0] || '';
+                    } else if (typeof t === 'object' && t !== null) {
+                        name = t.name || t['اسم المعلم'] || t.teacher_name || t.teacher || '';
+                    }
+
                     if (name) {
                         const opt = document.createElement('option');
                         opt.value = name;
@@ -492,7 +500,7 @@
 
         printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")} التاريخ:............................. التوقيع :........................................`, 10, 6);
 
-        // ===== ملحوظات هامة (تظهر في أسفل نفس الصفحة) =====
+        // ===== ملحوظات هامة =====
         doc.line(10, y, 200, y);
         y += 4.5;
 
@@ -516,10 +524,6 @@
             });
         });
 
-        // ===== حفظ الملف باسم المعلم =====
-        const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
-        doc.save(`${safeTeacherName}.pdf`);
-    }
         // ===== حفظ الملف باسم المعلم =====
         const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
         doc.save(`${safeTeacherName}.pdf`);
