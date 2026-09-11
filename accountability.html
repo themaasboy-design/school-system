@@ -338,6 +338,14 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
+        // 🔳 إضافة حدود الصفحة (Border)
+        const addBorder = () => {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        };
+        addBorder();
+
         // ===== رأس الصفحة =====
         const res = await fetch('/get-report-data');
         const fullResponse = await res.json();
@@ -362,41 +370,41 @@
             canvas.width = img.width; canvas.height = img.height;
             canvas.getContext('2d').drawImage(img, 0, 0);
             const imgData = canvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 70, 0, 70, 50);
+            doc.addImage(imgData, 'PNG', 85, 8, 40, 22);
         } catch (e) {
             console.warn("لم يتم العثور على صورة الشعار logo.png");
         }
 
-        doc.setFontSize(12);
-        doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
-        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 170, 21, { align: 'center' });
-        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 170, 27, { align: 'center' });
-        doc.line(15, 35, 195, 35);
-
         const fontName = doc.getFontList().Noto ? 'Noto' : 'helvetica';
+        doc.setFont(fontName, 'normal');
+
+        doc.setFontSize(10);
+        doc.text("المملكة العربية السعودية - وزارة التعليم", 195, 13, { align: 'right' });
+        doc.text("الإدارة العامة للتعليم بمنطقة " + toWesternDigits(mainInfo.B1 || ""), 195, 18, { align: 'right' });
+        doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 195, 23, { align: 'right' });
+        doc.line(10, 32, 200, 32);
+
         const RX = 195;        // أقصى يمين لمحاذاة النص
         const maxW = 180;      // العرض الأقصى للنص قبل اللف
-        let y = 45;
+        let y = 38;
 
-        // دالة مساعدة: طباعة نص RTL مع لف تلقائي، وترجع y الجديد
-        function printRTLLine(text, fontSize = 11, gapAfter = 7) {
+        // دالة مساعدة: طباعة نص RTL مع لف تلقائي دون إنشاء صفحات جديدة
+        function printRTLLine(text, fontSize = 10, gapAfter = 5) {
             doc.setFontSize(fontSize);
             const lines = doc.splitTextToSize(text, maxW);
             lines.forEach(line => {
-                if (y > 280) { doc.addPage(); y = 20; }
                 doc.text(line, RX, y, { align: 'right' });
-                y += 6;
+                y += 5;
             });
-            y += (gapAfter - 6);
+            y += (gapAfter - 5);
         }
 
         // ===== عنوان "مسائلة" =====
-        doc.setFontSize(16);
-        doc.setFont(fontName, 'normal');
+        doc.setFontSize(14);
         doc.text("مسائلة", 105, y, { align: 'center' });
-        y += 10;
+        y += 7;
 
-        // ===== جدول بيانات المعلم (رقم الهوية - اسم المعلم - التخصص - العمل الحالي) =====
+        // ===== جدول بيانات المعلم =====
         let teacherRow = null;
         try {
             const rawRes = await fetch('/api/teachers-raw');
@@ -418,102 +426,100 @@
             head: [['العمل الحالي', 'التخصص', 'اسم المعلم', 'رقم الهوية']],
             body: [[currentJob, specialization, teacherName, nationalId]],
             styles: {
-                font: fontName, halign: 'center', fontSize: 10, cellPadding: 3,
+                font: fontName, halign: 'center', fontSize: 9, cellPadding: 2,
                 textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.2, fillColor: [255, 255, 255]
             },
-            headStyles: { fillColor: [230, 230, 230], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.2 },
-            margin: { left: 15, right: 15 }
+            headStyles: { fillColor: [235, 235, 235], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.2 },
+            margin: { left: 10, right: 10 }
         });
 
-        y = doc.lastAutoTable.finalY + 12;
+        y = doc.lastAutoTable.finalY + 6;
 
         // ===== طلب إفادة =====
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.text("طلب إفادة", 105, y, { align: 'center' });
-        y += 10;
+        y += 6;
 
-        printRTLLine(`المكرم: ${teacherName}`, 12);
-        printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 11);
+        printRTLLine(`المكرم: ${teacherName}`, 10.5, 4);
+        printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 4);
 
         let line3 = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق ${hijriDate} لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
             line3 += ` بإجمالي عدد دقائق ${delayMinutes}`;
         }
-        printRTLLine(line3, 11);
+        printRTLLine(line3, 10, 4);
 
-        printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما يؤيد عذركم ،،، ولكم تحياتي", 11);
-        y += 4;
+        printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما تؤيد عذركم ،،، ولكم تحياتي", 10, 4);
 
-        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")}     التاريخ: ${hijriDate}     التوقيع:.............................`, 11);
+        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")}     التاريخ: ${hijriDate}     التوقيع:.............................`, 10, 6);
 
         // ===== الإفادة =====
-        y += 8;
-        if (y > 260) { doc.addPage(); y = 20; }
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.text("الإفادة", 105, y, { align: 'center' });
-        y += 10;
+        y += 6;
 
-        printRTLLine(`المكرم مدير : ${toWesternDigits(mainInfo.B2 || "")} حفظه الله`, 12);
-        printRTLLine("السلام عليكم ورحمة الله وبركاته        وبعد", 11);
-        printRTLLine("أفيدكم أن أسباب ذلك ما يلي:", 11);
+        printRTLLine(`المكرم مدير : ${toWesternDigits(mainInfo.B2 || "")} حفظه الله`, 10.5, 4);
+        printRTLLine("السلام عليكم ورحمة الله وبركاته        وبعد", 10, 4);
+        printRTLLine("أفيدكم أن أسباب ذلك ما يلي:", 10, 4);
 
-        // ثلاثة أسطر فارغة رمادية للكتابة اليدوية
+        // أسطر فارغة للكتابة اليدوية
         doc.setDrawColor(180, 180, 180);
-        doc.setLineWidth(0.4);
+        doc.setLineWidth(0.3);
         for (let i = 0; i < 3; i++) {
-            if (y > 280) { doc.addPage(); y = 20; }
-            doc.line(15, y, 195, y);
-            y += 8;
+            doc.line(10, y, 200, y);
+            y += 6.5;
         }
         doc.setDrawColor(0, 0, 0);
-        y += 2;
+        y += 1;
 
-        printRTLLine("الاسم :........................................................... التاريخ:....................... التوقيع:........................", 11);
+        printRTLLine("الاسم :........................................................... التاريخ:....................... التوقيع:........................", 10, 6);
 
         // ===== قرار مدير المدرسة =====
-        y += 8;
-        if (y > 250) { doc.addPage(); y = 20; }
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.text("مدير المدرسة", 105, y, { align: 'center' });
-        y += 10;
+        y += 6;
 
-        // مربعات اختيار (☐) مرسومة يدوياً بدل رمز يونيكود لضمان ظهورها بكل الخطوط
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setDrawColor(0, 0, 0);
 
-        doc.rect(RX - 4, y - 4, 4, 4);
-        doc.text("عذر مقبول", RX - 8, y, { align: 'right' });
-        y += 9;
+        doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
+        doc.text("عذر مقبول", RX - 7, y, { align: 'right' });
+        y += 5.5;
 
-        doc.rect(RX - 4, y - 4, 4, 4);
-        doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 8, y, { align: 'right' });
-        y += 10;
+        doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
+        doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 7, y, { align: 'right' });
+        y += 6.5;
 
-        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")} التاريخ:............................. التوقيع :........................................`, 11);
+        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")} التاريخ:............................. التوقيع :........................................`, 10, 6);
 
-        // ===== صفحة أخيرة: ملحوظات هامة =====
-        doc.addPage();
-        let noteY = 30;
-        doc.setFontSize(11);
-        doc.text("ملحوظات هامة :", RX, noteY, { align: 'right' });
-        noteY += 8;
+        // ===== ملحوظات هامة (تظهر في أسفل نفس الصفحة) =====
+        doc.line(10, y, 200, y);
+        y += 4.5;
+
+        doc.setFontSize(10);
+        doc.text("ملحوظات هامة :", RX, y, { align: 'right' });
+        y += 4.5;
 
         const notes = [
             "- تستكمل الاستمارة من المدير المباشر وإصدار قرار بموجبه .",
             "- إذا سبق الإجازة نهاية الأسبوع غياب وألحقها غياب تحتسب مدة الغياب كاملة .",
             "- يجب أن يوضح المتغيب أسباب غيابه فور تسلمه الاستمارة ويعيدها لمديره المباشر.",
-            "- يعطى المتغيب مدة أسبوع لتقديم ما يؤيد عذره فإذا انقضت المدة الزمنية تستكمل الاستمارة ويتم الحسم ."
+            "- يعطى المتغيب مدة أسبوع لتقديم ما تؤيد عذره فإذا انقضت المدة الزمنية تستكمل الاستمارة ويتم الحسم ."
         ];
 
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         notes.forEach(note => {
             const wrapped = doc.splitTextToSize(note, maxW);
             wrapped.forEach(line => {
-                doc.text(line, RX, noteY, { align: 'right' });
-                noteY += 6;
+                doc.text(line, RX, y, { align: 'right' });
+                y += 4;
             });
         });
 
+        // ===== حفظ الملف باسم المعلم =====
+        const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
+        doc.save(`${safeTeacherName}.pdf`);
+    }
         // ===== حفظ الملف باسم المعلم =====
         const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
         doc.save(`${safeTeacherName}.pdf`);
