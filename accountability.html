@@ -328,7 +328,7 @@
         }
     }
 
-    // 🖨️ طباعة تقرير المساءلة الكامل (PDF)
+// 🖨️ طباعة تقرير المساءلة الكامل (PDF)
     async function printAccountabilityReport(id) {
         const record = accountabilityRecords.find((r, idx) => (r._id || r.id || idx) == id);
         if (!record) {
@@ -396,21 +396,33 @@
         const maxW = 180;      // العرض الأقصى للنص قبل اللف
         let y = 38;
 
-        // دالة مساعدة: طباعة نص RTL مع لف تلقائي دون إنشاء صفحات جديدة
-        function printRTLLine(text, fontSize = 10, gapAfter = 5) {
+        // دالة مساعدة: طباعة نص RTL مع لف تلقائي وتباعد أسطر موسّع
+        function printRTLLine(text, fontSize = 10, gapAfter = 6) {
             doc.setFontSize(fontSize);
             const lines = doc.splitTextToSize(text, maxW);
             lines.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
-                y += 5;
+                y += 6.5; // توسيع التباعد بين الأسطر
             });
-            y += (gapAfter - 5);
+            y += (gapAfter - 6.5);
         }
 
-        // ===== عنوان "مسائلة" =====
+        // دالة مساعدة: طباعة عناوين الأقسام بخلفية رصاصية (رمادية)
+        function printSectionTitle(titleText) {
+            doc.setFillColor(235, 235, 235);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.3);
+            doc.rect(10, y - 4.5, 190, 7.5, 'FD');
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
+            doc.text(titleText, 105, y, { align: 'center' });
+            y += 8;
+        }
+
+        // ===== عنوان "مسائلة" الرئيسي =====
         doc.setFontSize(14);
         doc.text("مسائلة", 105, y, { align: 'center' });
-        y += 7;
+        y += 8;
 
         // ===== جدول بيانات المعلم =====
         let teacherRow = null;
@@ -434,79 +446,78 @@
             head: [['العمل الحالي', 'التخصص', 'اسم المعلم', 'رقم الهوية']],
             body: [[currentJob, specialization, teacherName, nationalId]],
             styles: {
-                font: fontName, halign: 'center', fontSize: 9, cellPadding: 2,
+                font: fontName, halign: 'center', fontSize: 9, cellPadding: 2.5,
                 textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.2, fillColor: [255, 255, 255]
             },
             headStyles: { fillColor: [235, 235, 235], textColor: [0, 0, 0], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.2 },
             margin: { left: 10, right: 10 }
         });
 
-        y = doc.lastAutoTable.finalY + 6;
+        y = doc.lastAutoTable.finalY + 8;
 
-        // ===== طلب إفادة =====
-        doc.setFontSize(12);
-        doc.text("طلب إفادة", 105, y, { align: 'center' });
-        y += 6;
+        // ===== 1️⃣ قسم: طلب إفادة =====
+        printSectionTitle("طلب إفادة");
 
-        printRTLLine(`المكرم: ${teacherName}`, 10.5, 4);
-        printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 4);
+        printRTLLine(`المكرم: ${teacherName}`, 10.5, 5);
+        printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 5);
 
         let line3 = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق ${hijriDate} لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
             line3 += ` بإجمالي عدد دقائق ${delayMinutes}`;
         }
-        printRTLLine(line3, 10, 4);
+        printRTLLine(line3, 10, 5);
 
-        printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما تؤيد عذركم ،،، ولكم تحياتي", 10, 4);
+        printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما تؤيد عذركم ،،، ولكم تحياتي", 10, 5);
 
-        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")}     التاريخ: ${hijriDate}     التوقيع:.............................`, 10, 6);
+        const managerName = toWesternDigits(mainInfo.B3 || "");
+        printRTLLine(`مدير المدرسة : ${managerName}                                      التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
 
-        // ===== الإفادة =====
-        doc.setFontSize(12);
-        doc.text("الإفادة", 105, y, { align: 'center' });
-        y += 6;
+        // ===== 2️⃣ قسم: الإفادة =====
+        printSectionTitle("الإفادة");
 
-        printRTLLine(`المكرم مدير : ${toWesternDigits(mainInfo.B2 || "")} حفظه الله`, 10.5, 4);
-        printRTLLine("السلام عليكم ورحمة الله وبركاته        وبعد", 10, 4);
-        printRTLLine("أفيدكم أن أسباب ذلك ما يلي:", 10, 4);
+        const schoolNameText = toWesternDigits(mainInfo.B2 || "");
+        printRTLLine(`المكرم مدير : ${schoolNameText} حفظه الله`, 10.5, 5);
+        printRTLLine("السلام عليكم ورحمة الله وبركاته        وبعد", 10, 5);
+        printRTLLine("أفيدكم أن أسباب ذلك ما يلي:", 10, 5);
 
         // أسطر فارغة للكتابة اليدوية
         doc.setDrawColor(180, 180, 180);
         doc.setLineWidth(0.3);
         for (let i = 0; i < 3; i++) {
             doc.line(10, y, 200, y);
-            y += 6.5;
+            y += 7.5;
         }
         doc.setDrawColor(0, 0, 0);
-        y += 1;
+        y += 2;
 
-        printRTLLine("الاسم :........................................................... التاريخ:....................... التوقيع:........................", 10, 6);
+        printRTLLine("الاسم :ـــــــــــــــــــــــــــــــــــــــ     التاريخ : ــــــــــــــــــــــــــــــــــــــ    التوقيع : ـــــــــــــــــــــــــــــــ", 10, 8);
 
-        // ===== قرار مدير المدرسة =====
-        doc.setFontSize(12);
-        doc.text("مدير المدرسة", 105, y, { align: 'center' });
-        y += 6;
+        // ===== 3️⃣ قسم: مدير المدرسة =====
+        printSectionTitle("مدير المدرسة");
 
         doc.setFontSize(10);
         doc.setDrawColor(0, 0, 0);
 
         doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
         doc.text("عذر مقبول", RX - 7, y, { align: 'right' });
-        y += 5.5;
+        y += 6.5;
 
         doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
         doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 7, y, { align: 'right' });
-        y += 6.5;
+        y += 7.5;
 
-        printRTLLine(`مدير المدرسة : ${toWesternDigits(mainInfo.B3 || "")} التاريخ:............................. التوقيع :........................................`, 10, 6);
+        printRTLLine(`مدير المدرسة : ${managerName}                                      التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
 
-        // ===== ملحوظات هامة =====
+        // ===== 4️⃣ قسم: ملحوظات هامة (في أسفل الورقة) =====
+        y = 242; // تثبيت الملحوظات عند الموضع السفلي للورقة
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.4);
         doc.line(10, y, 200, y);
-        y += 4.5;
+        y += 5;
 
         doc.setFontSize(10);
         doc.text("ملحوظات هامة :", RX, y, { align: 'right' });
-        y += 4.5;
+        y += 5;
 
         const notes = [
             "- تستكمل الاستمارة من المدير المباشر وإصدار قرار بموجبه .",
@@ -515,12 +526,12 @@
             "- يعطى المتغيب مدة أسبوع لتقديم ما تؤيد عذره فإذا انقضت المدة الزمنية تستكمل الاستمارة ويتم الحسم ."
         ];
 
-        doc.setFontSize(8);
+        doc.setFontSize(8.5);
         notes.forEach(note => {
             const wrapped = doc.splitTextToSize(note, maxW);
             wrapped.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
-                y += 4;
+                y += 4.5;
             });
         });
 
@@ -528,7 +539,6 @@
         const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
         doc.save(`${safeTeacherName}.pdf`);
     }
-
     // 5️⃣ حفظ المساءلة الجديدة
     document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
