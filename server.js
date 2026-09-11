@@ -295,18 +295,23 @@ function canonicalizeDayName(day) {
 // 📊 مسارات جلب وحفظ البيانات الأساسية
 // =========================================================================
 
-// 📥 مسار تنزيل نموذج الإكسل النظيف
+// 📥 مسار تنزيل نموذج الإكسل المباشر من ملفات السيرفر
 app.get('/download-template', (req, res) => {
-  try {
-    const wb = createCleanSchoolWorkbook();
-    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const templatePath = path.join(__dirname, 'templates', 'waiting_data.xlsx');
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="school_template.xlsx"');
-    return res.send(buffer);
-  } catch (error) {
-    console.error("خطأ أثناء تنزيل النموذج:", error);
-    return res.status(500).send("حدث خطأ أثناء إنشاء النموذج وتنزيله");
+  // التحقق من وجود الملف في المسار قبل تنزيله
+  if (fs.existsSync(templatePath)) {
+    return res.download(templatePath, 'waiting_data.xlsx', (err) => {
+      if (err) {
+        console.error("خطأ أثناء إرسال الملف:", err);
+        if (!res.headersSent) {
+          return res.status(500).send("حدث خطأ أثناء تنزيل الملف.");
+        }
+      }
+    });
+  } else {
+    console.error("❌ ملف النموذج غير موجود في المسار:", templatePath);
+    return res.status(404).send("عذراً، لم يتم العثور على ملف النموذج في السيرفر.");
   }
 });
 
