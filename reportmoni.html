@@ -136,7 +136,7 @@
         <!-- زر استخراج الـ PDF -->
         <div class="text-end mt-4">
             <button type="button" id="btnDownloadWeeklyPDF" class="btn btn-outline-primary fw-bold px-4 me-2">
-               طباعة الجدول الأسبوعي كامل (الأحد - الخميس)
+               طباعة الجدول الأسبوعي 
             </button>
             <button type="button" id="btnDownloadPDF" class="btn btn-success fw-bold px-4" disabled>
                طباعة جدول الإشراف 
@@ -397,7 +397,7 @@ async function generateReportPDF() {
             doc.line(15, 48, 195, 48);
 
             doc.setFontSize(15);
-            doc.text("الجدول الأسبوعي لتوزيع الإشراف (الأحد - الخميس)", 105, 57, { align: 'center' });
+            doc.text("الجدول الأسبوعي لتوزيع الإشراف ", 105, 57, { align: 'center' });
 
             return drawTableHeaderRow(66);
         }
