@@ -4,10 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الانتظار</title>
+
+    <!-- مكتبة الأيقونات Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- ملف الستايل الخاص بالموقع -->
     <link rel="stylesheet" href="style.css">
+    
+    <!-- مكتبة التقويم الهجري CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/css/bootstrap-datetimepicker.min.css">
+    
+    <!-- ملف الستايل والتشغيل الخاص بالرسائل (Toastify) -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
     <style>
-        .hijri-datepicker-container,.datepicker { z-index: 99999 !important; }
+        .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
         .secondary-teacher-select {
             margin-top: 8px;
             display: none;
@@ -15,44 +27,40 @@
             background-color: #f8f9fa;
         }
     </style>
-    <!-- ملف الستايل الخاص بالرسائل (CSS) -->
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <!-- ملف التشغيل الخاص بالرسائل (JavaScript) -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </head>
 <body>
- <nav class="navbar">
-    <h2 id="schoolName">المدرسة </h2>
-    <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+    <nav class="navbar">
+        <h2 id="schoolName">المدرسة </h2>
+        <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
 
-    <!-- 🍔 زر القائمة للجوال -->
-    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
-        <i class="fas fa-bars"></i>
-    </button>
+        <!-- 🍔 زر القائمة للجوال -->
+        <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+            <i class="fas fa-bars"></i>
+        </button>
 
-    <!-- روابط الشريط -->
-    <div class="navbar-links" id="navbarLinks">
-        <a href="index.html">الرئيسية</a>
-        <a href="dashboard.html#">الانتظار</a>
-        <a href="/monitoring">الإشراف</a>
-        
-        <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger">التقارير</a>
-            <div class="dropdown-menu">
-                <a href="report.html">تقرير الغياب</a>
-                <a href="reportmoni.html">تقرير الإشراف</a>
+        <!-- روابط الشريط -->
+        <div class="navbar-links" id="navbarLinks">
+            <a href="index.html">الرئيسية</a>
+            <a href="dashboard.html#">الانتظار</a>
+            <a href="/monitoring">الإشراف</a>
+            
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger">التقارير</a>
+                <div class="dropdown-menu">
+                    <a href="report.html">تقرير الغياب</a>
+                    <a href="reportmoni.html">تقرير الإشراف</a>
+                </div>
             </div>
-        </div>
-        <div class="dropdown-container">
-            <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
-            <div class="dropdown-menu">
-                <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>       
-                <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+                <div class="dropdown-menu">
+                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>       
+                    <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                </div>
             </div>
+            <a href="/login.html" class="logout">تسجيل الخروج</a>
         </div>
-        <a href="/login.html" class="logout">تسجيل الخروج</a>
-    </div>
-</nav>
+    </nav>
 
     <div class="main-container">
         <div class="card">
@@ -90,11 +98,18 @@
         </div>
     </div>
 
+    <!-- المكتبات الخارجية JavaScript -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
+
     <script>
         let allTeachersList = [];
 
+        // إنشاء خيارات الحصص 1 إلى 7
         const container = document.getElementById('classesContainer');
-        for(let i=1; i<=7; i++) {
+        for (let i = 1; i <= 7; i++) {
             container.innerHTML += `
                 <div class="class-box">
                     <label>الحصة ${i}:</label>
@@ -111,6 +126,16 @@
             `;
         }
 
+        // 🍔 زر القائمة للجوال
+        const menuToggle = document.getElementById('menuToggle');
+        const navbarLinks = document.getElementById('navbarLinks');
+        if (menuToggle && navbarLinks) {
+            menuToggle.addEventListener('click', () => {
+                navbarLinks.classList.toggle('active');
+            });
+        }
+
+        // حفظ النموذج
         document.getElementById('absenceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const reportData = {
@@ -119,11 +144,10 @@
                 absentTeacher: document.getElementById('teacherSelect').value
             };
 
-            for(let i=1; i<=7; i++) {
+            for (let i = 1; i <= 7; i++) {
                 reportData[`class${i}_room`] = document.getElementById(`roomSelect_${i}`).value;
                 
                 let selectedTeacher = document.getElementById(`teacherSelect_${i}`).value;
-                // إذا كان خيار المستخدم "معلم بديل آخر"، نأخذ القيمة من قائمة المعلمين الثانية
                 if (selectedTeacher === "معلم بديل آخر") {
                     const altTeacher = document.getElementById(`allTeacherSelect_${i}`).value;
                     selectedTeacher = altTeacher !== "" ? altTeacher : "معلم بديل آخر";
@@ -143,10 +167,20 @@
                     clearAllInputs(); 
                     showNotification("تم حفظ بيانات غياب المعلم بنجاح !", "success"); 
                 } else {
-                    showNotification("خطأ أثناء الحفظ: " + result.error, "error");
+                    showNotification("خطأ أثناء الحفظ: " + (result.error || "خطأ غير معروف"), "error");
                 }
             } catch (err) { 
                 showNotification("فشل الاتصال بالسيرفر", "error"); 
+            }
+        });
+
+        // إعطاء تنبيه/تحديث المعلمين عند تغيير اليوم
+        document.getElementById('daySelect').addEventListener('change', () => {
+            for (let i = 1; i <= 7; i++) {
+                const roomSelect = document.getElementById(`roomSelect_${i}`);
+                if (roomSelect && roomSelect.value !== "") {
+                    loadWaitingTeachers(i);
+                }
             }
         });
 
@@ -154,7 +188,7 @@
             try {
                 const response = await fetch('/get-classes');
                 const classes = await response.json();
-                for(let i=1; i<=7; i++) {
+                for (let i = 1; i <= 7; i++) {
                     let roomSelect = document.getElementById(`roomSelect_${i}`);
                     classes.forEach(row => {
                         let opt = document.createElement('option');
@@ -163,7 +197,7 @@
                         roomSelect.appendChild(opt);
                     });
                 }
-            } catch (e) { console.error("خطأ في جلب الفصول"); }
+            } catch (e) { console.error("خطأ في جلب الفصول", e); }
         }
 
         async function loadAllTeachers() {
@@ -180,9 +214,8 @@
                     mainSelect.appendChild(opt);
                 });
 
-                // تعبئة قائمة جميع المعلمين في القوائم الثانوية
                 populateSecondaryTeacherSelects();
-            } catch (e) { console.error("خطأ في جلب المعلمين"); }
+            } catch (e) { console.error("خطأ في جلب المعلمين", e); }
         }
 
         function populateSecondaryTeacherSelects() {
@@ -192,7 +225,6 @@
                 
                 secSelect.innerHTML = '<option value="">-- اختر المعلم --</option>';
 
-                // تعبئة أسماء كافة معلمي المدرسة فقط
                 allTeachersList.forEach(t => {
                     let opt = document.createElement('option');
                     opt.value = t["Name_teacher"];
@@ -215,17 +247,17 @@
             }
             if (roomSelect.value === "") { 
                 teacherSelect.disabled = true; 
+                teacherSelect.innerHTML = '<option value="">-- اختر الفصل أولاً --</option>';
                 if (secondarySelect) secondarySelect.style.display = "none";
                 return; 
             }
 
             try {
-                const response = await fetch(`/get-waiting-teachers?day=${day}&period=${i}`);
+                const response = await fetch(`/get-waiting-teachers?day=${encodeURIComponent(day)}&period=${i}`);
                 const data = await response.json();
                 
                 teacherSelect.innerHTML = '<option value="">-- اختر المعلم البديل --</option>';
 
-                // 1️⃣ إظهار المعلمين المتاحين فقط لهذه الحصة حسب الجدول
                 if (data.teachers && data.teachers.length > 0) {
                     data.teachers.forEach(teacherCode => {
                         let opt = document.createElement('option');
@@ -235,7 +267,6 @@
                     });
                 }
 
-                // 2️⃣ إدراج خيار "معلم بديل آخر" دائماً في الأسفل
                 let optOther = document.createElement('option');
                 optOther.value = "معلم بديل آخر";
                 optOther.text = "معلم بديل آخر";
@@ -243,13 +274,12 @@
 
                 teacherSelect.disabled = false;
                 
-                // إعادة إخفاء وتصفير القائمة الثانوية عند التغيير
                 if (secondarySelect) {
                     secondarySelect.style.display = "none";
                     secondarySelect.value = "";
                 }
             } catch (e) { 
-                console.error("خطأ في جلب المعلمين البدلاء"); 
+                console.error("خطأ في جلب المعلمين البدلاء", e); 
             }
         }
 
@@ -283,13 +313,22 @@
             loadSchoolName();
             loadAllTeachers();
             loadClasses();
+
+            // تفعيل منتقي التاريخ الهجري
+            $("#hijriDate").hijriDatePicker({
+                hijri: true,
+                showSwitcher: false,
+                format: 'iYYYY/iMM/iDD',
+                hijriFormat: 'iYYYY/iMM/iDD',
+                locale: 'ar-sa'
+            });
         });
 
         function clearAllInputs() {
             const selects = document.querySelectorAll('select');
             selects.forEach((select) => {
                 select.value = ""; 
-                select.selectedIndex = -1;
+                select.selectedIndex = 0;
                 if (typeof $ !== 'undefined' && $.fn.select2) {
                     $(select).val(null).trigger('change.select2'); 
                 }
@@ -302,10 +341,14 @@
                 }
             });
 
-            // إخفاء كافة القوائم الثانوية للمعلمين
-            for(let i=1; i<=7; i++) {
+            for (let i = 1; i <= 7; i++) {
                 const secSelect = document.getElementById(`allTeacherSelect_${i}`);
                 if (secSelect) secSelect.style.display = "none";
+                const teacherSelect = document.getElementById(`teacherSelect_${i}`);
+                if (teacherSelect) {
+                    teacherSelect.disabled = true;
+                    teacherSelect.innerHTML = '<option value="">-- اختر الفصل أولاً --</option>';
+                }
             }
         }
 
@@ -327,23 +370,6 @@
                 }
             }).showToast();
         }
-    </script>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment-hijri@2.1.2/moment-hijri.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap-hijri-datepicker@1.0.2/dist/js/bootstrap-hijri-datetimepicker.min.js"></script>
-
-    <script>
-        $(document).ready(function () {
-            $("#hijriDate").hijriDatePicker({
-                hijri: true,
-                showSwitcher: false,
-                format: 'iYYYY/iMM/iDD',
-                hijriFormat: 'iYYYY/iMM/iDD',
-                locale: 'ar-sa'
-            });
-        });
     </script>
 </body>
 </html>

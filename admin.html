@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/style.css">
 
     <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f6f9; }
         .admin-header {
             background: linear-gradient(135deg, #1e293b, #0f172a);
             color: white;
@@ -31,15 +31,6 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .pass-text {
-            font-family: monospace;
-            letter-spacing: 1px;
-            max-width: 150px;
-            display: inline-block;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
         /* كارت تسجيل الدخول */
         .admin-login-card {
@@ -166,7 +157,7 @@
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-bold">كلمة المرور الجديدة (أو اتركها كما هي):</label>
-                            <input type="text" id="editPassword" class="form-control" placeholder="اتركه فارغاً إذا لم ترغب بتغيير كلمة المرور">
+                            <input type="text" id="editPassword" class="form-control" required>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-bold">رفع / استبدال ملف الإكسل (.xlsx):</label>

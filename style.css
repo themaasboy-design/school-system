@@ -1,5 +1,11 @@
-/* --- استيراد خط Cairo --- */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+/* --- تعريف الخط الأساسي الموحّد للموقع بالكامل (مصدر وحيد لنوع الخط) --- */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    src: url('IBMPlexSansArabic-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* --- المتغيرات اللونية (لتسهيل التعديل مستقبلاً) --- */
 :root {
@@ -16,7 +22,7 @@
 /* --- الإعدادات العامة --- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { 
-    font-family: 'Cairo', Tahoma, sans-serif; 
+    font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif; 
     background-color: var(--bg-color); 
     color: var(--text-color); 
     direction: rtl; 
@@ -101,15 +107,6 @@ select, input {
     transition: border-color 0.3s, box-shadow 0.3s; 
 }
 select:focus, input:focus { border-color: var(--secondary-color); outline: none; box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
-/* --- تعريف الخط المحلي --- */
-@font-face {
-    font-family: 'Thmanyah Serif Display';
-    src: url('thmanyahserifdisplay-Medium.otf') format('truetype');
-    /* إذا كان الملف بصيغة woff2 قم بتغيير الامتداد إلى woff2 والفرومات إلى format('woff2') */
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
-}
 /* --- تصميم شبكة الحصص --- */
 .classes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
 .class-box { 
@@ -202,7 +199,7 @@ button:active { transform: scale(0.98); }
   border-radius: 16px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif;
   direction: rtl;
 }
 
@@ -478,5 +475,16 @@ button:active { transform: scale(0.98); }
   cursor: pointer;
 }
 h1, h2, h3,p, .navbar h2 {
-    font-family: 'Thmanyah Serif Display', 'Cairo', sans-serif;
+    font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif;
+}
+
+/* عرض كلمة المرور بلوحة الأدمن (نُقلت من admin.html لتوحيد كل تعريفات الخطوط هنا) */
+.pass-text {
+    font-family: monospace;
+    letter-spacing: 1px;
+    max-width: 150px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
