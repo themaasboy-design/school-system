@@ -135,6 +135,9 @@
 
         <!-- زر استخراج الـ PDF -->
         <div class="text-end mt-4">
+            <button type="button" id="btnDownloadWeeklyPDF" class="btn btn-outline-primary fw-bold px-4 me-2">
+               طباعة الجدول الأسبوعي كامل (الأحد - الخميس)
+            </button>
             <button type="button" id="btnDownloadPDF" class="btn btn-success fw-bold px-4" disabled>
                طباعة جدول الإشراف 
             </button>
@@ -296,8 +299,189 @@ async function generateReportPDF() {
         console.error("حدث خطأ أثناء صياغة الـ PDF:", error);
     }
 }
+    // 📆 طباعة جدول الإشراف لكل أيام الأسبوع بجدول واحد في صفحة واحدة (اليوم - اسماء المعلمين - المهمة)
+    async function generateWeeklyReportPDF() {
+        const weekDays = [
+            { value: 'sun', label: 'الأحد' },
+            { value: 'mon', label: 'الإثنين' },
+            { value: 'tue', label: 'الثلاثاء' },
+            { value: 'wed', label: 'الأربعاء' },
+            { value: 'thu', label: 'الخميس' }
+        ];
+
+        Toastify({ text: "جاري تجهيز الجدول الأسبوعي، الرجاء الانتظار...", duration: 2500 }).showToast();
+
+        // جلب اسم المدرسة والمعلومات الأساسية بشكل مستقل عن الفلترة اليومية
+        let weeklyMainInfo = { B1: "", B2: "", B3: "", B4: "" };
+        try {
+            const infoRes = await fetch('/get-report-data');
+            const infoResult = await infoRes.json();
+            if (infoResult.mainInfo) weeklyMainInfo = infoResult.mainInfo;
+        } catch (e) {
+            console.warn("تعذر جلب بيانات المدرسة، سيتم المتابعة ببيانات فارغة", e);
+        }
+
+        // جلب بيانات كل الأيام (كل المهام) بالتوازي
+        let dailyResults = [];
+        try {
+            dailyResults = await Promise.all(weekDays.map(async (d) => {
+                try {
+                    const res = await fetch(`/get-reportmoni-data?day=${encodeURIComponent(d.value)}&task=all`);
+                    const result = await res.json();
+                    return { ...d, data: (result.success && Array.isArray(result.data)) ? result.data : [] };
+                } catch (e) {
+                    return { ...d, data: [] };
+                }
+            }));
+        } catch (e) {
+            console.error("خطأ أثناء جلب بيانات الأسبوع:", e);
+            Toastify({ text: "حدث خطأ أثناء جلب بيانات الأسبوع", style: { background: "#e74c3c" } }).showToast();
+            return;
+        }
+
+        // 🗓️ تجاهل الأيام اللي ما فيها أي مهام إطلاقاً
+        const daysWithData = dailyResults.filter(d => d.data.length > 0);
+
+        if (daysWithData.length === 0) {
+            Toastify({ text: "⚠️ لا توجد بيانات مسجلة لأي يوم بالأسبوع", style: { background: "#e74c3c" } }).showToast();
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+        // تحميل الخط العربي
+        try {
+            const fontData = await fetch('NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+            const fontBase64 = btoa(new Uint8Array(fontData).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            doc.addFileToVFS("NotoSansArabic-Regular.ttf", fontBase64);
+            doc.addFont("NotoSansArabic-Regular.ttf", "Noto", "normal");
+            doc.setFont("Noto", "normal");
+        } catch (e) {
+            console.warn("تعذر تحميل الخط الخاص، سيتم استخدام الخط الافتراضي", e);
+        }
+
+        // تحميل الشعار
+        let logoImgData = null;
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            await img.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            logoImgData = canvas.toDataURL('image/png');
+        } catch (e) {
+            console.warn("لم يتم العثور على صورة الشعار logo.png");
+        }
+
+        // ===== حدود الأعمدة الثلاثة (من اليمين لليسار: اليوم - اسماء المعلمين - المهمة) =====
+        const dayColX2 = 195, dayColX1 = 165;         // عمود اليوم (يمين)
+        const teachersColX2 = 165, teachersColX1 = 75; // عمود اسماء المعلمين (وسط)
+        const taskColX2 = 75, taskColX1 = 15;          // عمود المهمة (يسار)
+
+        function drawPageBorder() {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.rect(5, 5, 200, 287);
+        }
+
+        function drawHeader() {
+            drawPageBorder();
+            if (logoImgData) doc.addImage(logoImgData, 'PNG', 70, 5, 70, 40);
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text("المملكة العربية السعودية - وزارة التعليم", 170, 15, { align: 'center' });
+            doc.text("الإدارة العامة للتعليم بمنطقة " + (weeklyMainInfo.B1 || ""), 170, 21, { align: 'center' });
+            doc.text("مدرسة " + (weeklyMainInfo.B2 || ""), 170, 27, { align: 'center' });
+            doc.line(15, 48, 195, 48);
+
+            doc.setFontSize(15);
+            doc.text("الجدول الأسبوعي لتوزيع الإشراف (الأحد - الخميس)", 105, 57, { align: 'center' });
+
+            return drawTableHeaderRow(66);
+        }
+
+        function drawTableHeaderRow(y) {
+            doc.setFillColor(44, 62, 80);
+            doc.rect(15, y, 180, 10, "F");
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.3);
+            doc.rect(dayColX1, y, dayColX2 - dayColX1, 10);
+            doc.rect(teachersColX1, y, teachersColX2 - teachersColX1, 10);
+            doc.rect(taskColX1, y, taskColX2 - taskColX1, 10);
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.text("اليوم", (dayColX1 + dayColX2) / 2, y + 7, { align: 'center' });
+            doc.text("اسماء المعلمين", (teachersColX1 + teachersColX2) / 2, y + 7, { align: 'center' });
+            doc.text("المهمة", (taskColX1 + taskColX2) / 2, y + 7, { align: 'center' });
+
+            doc.setTextColor(0, 0, 0);
+            return y + 10;
+        }
+
+        let currentY = drawHeader();
+
+        daysWithData.forEach(dayInfo => {
+            dayInfo.data.forEach(item => {
+                const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
+                const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
+
+                // صفحة جديدة لو الصف الحالي بيتجاوز نهاية الصفحة
+                if (currentY + rowHeight > 260) {
+                    doc.addPage();
+                    drawPageBorder();
+                    currentY = drawTableHeaderRow(20);
+                }
+
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.3);
+                doc.rect(dayColX1, currentY, dayColX2 - dayColX1, rowHeight);
+                doc.rect(teachersColX1, currentY, teachersColX2 - teachersColX1, rowHeight);
+                doc.rect(taskColX1, currentY, taskColX2 - taskColX1, rowHeight);
+
+                doc.setFontSize(11);
+
+                // عمود اليوم
+                doc.text(dayInfo.label, (dayColX1 + dayColX2) / 2, currentY + (rowHeight / 2) + 1.5, { align: 'center' });
+
+                // عمود اسماء المعلمين (قد يكون أكثر من اسم بنفس الخلية)
+                const teachersYStart = currentY + (rowHeight / 2) - ((teacherLines.length - 1) * 5 / 2) + 1.5;
+                doc.text(teacherLines, (teachersColX1 + teachersColX2) / 2, teachersYStart, { align: 'center' });
+
+                // عمود المهمة
+                doc.text(item.task, (taskColX1 + taskColX2) / 2, currentY + (rowHeight / 2) + 1.5, { align: 'center' });
+
+                currentY += rowHeight;
+            });
+        });
+
+        // التذييل (توقيع المدير والوكيل) مرة واحدة فقط في نهاية آخر صفحة
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setPage(pageCount);
+        doc.setFont("Noto");
+        doc.setFontSize(11);
+
+        let signY = currentY + 20;
+        if (signY > 280) {
+            doc.addPage();
+            drawPageBorder();
+            signY = 30;
+        }
+
+        doc.text("مدير المدرسة", 40, signY, { align: 'center' });
+        doc.text((weeklyMainInfo.B3 || ""), 40, signY + 6, { align: 'center' });
+
+        doc.text("وكيل المدرسة", 170, signY, { align: 'center' });
+        doc.text((weeklyMainInfo.B4 || ""), 170, signY + 6, { align: 'center' });
+
+        doc.save("الجدول الأسبوعي للإشراف.pdf");
+    }
+
     document.getElementById('btnFetchReport').addEventListener('click', fetchReportData);
     document.getElementById('btnDownloadPDF').addEventListener('click', generateReportPDF);
+    document.getElementById('btnDownloadWeeklyPDF').addEventListener('click', generateWeeklyReportPDF);
      
         async function loadSchoolName() {
             try {
