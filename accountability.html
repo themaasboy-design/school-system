@@ -104,6 +104,13 @@
         <div class="col-12 col-lg-8">
             <div class="card p-4 shadow-sm border-0 rounded-3">
                 <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">📋 سجل المساءلات المحفوظة</h5>
+
+                <!-- 🔍 حقل البحث بالاسم أو نوع المخالفة -->
+                <div class="mb-3">
+                    <input type="text" id="recordsSearchInput" class="form-control"
+                           placeholder="🔍 ابحث باسم المعلم أو نوع المخالفة...">
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover text-center align-middle">
                         <thead class="table-dark">
@@ -283,7 +290,6 @@
         try {
             const res = await fetch('/api/accountability');
             const result = await res.json();
-            const tbody = document.getElementById('recordsTableBody');
 
             let recordsList = [];
             if (Array.isArray(result)) recordsList = result;
@@ -291,41 +297,69 @@
             else if (result && Array.isArray(result.records)) recordsList = result.records;
 
             accountabilityRecords = recordsList;
-
-            if (recordsList.length > 0) {
-                tbody.innerHTML = "";
-                recordsList.forEach((item, index) => {
-                    const delayVal = item.delay_minutes || item.delay || 0;
-                    const delayText = delayVal > 0 ? `${delayVal} دقيقة` : '-';
-                    const recordId = item._id || item.id || index;
-                    const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
-                    const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
-                    const hijriDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${index + 1}</td>
-                        <td class="fw-bold">${teacherName}</td>
-                        <td><span class="badge bg-danger p-2">${violationType}</span></td>
-                        <td>${delayText}</td>
-                        <td>${hijriDate}</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
-                                🖨️ طباعة
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } else {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد مساءلات مسجلة في قاعدة البيانات</td></tr>`;
-            }
+            renderRecordsTable(accountabilityRecords);
         } catch (e) {
             const tbody = document.getElementById('recordsTableBody');
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-3">خطأ في جلب البيانات من السيرفر</td></tr>`;
             }
         }
+    }
+
+    // 🖥️ عرض قائمة سجلات (كاملة أو مفلترة) داخل الجدول
+    function renderRecordsTable(recordsList) {
+        const tbody = document.getElementById('recordsTableBody');
+        if (!tbody) return;
+
+        if (recordsList.length > 0) {
+            tbody.innerHTML = "";
+            recordsList.forEach((item) => {
+                const delayVal = item.delay_minutes || item.delay || 0;
+                const delayText = delayVal > 0 ? `${delayVal} دقيقة` : '-';
+                // 🔑 نستخدم رقم السجل الأصلي (index الحقيقي بالمصفوفة الكاملة) عشان زر الطباعة يشتغل صح حتى بعد الفلترة
+                const originalIndex = accountabilityRecords.indexOf(item);
+                const recordId = item._id || item.id || originalIndex;
+                const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
+                const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
+                const hijriDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${originalIndex + 1}</td>
+                    <td class="fw-bold">${teacherName}</td>
+                    <td><span class="badge bg-danger p-2">${violationType}</span></td>
+                    <td>${delayText}</td>
+                    <td>${hijriDate}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
+                            🖨️ طباعة
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد نتائج مطابقة للبحث</td></tr>`;
+        }
+    }
+
+    // 🔍 البحث الفوري باسم المعلم أو نوع المخالفة
+    function filterAccountabilityRecords() {
+        const searchInput = document.getElementById('recordsSearchInput');
+        const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+        if (!query) {
+            renderRecordsTable(accountabilityRecords);
+            return;
+        }
+
+        const filtered = accountabilityRecords.filter(item => {
+            const teacherName = (item.teacher_name || item.teacher || item['اسم المعلم'] || '').toString().toLowerCase();
+            const violationType = (item.violation_type || item.violation || item['نوع المساءلة'] || '').toString().toLowerCase();
+            return teacherName.includes(query) || violationType.includes(query);
+        });
+
+        renderRecordsTable(filtered);
     }
 
 // 🖨️ طباعة تقرير المساءلة الكامل (PDF)
@@ -402,7 +436,7 @@
             const lines = doc.splitTextToSize(text, maxW);
             lines.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
-                y +=10; // توسيع التباعد بين الأسطر
+                y += 6.5; // توسيع التباعد بين الأسطر
             });
             y += (gapAfter - 6.5);
         }
@@ -470,7 +504,7 @@
         printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما تؤيد عذركم ،،، ولكم تحياتي", 10, 5);
 
         const managerName = toWesternDigits(mainInfo.B3 || "");
-        printRTLLine(`مدير المدرسة : ${managerName}                        التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
+        printRTLLine(`مدير المدرسة : ${managerName}                                      التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
 
         // ===== 2️⃣ قسم: الإفادة =====
         printSectionTitle("الإفادة");
@@ -490,7 +524,7 @@
         doc.setDrawColor(0, 0, 0);
         y += 2;
 
-        printRTLLine("الاسم :ـــــــــــــــــــــــــــــــــــــــ     التاريخ :   /   /  144هـ   التوقيع : ـــــــــــــــــــــــــــ", 10, 8);
+        printRTLLine("الاسم :ـــــــــــــــــــــــــــــــــــــــ     التاريخ : ــــــــــــــــــــــــــــــــــــــ    التوقيع : ـــــــــــــــــــــــــــــــ", 10, 8);
 
         // ===== 3️⃣ قسم: مدير المدرسة =====
         printSectionTitle("مدير المدرسة");
@@ -506,7 +540,7 @@
         doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 7, y, { align: 'right' });
         y += 7.5;
 
-        printRTLLine(`مدير المدرسة : ${managerName}                         التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
+        printRTLLine(`مدير المدرسة : ${managerName}                                      التاريخ:ــــــــــــــــــــــــــــــــــــ     التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
 
         // ===== 4️⃣ قسم: ملحوظات هامة (في أسفل الورقة) =====
         y = 242; // تثبيت الملحوظات عند الموضع السفلي للورقة
@@ -588,6 +622,11 @@
         loadSchoolName();
         loadTeachers();
         loadAccountabilityRecords();
+
+        const searchInput = document.getElementById('recordsSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', filterAccountabilityRecords);
+        }
 
         $("#hijriPicker").hijriDatePicker({
             hijri: true,
