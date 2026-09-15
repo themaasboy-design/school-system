@@ -245,7 +245,7 @@
         }
     });
 
-    // 3️⃣ جلب قائمة المعلمين (تم التطوير لدعم كافة أشكال الاستجابات)
+    // 3️⃣ جلب قائمة المعلمين
     async function loadTeachers() {
         try {
             const res = await fetch('/get-monitoring-teachers');
@@ -306,7 +306,7 @@
         }
     }
 
-    // 🖥️ عرض قائمة سجلات (كاملة أو مفلترة) داخل الجدول
+    // 🖥️ عرض قائمة سجلات داخل الجدول
     function renderRecordsTable(recordsList) {
         const tbody = document.getElementById('recordsTableBody');
         if (!tbody) return;
@@ -316,7 +316,6 @@
             recordsList.forEach((item) => {
                 const delayVal = item.delay_minutes || item.delay || 0;
                 const delayText = delayVal > 0 ? `${delayVal} دقيقة` : '-';
-                // 🔑 نستخدم رقم السجل الأصلي (index الحقيقي بالمصفوفة الكاملة) عشان زر الطباعة يشتغل صح حتى بعد الفلترة
                 const originalIndex = accountabilityRecords.indexOf(item);
                 const recordId = item._id || item.id || originalIndex;
                 const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
@@ -362,7 +361,7 @@
         renderRecordsTable(filtered);
     }
 
-// 🖨️ طباعة تقرير المساءلة الكامل (PDF)
+    // 🖨️ طباعة تقرير المساءلة الكامل (PDF)
     async function printAccountabilityReport(id) {
         const record = accountabilityRecords.find((r, idx) => (r._id || r.id || idx) == id);
         if (!record) {
@@ -504,7 +503,11 @@
         printRTLLine("عليه نأمل توضيح أسباب ذلك مع إرفاق ما تؤيد عذركم ،،، ولكم تحياتي", 10, 5);
 
         const managerName = toWesternDigits(mainInfo.B3 || "");
-        printRTLLine(`مدير المدرسة : ${managerName}   التاريخ : 1448/  /    التوقيع:ـــــــــــــــــ`, 10, 8);
+        doc.setFontSize(9.5);
+        doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
+        doc.text("التاريخ : 1448 /    /    هـ", 125, y, { align: 'right' });
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        y += 8;
 
         // ===== 2️⃣ قسم: الإفادة =====
         printSectionTitle("الإفادة");
@@ -524,7 +527,11 @@
         doc.setDrawColor(0, 0, 0);
         y += 2;
 
-        printRTLLine("الاسم :ـــــــــــــــــــــــــــــــــــــــ     التاريخ : 1448/  /      التوقيع : ـــــــــــــــــــــــــــــــ", 10, 8);
+        doc.setFontSize(9.5);
+        doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
+        doc.text("التاريخ : 1448 /    /    هـ", 125, y, { align: 'right' });
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        y += 8;
 
         // ===== 3️⃣ قسم: مدير المدرسة =====
         printSectionTitle("مدير المدرسة");
@@ -540,7 +547,11 @@
         doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 7, y, { align: 'right' });
         y += 7.5;
 
-        printRTLLine(`مدير المدرسة : ${managerName}                                      التاريخ : 1448/  /    التوقيع:ـــــــــــــــــــــــــــ`, 10, 8);
+        doc.setFontSize(9.5);
+        doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
+        doc.text("التاريخ : 1448 /    /    هـ", 125, y, { align: 'right' });
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        y += 8;
 
         // ===== 4️⃣ قسم: ملحوظات هامة (في أسفل الورقة) =====
         y = 242; // تثبيت الملحوظات عند الموضع السفلي للورقة
@@ -573,6 +584,7 @@
         const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
         doc.save(`${safeTeacherName}.pdf`);
     }
+
     // 5️⃣ حفظ المساءلة الجديدة
     document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
