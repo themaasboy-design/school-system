@@ -192,7 +192,7 @@
         return (day && month && year) ? { day, month, year } : null;
     }
 
-    // 🗓️ تنسيق التاريخ الهجري مع مراعاة علامات السلاش
+    // 🗓️ تنسيق التاريخ الهجري
     function formatHijriDate(rawDate) {
         const parts = parseHijriParts(rawDate);
         if (parts) return `${parts.day} / ${parts.month} / ${parts.year}`;
@@ -379,7 +379,7 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // ضبط معامل ارتفاع السطر ليكون 1.5
+        // ضبط معامل ارتفاع السطر
         doc.setLineHeightFactor(1.5);
 
         // 🔳 إضافة حدود الصفحة (Border)
@@ -435,7 +435,7 @@
         // دالة مساعدة: طباعة نص RTL مع تباعد أسطر 1.5
         function printRTLLine(text, fontSize = 10, gapAfter = 6) {
             doc.setFontSize(fontSize);
-            const lineHeight = (fontSize * 0.3527) * 1.5; // تباعد 1.5 بين الأسطر
+            const lineHeight = (fontSize * 0.3527) * 1.5;
             const lines = doc.splitTextToSize(text, maxW);
             lines.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
@@ -509,8 +509,7 @@
         const managerName = toWesternDigits(mainInfo.B3 || "");
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        // استخدام \u200F للمحافظة على اتجاه علامات السلاش / وعدم اختفائها
-        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
+        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -534,7 +533,7 @@
 
         doc.setFontSize(9.5);
         doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
-        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
+        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -554,12 +553,12 @@
 
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
+        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
-        // ===== 4️⃣ قسم: ملحوظات هامة (في أسفل الورقة) =====
-        y = 240; // تثبيت الملحوظات عند الموضع السفلي للورقة
+        // ===== 4️⃣ قسم: ملحوظات هامة =====
+        y = 240;
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.line(10, y, 200, y);
@@ -585,7 +584,7 @@
             });
         });
 
-        // ===== حفظ الملف باسم المعلم =====
+        // ===== حفظ الملف =====
         const safeTeacherName = teacherName ? teacherName.toString().trim().replace(/[\\/:*?"<>|]/g, '-') : 'تقرير';
         doc.save(`${safeTeacherName}.pdf`);
     }
