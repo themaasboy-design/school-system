@@ -192,10 +192,10 @@
         return (day && month && year) ? { day, month, year } : null;
     }
 
-    // 🗓️ تنسيق التاريخ الهجري
+    // 🗓️ تنسيق التاريخ الهجري مع مراعاة علامات السلاش
     function formatHijriDate(rawDate) {
         const parts = parseHijriParts(rawDate);
-        if (parts) return `${parts.day}-${parts.month}-${parts.year}`;
+        if (parts) return `${parts.day} / ${parts.month} / ${parts.year}`;
         return rawDate ? toWesternDigits(rawDate).toString().trim() : '';
     }
 
@@ -379,6 +379,9 @@
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
+        // ضبط معامل ارتفاع السطر ليكون 1.5
+        doc.setLineHeightFactor(1.5);
+
         // 🔳 إضافة حدود الصفحة (Border)
         const addBorder = () => {
             doc.setDrawColor(0, 0, 0);
@@ -429,18 +432,19 @@
         const maxW = 180;      // العرض الأقصى للنص قبل اللف
         let y = 38;
 
-        // دالة مساعدة: طباعة نص RTL مع لف تلقائي وتباعد أسطر موسّع
+        // دالة مساعدة: طباعة نص RTL مع تباعد أسطر 1.5
         function printRTLLine(text, fontSize = 10, gapAfter = 6) {
             doc.setFontSize(fontSize);
+            const lineHeight = (fontSize * 0.3527) * 1.5; // تباعد 1.5 بين الأسطر
             const lines = doc.splitTextToSize(text, maxW);
             lines.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
-                y += 6.5; // توسيع التباعد بين الأسطر
+                y += lineHeight;
             });
-            y += (gapAfter - 6.5);
+            y += (gapAfter - lineHeight);
         }
 
-        // دالة مساعدة: طباعة عناوين الأقسام بخلفية رصاصية (رمادية)
+        // دالة مساعدة: طباعة عناوين الأقسام بخلفية رمادية
         function printSectionTitle(titleText) {
             doc.setFillColor(235, 235, 235);
             doc.setDrawColor(0, 0, 0);
@@ -505,9 +509,10 @@
         const managerName = toWesternDigits(mainInfo.B3 || "");
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        doc.text("التاريخ :      /     / 1448هـ", 125, y, { align: 'right' });
+        // استخدام \u200F للمحافظة على اتجاه علامات السلاش / وعدم اختفائها
+        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
-        y += 8;
+        y += 10;
 
         // ===== 2️⃣ قسم: الإفادة =====
         printSectionTitle("الإفادة");
@@ -522,16 +527,16 @@
         doc.setLineWidth(0.3);
         for (let i = 0; i < 3; i++) {
             doc.line(10, y, 200, y);
-            y += 7.5;
+            y += 8;
         }
         doc.setDrawColor(0, 0, 0);
         y += 2;
 
         doc.setFontSize(9.5);
         doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
-        doc.text("التاريخ :      /     / 1448هـ", 125, y, { align: 'right' });
+        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
-        y += 8;
+        y += 10;
 
         // ===== 3️⃣ قسم: مدير المدرسة =====
         printSectionTitle("مدير المدرسة");
@@ -541,20 +546,20 @@
 
         doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
         doc.text("عذر مقبول", RX - 7, y, { align: 'right' });
-        y += 6.5;
+        y += 7.5;
 
         doc.rect(RX - 4, y - 3.5, 3.5, 3.5);
         doc.text("عذر غير مقبول وتحتسب من ضمن دقائق التأخر.", RX - 7, y, { align: 'right' });
-        y += 7.5;
+        y += 8.5;
 
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        doc.text("التاريخ :      /     / 1448هـ", 125, y, { align: 'right' });
+        doc.text("\u200Fالتاريخ :    /    / 1448 هـ", 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
-        y += 8;
+        y += 10;
 
         // ===== 4️⃣ قسم: ملحوظات هامة (في أسفل الورقة) =====
-        y = 242; // تثبيت الملحوظات عند الموضع السفلي للورقة
+        y = 240; // تثبيت الملحوظات عند الموضع السفلي للورقة
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.line(10, y, 200, y);
@@ -562,7 +567,7 @@
 
         doc.setFontSize(10);
         doc.text("ملحوظات هامة :", RX, y, { align: 'right' });
-        y += 5;
+        y += 6;
 
         const notes = [
             "- تستكمل الاستمارة من المدير المباشر وإصدار قرار بموجبه .",
@@ -576,7 +581,7 @@
             const wrapped = doc.splitTextToSize(note, maxW);
             wrapped.forEach(line => {
                 doc.text(line, RX, y, { align: 'right' });
-                y += 4.5;
+                y += 5;
             });
         });
 
