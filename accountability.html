@@ -69,6 +69,7 @@
                             <option value="عدم حضور الطابور الصباحي">عدم حضور الطابور الصباحي</option>
                             <option value="عدم حضور المناوبة الصباحية">عدم حضور المناوبة الصباحية</option>
                             <option value="عدم حضور المناوبة المسائية">عدم حضور المناوبة المسائية</option>
+                            <option value="أخرى">أخرى</option>
                         </select>
                     </div>
 
@@ -91,7 +92,7 @@
 
                     <!-- التفاصيل / الملاحظات -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">تفاصيل أو ملاحظات إضافية:</label>
+                        <label class="form-label fw-bold" id="detailsLabel">تفاصيل أو ملاحظات إضافية:</label>
                         <textarea id="details" class="form-control" rows="3" placeholder="اكتب التفاصيل هنا (اختياري)..."></textarea>
                     </div>
 
@@ -228,13 +229,16 @@
         }
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير + التعامل مع خيار "أخرى"
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
+    const detailsInput = document.getElementById('details');
+    const detailsLabel = document.getElementById('detailsLabel');
 
     violationSelect.addEventListener('change', () => {
         const val = violationSelect.value;
+
         if (val.includes("التأخر")) {
             delayContainer.classList.remove('d-none');
             delayInput.required = true;
@@ -242,6 +246,17 @@
             delayContainer.classList.add('d-none');
             delayInput.required = false;
             delayInput.value = "";
+        }
+
+        // ✍️ عند اختيار "أخرى": حقل التفاصيل يصير إلزامي وهو نفسه اللي يُعرض ويُطبع كـ "نوع المساءلة"
+        if (val === "أخرى") {
+            detailsInput.required = true;
+            detailsLabel.textContent = "اكتب نوع المساءلة / التفاصيل (سيظهر بدل \"أخرى\"):";
+            detailsInput.placeholder = "مثال: مخالفة استخدام الجوال أثناء الحصة";
+        } else {
+            detailsInput.required = false;
+            detailsLabel.textContent = "تفاصيل أو ملاحظات إضافية:";
+            detailsInput.placeholder = "اكتب التفاصيل هنا (اختياري)...";
         }
     });
 
@@ -376,6 +391,10 @@
         const hijriDate = formatHijriDate(hijriDateRaw);
         const dayName = getArabicDayName(hijriDateRaw);
 
+        // السنة الهجرية الفعلية (تُستخرج من تاريخ المساءلة نفسه) لتعبئة الأسطر الفارغة تلقائياً
+        const hijriParts = parseHijriParts(hijriDateRaw);
+        const currentHijriYear = hijriParts ? toWesternDigits(hijriParts.year) : (typeof moment !== 'undefined' ? moment().iYear() : '');
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -444,6 +463,20 @@
             y += (gapAfter - lineHeight);
         }
 
+        // دالة مساعدة: طباعة سطر مكوّن من عدة أجزاء (تسمية + قيمة) كل جزء بموضعه الصحيح يدوياً
+        // بدل خلطها بسطر نصي واحد، لأن jsPDF لا يطبّق خوارزمية اتجاه النص (Bidi) تلقائياً
+        // segments: مصفوفة بترتيب القراءة من اليمين لليسار (أول عنصر = أقصى اليمين)
+        function printRTLSegments(segments, startX, fontSize = 10.5) {
+            doc.setFontSize(fontSize);
+            let x = startX;
+            segments.forEach(seg => {
+                const text = (seg === null || seg === undefined) ? '' : seg.toString();
+                if (!text) return;
+                doc.text(text, x, y, { align: 'right' });
+                x -= doc.getTextWidth(text);
+            });
+        }
+
         // دالة مساعدة: طباعة عناوين الأقسام بخلفية رمادية
         function printSectionTitle(titleText) {
             doc.setFillColor(235, 235, 235);
@@ -498,7 +531,11 @@
         printRTLLine(`المكرم: ${teacherName}`, 10.5, 5);
         printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 5);
 
-        let line3 = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق ${hijriDate} لوحظ عليكم ما يلي ${violationType}`;
+        printRTLLine(`من خلال متابعة سير العمل ليوم : ${dayName}`, 10, 5);
+        printRTLSegments(["الموافق ", hijriDate], RX, 10);
+        y += 5;
+
+        let line3 = `لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
             line3 += ` بإجمالي عدد دقائق ${delayMinutes}`;
         }
@@ -509,7 +546,7 @@
         const managerName = toWesternDigits(mainInfo.B3 || "");
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
+        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -533,7 +570,7 @@
 
         doc.setFontSize(9.5);
         doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
-        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
+        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -553,7 +590,7 @@
 
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        doc.text("التاريخ :    /    / 1448هـ", 125, y, { align: 'right' });
+        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -593,12 +630,21 @@
     document.getElementById('accountabilityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const selectedViolation = document.getElementById('violationType').value;
+        const detailsText = document.getElementById('details').value.trim();
+
+        // ⚠️ لو اختار "أخرى" لازم يكتب التفاصيل، لأنها هي اللي تصير نوع المساءلة المعروض والمطبوع
+        if (selectedViolation === "أخرى" && !detailsText) {
+            Toastify({ text: "يرجى كتابة نوع المساءلة/التفاصيل عند اختيار (أخرى)", style: { background: "#e74c3c" } }).showToast();
+            return;
+        }
+
         const payload = {
             teacher_name: document.getElementById('teacherSelect').value,
-            violation_type: document.getElementById('violationType').value,
+            violation_type: selectedViolation === "أخرى" ? detailsText : selectedViolation,
             delay_minutes: document.getElementById('delayMinutes').value || 0,
             hijri_date: document.getElementById('hijriPicker').value,
-            details: document.getElementById('details').value
+            details: detailsText
         };
 
         try {
@@ -619,6 +665,9 @@
 
                 document.getElementById('accountabilityForm').reset();
                 delayContainer.classList.add('d-none');
+                detailsInput.required = false;
+                detailsLabel.textContent = "تفاصيل أو ملاحظات إضافية:";
+                detailsInput.placeholder = "اكتب التفاصيل هنا (اختياري)...";
                 $('#hijriPicker').val(moment().format('iYYYY/iMM/iDD'));
                 
                 loadAccountabilityRecords();
