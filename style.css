@@ -1,8 +1,8 @@
 /* --- تعريف الخط الأساسي الموحّد للموقع بالكامل (مصدر وحيد لنوع الخط) --- */
 @font-face {
-    font-family: 'IBM Plex Sans Arabic';
-    src: url('IBMPlexSansArabic-Regular.ttf') format('truetype');
-    font-weight: 400;
+    font-family: 'GE Dinkum';
+    src: url('GEDinkum-Bold-1.ttf') format('truetype');
+    font-weight: 700;
     font-style: normal;
     font-display: swap;
 }
@@ -22,7 +22,7 @@
 /* --- الإعدادات العامة --- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { 
-    font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif; 
+    font-family: 'GE Dinkum', Tahoma, sans-serif; 
     background-color: var(--bg-color); 
     color: var(--text-color); 
     direction: rtl; 
@@ -199,7 +199,7 @@ button:active { transform: scale(0.98); }
   border-radius: 16px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif;
+  font-family: 'GE Dinkum', Tahoma, sans-serif;
   direction: rtl;
 }
 
@@ -475,7 +475,7 @@ button:active { transform: scale(0.98); }
   cursor: pointer;
 }
 h1, h2, h3,p, .navbar h2 {
-    font-family: 'IBM Plex Sans Arabic', Tahoma, sans-serif;
+    font-family: 'GE Dinkum', Tahoma, sans-serif;
 }
 
 /* عرض كلمة المرور بلوحة الأدمن (نُقلت من admin.html لتوحيد كل تعريفات الخطوط هنا) */
