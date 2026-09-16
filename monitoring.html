@@ -114,7 +114,7 @@
                  <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
             </div>
         </div>
-                <a href="/login.html" class="logout">تسجيل الخروج</a>
+        <a href="/login.html" class="logout">تسجيل الخروج</a>
     </div>
 </nav>
 
@@ -146,16 +146,16 @@
                 <!-- قائمة المهام -->
                 <div class="mb-3">
                     <label class="form-label fw-bold">2. اختر المهمة المحددة:</label>
-                   <select id="taskSelect" class="form-select" disabled>
-    <option value="">-- اختر المهمة أولاً --</option>
-    <option value="المقصف">المقصف</option>
-    <option value="الساحة">الساحة</option>
-    <option value="المقصف الغربي">المقصف الغربي</option>
-    <option value="المقصف الشرقي">المقصف الشرقي</option>
-    <option value="الساحة الغربية">الساحة الغربية</option>
-    <option value="الساحة الشرقية">الساحة الشرقية</option>
-    <option value="الدور الثاني">الدور الثاني</option>
-</select>
+                    <select id="taskSelect" class="form-select" disabled>
+                        <option value="">-- اختر المهمة أولاً --</option>
+                        <option value="المقصف">المقصف</option>
+                        <option value="الساحة">الساحة</option>
+                        <option value="المقصف الغربي">المقصف الغربي</option>
+                        <option value="المقصف الشرقي">المقصف الشرقي</option>
+                        <option value="الساحة الغربية">الساحة الغربية</option>
+                        <option value="الساحة الشرقية">الساحة الشرقية</option>
+                        <option value="الدور الثاني">الدور الثاني</option>
+                    </select>
                 </div>
 
                 <!-- قائمة المعلمين المتاحين -->
@@ -214,10 +214,27 @@
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
-const tasks = ["المقصف", "الساحة", "المقصف الغربي", "المقصف الشرقي", "الساحة الغربية", "الساحة الشرقية", "الدور الثاني"];    const daysKeys = ["sun", "mon", "tue", "wed", "thu"];
+    const tasks = ["المقصف", "الساحة", "المقصف الغربي", "المقصف الشرقي", "الساحة الغربية", "الساحة الشرقية", "الدور الثاني"];
+    const daysKeys = ["sun", "mon", "tue", "wed", "thu"];
 
     let weeklySchedule = { sun: {}, mon: {}, tue: {}, wed: {}, thu: {} };
     let currentSchoolName = "";
+
+    function ensureScheduleStructure() {
+        if (!weeklySchedule || typeof weeklySchedule !== 'object') {
+            weeklySchedule = {};
+        }
+        daysKeys.forEach(day => {
+            if (!weeklySchedule[day] || typeof weeklySchedule[day] !== 'object') {
+                weeklySchedule[day] = {};
+            }
+            tasks.forEach(task => {
+                if (!Array.isArray(weeklySchedule[day][task])) {
+                    weeklySchedule[day][task] = [];
+                }
+            });
+        });
+    }
 
     function initEmptySchedule() {
         daysKeys.forEach(day => {
@@ -303,6 +320,7 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
             }
         }
 
+        ensureScheduleStructure();
         renderSummaryTable();
         renderTeachersCheckboxes();
     }
@@ -323,24 +341,21 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
 
     taskSelect.addEventListener('change', renderTeachersCheckboxes);
 
-    // التحقق لمنع تكرار المعلم طوال الأسبوع (من الأحد إلى الخميس)
     function isTeacherSelectedElsewhere(teacherName, currentDay, currentTask) {
         const cleanName = teacherName.trim();
         for (let d of daysKeys) {
             for (let t of tasks) {
-                // استثناء الخلية الحالية المقابلة لليوم والمهمة لكي يتمكن المستخدم من إلغاء التحديد إن أراد
                 if (d === currentDay && t === currentTask) continue;
                 
-                const assignedList = weeklySchedule[d][t] || [];
+                const assignedList = (weeklySchedule[d] && weeklySchedule[d][t]) ? weeklySchedule[d][t] : [];
                 if (Array.isArray(assignedList) && assignedList.some(name => String(name).trim() === cleanName)) {
-                    return true; // المعلم مكلف في خيار آخر خلال الأسبوع
+                    return true;
                 }
             }
         }
         return false;
     }
 
-    // حساب المعلمين غير المكلفين بأي مهمة طوال الأسبوع
     function countUnassignedTeachersInWeek() {
         let count = 0;
         allTeachers.forEach(teacher => {
@@ -352,6 +367,7 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
     }
 
     function renderTeachersCheckboxes() {
+        ensureScheduleStructure();
         const day = daySelect.value;
         const task = taskSelect.value;
 
@@ -359,7 +375,6 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
             teachersContainer.innerHTML = `يرجى تحديد اليوم والمهمة لإظهار المعلمين المتاحين...`;
             teachersContainer.classList.add('text-muted', 'text-center');
             
-            // إظهار عدد المتاحين الكلي للأسبوع عند عدم اختيار اليوم/المهمة
             const totalUnassigned = countUnassignedTeachersInWeek();
             document.getElementById('poolCount').textContent = `${totalUnassigned} متاح للأسبوع`;
             return;
@@ -375,7 +390,6 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
             const cleanTeacher = String(teacher).trim();
             if (!cleanTeacher) return;
 
-            // يظهر المعلم فقط إذا لم يتم اختياره في أي مكان آخر خلال الأسبوع
             if (!isTeacherSelectedElsewhere(cleanTeacher, day, task)) {
                 availableCount++;
                 const isChecked = currentAssignedTeachers.includes(cleanTeacher) ? "checked" : "";
@@ -397,7 +411,9 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
 
         document.querySelectorAll('.teacher-checkbox').forEach(chk => {
             chk.addEventListener('change', (e) => {
+                ensureScheduleStructure();
                 const teacherName = e.target.value.trim();
+
                 if (e.target.checked) {
                     if (!weeklySchedule[day][task].includes(teacherName)) {
                         weeklySchedule[day][task].push(teacherName);
@@ -413,18 +429,16 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
         });
     }
 
-    // 🟢 التعديل الجوهري هنا: عرض المهام المحددة فقط
     function renderSummaryTable() {
+        ensureScheduleStructure();
         const tbody = document.getElementById('summaryTableBody');
         tbody.innerHTML = "";
 
         let hasAnyTask = false;
 
         tasks.forEach(task => {
-            // التحقق مما إذا كانت هذه المهمة بها معلم واحد على الأقل في أي يوم من أيام الأسبوع
             const isTaskAssigned = daysKeys.some(day => (weeklySchedule[day][task] || []).length > 0);
 
-            // إذا لم يتم تحديد أي معلم لهذه المهمة طوال الأسبوع، نتخطى عرض الصف
             if (!isTaskAssigned) return;
 
             hasAnyTask = true;
@@ -443,7 +457,6 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
             tbody.innerHTML += rowHtml;
         });
 
-        // إذا لم تكن هناك أي مهمة مسند إليها معلمون عبر الأسبوع، يُعرض رسالة تنبيهية بالجدول
         if (!hasAnyTask) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-muted text-center py-3">لم يتم إسناد أي معلم لأي مهمة بعد</td></tr>`;
         }
@@ -451,6 +464,7 @@ const tasks = ["المقصف", "الساحة", "المقصف الغربي", "ا�
 
     document.getElementById('btnSave').addEventListener('click', async () => {
         try {
+            ensureScheduleStructure();
             let formattedSchedule = {};
             daysKeys.forEach(day => {
                 formattedSchedule[day] = {};
