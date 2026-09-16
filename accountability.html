@@ -121,11 +121,12 @@
                                 <th>نوع المساءلة</th>
                                 <th>مدة التأخير</th>
                                 <th>التاريخ الهجري</th>
+                                <th>الإجراء المتخذ</th>
                                 <th>التقرير</th>
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
-                            <tr><td colspan="6" class="text-muted">جاري تحميل البيانات...</td></tr>
+                            <tr><td colspan="7" class="text-muted">جاري تحميل البيانات...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -196,7 +197,7 @@
     // 🗓️ تنسيق التاريخ الهجري
     function formatHijriDate(rawDate) {
         const parts = parseHijriParts(rawDate);
-        if (parts) return `${parts.day} / ${parts.month} / ${parts.year}`;
+        if (parts) return `${parts.day}/${parts.month}/${parts.year}`;
         return rawDate ? toWesternDigits(rawDate).toString().trim() : '';
     }
 
@@ -316,7 +317,7 @@
         } catch (e) {
             const tbody = document.getElementById('recordsTableBody');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-3">خطأ في جلب البيانات من السيرفر</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-danger py-3">خطأ في جلب البيانات من السيرفر</td></tr>`;
             }
         }
     }
@@ -336,6 +337,7 @@
                 const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
                 const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
                 const hijriDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
+                const currentStatus = item.status || '';
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -345,15 +347,69 @@
                     <td>${delayText}</td>
                     <td>${hijriDate}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
-                            🖨️ طباعة
-                        </button>
+                        <select class="form-select form-select-sm" onchange="updateActionStatus('${recordId}', this.value)">
+                            <option value="بانتظار الرد" ${currentStatus === 'بانتظار الرد' || !currentStatus ? 'selected' : ''}>بانتظار الرد</option>
+                            <option value="مقبول" ${currentStatus === 'مقبول' ? 'selected' : ''}>مقبول</option>
+                            <option value="مرفوض" ${currentStatus === 'مرفوض' ? 'selected' : ''}>مرفوض</option>
+                        </select>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 justify-content-center">
+                            <button class="btn btn-sm btn-outline-primary fw-bold px-3" onclick="printAccountabilityReport('${recordId}')">
+                                🖨️ طباعة
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger fw-bold px-3" onclick="deleteAccountabilityRecord('${recordId}')">
+                                🗑️ حذف
+                            </button>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-3">لا توجد نتائج مطابقة للبحث</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-muted py-3">لا توجد نتائج مطابقة للبحث</td></tr>`;
+        }
+    }
+
+    // 🔄 تحديث الإجراء المتخذ (مقبول / مرفوض) لسجل معين
+    async function updateActionStatus(id, newStatus) {
+        try {
+            const res = await fetch(`/api/accountability/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const result = await res.json();
+
+            if (result.success || res.ok) {
+                Toastify({ text: "تم تحديث الإجراء بنجاح", style: { background: "#2ecc71" } }).showToast();
+                loadAccountabilityRecords();
+            } else {
+                Toastify({ text: result.message || "تعذر تحديث الإجراء", style: { background: "#e74c3c" } }).showToast();
+            }
+        } catch (e) {
+            console.error("خطأ أثناء تحديث الإجراء:", e);
+            Toastify({ text: "تعذر الاتصال بالسيرفر", style: { background: "#e74c3c" } }).showToast();
+        }
+    }
+
+    // 🗑️ حذف سجل مساءلة
+    async function deleteAccountabilityRecord(id) {
+        if (!confirm("هل أنت متأكد من حذف هذه المساءلة؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+
+        try {
+            const res = await fetch(`/api/accountability/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+
+            if (result.success || res.ok) {
+                Toastify({ text: "تم حذف المساءلة بنجاح", style: { background: "#2ecc71" } }).showToast();
+                loadAccountabilityRecords();
+            } else {
+                Toastify({ text: result.message || "تعذر حذف السجل", style: { background: "#e74c3c" } }).showToast();
+            }
+        } catch (e) {
+            console.error("خطأ أثناء حذف السجل:", e);
+            Toastify({ text: "تعذر الاتصال بالسيرفر", style: { background: "#e74c3c" } }).showToast();
         }
     }
 
@@ -535,8 +591,10 @@
         printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 5);
 
         printRTLLine(`من خلال متابعة سير العمل ليوم : ${dayName}`, 10, 5);
-        printRTLSegments(["الموافق ", hijriDate], RX, 10);
-        y += 5;
+        doc.setFont(fontName, 'normal');
+        doc.setFontSize(10);
+        doc.text(`الموافق ${hijriDate}`, RX, y, { align: 'right' });
+        y += 8;
 
         let line3 = `لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
@@ -549,7 +607,7 @@
         const managerName = toWesternDigits(mainInfo.B3 || "");
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
+        doc.text(`التاريخ : ___ /___ /${currentHijriYear} هـ`, 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -573,7 +631,7 @@
 
         doc.setFontSize(9.5);
         doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
-        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
+        doc.text(`التاريخ : ___ /___ /${currentHijriYear} هـ`, 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
@@ -593,7 +651,7 @@
 
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        printRTLSegments(["التاريخ : ", `     /    /${currentHijriYear}`, " هـ"], 125, 9.5);
+        doc.text(`التاريخ : ___ /___ /${currentHijriYear} هـ`, 125, y, { align: 'right' });
         doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
         y += 10;
 
