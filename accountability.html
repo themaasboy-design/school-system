@@ -13,6 +13,21 @@
 
     <style>
         .hijri-datepicker-container, .datepicker { z-index: 99999 !important; }
+        
+        /* ألوان وتنسيق قائمة الإجراء المتخذ */
+        .status-select {
+            cursor: pointer;
+            border: none !important;
+            border-radius: 6px;
+            font-weight: bold !important;
+            text-align: center;
+            transition: all 0.25s ease;
+        }
+        .status-select option {
+            background-color: #ffffff !important;
+            color: #212529 !important;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -146,6 +161,23 @@
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 <script>
+    // 🎨 دالة تحديد لون خلفية الإجراء المتخذ
+    function getStatusStyle(status) {
+        if (status === 'مقبول') {
+            return 'background-color: #198754 !important; color: #ffffff !important;'; // أخضر
+        } else if (status === 'مرفوض') {
+            return 'background-color: #dc3545 !important; color: #ffffff !important;'; // أحمر
+        } else {
+            return 'background-color: #fd7e14 !important; color: #ffffff !important;'; // برتقالي لـ "بانتظار الرد"
+        }
+    }
+
+    // 🔄 تغيير اللون فوراً وتحديث الحالة في الخادم
+    function handleStatusChange(selectElement, recordId) {
+        selectElement.style.cssText = getStatusStyle(selectElement.value);
+        updateActionStatus(recordId, selectElement.value);
+    }
+
     // 🔢 تحويل الأرقام العربية الشرقية (٠-٩) إلى أرقام غربية (0-9)
     function toWesternDigits(str) {
         if (str === null || str === undefined) return '';
@@ -360,7 +392,7 @@
         }
     }
 
-    // 🖥️ عرض السجلات في الجدول
+    // 🖥️ عرض السجلات في الجدول مع تلوين الإجراء المتخذ
     function renderRecordsTable(recordsList) {
         const tbody = document.getElementById('recordsTableBody');
         if (!tbody) return;
@@ -376,7 +408,8 @@
                 const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
                 const rawDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
                 const hijriDate = formatHijriDate(rawDate);
-                const currentStatus = item.status || '';
+                const currentStatus = item.status || 'بانتظار الرد';
+                const statusStyle = getStatusStyle(currentStatus);
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -385,9 +418,11 @@
                     <td><span class="badge bg-danger p-2">${violationType}</span></td>
                     <td>${delayText}</td>
                     <td>${hijriDate}</td>
-                    <td>
-                        <select class="form-select form-select-sm" onchange="updateActionStatus('${recordId}', this.value)">
-                            <option value="بانتظار الرد" ${currentStatus === 'بانتظار الرد' || !currentStatus ? 'selected' : ''}>بانتظار الرد</option>
+                    <td style="width: 140px;">
+                        <select class="form-select form-select-sm status-select" 
+                                style="${statusStyle}" 
+                                onchange="handleStatusChange(this, '${recordId}')">
+                            <option value="بانتظار الرد" ${currentStatus === 'بانتظار الرد' ? 'selected' : ''}>بانتظار الرد</option>
                             <option value="مقبول" ${currentStatus === 'مقبول' ? 'selected' : ''}>مقبول</option>
                             <option value="مرفوض" ${currentStatus === 'مرفوض' ? 'selected' : ''}>مرفوض</option>
                         </select>
@@ -410,7 +445,7 @@
         }
     }
 
-    // 🔄 تحديث الإجراء المتخذ
+    // 🔄 تحديث الإجراء المتخذ في قاعدة البيانات
     async function updateActionStatus(id, newStatus) {
         try {
             const res = await fetch(`/api/accountability/${id}`, {
@@ -422,13 +457,17 @@
 
             if (result.success || res.ok) {
                 Toastify({ text: "تم تحديث الإجراء بنجاح", style: { background: "#2ecc71" } }).showToast();
-                loadAccountabilityRecords();
+                // تحديث القيمة محلياً في الذاكرة لتجنب إعادة التحميل الكامل
+                const rec = accountabilityRecords.find((r, idx) => (r._id || r.id || idx) == id);
+                if (rec) rec.status = newStatus;
             } else {
                 Toastify({ text: result.message || "تعذر تحديث الإجراء", style: { background: "#e74c3c" } }).showToast();
+                loadAccountabilityRecords();
             }
         } catch (e) {
             console.error("خطأ أثناء تحديث الإجراء:", e);
             Toastify({ text: "تعذر الاتصال بالسيرفر", style: { background: "#e74c3c" } }).showToast();
+            loadAccountabilityRecords();
         }
     }
 
@@ -594,7 +633,7 @@
             // 6. طباعة الرقم أولاً على اليمين لضمان عدم انقلابه
             doc.text(year.toString(), startX - 35, targetY, { align: 'right' });
 
-            // 7. طباعة "هـ" على يسار الرقم مباشرة لتظهر دائماً: "1448 هـ" من اليمين لليسار
+            // 7. طباعة "هـ" على يسار الرقم لتظهر: "1448 هـ" من اليمين لليسار
             doc.text("هـ", startX - 44, targetY, { align: 'right' });
         }
 
