@@ -152,8 +152,15 @@
         const reportSubtitleEle = document.getElementById('reportSubtitle');
         if (reportSubtitleEle) reportSubtitleEle.textContent = `المهمة المستهدفة: ${taskText}`;
 
+        // 🔍 الخيارات العامة (المقصف / الساحة) لا تطابق أي مهمة بالضبط حرفياً في قاعدة البيانات
+        // (لأن المهام المسجلة فعلياً دائماً محددة: الغربي أو الشرقي)
+        // لذلك نجيب كل مهام اليوم ونفلترها بالمتصفح لأي مهمة تحتوي على هذه الكلمة
+        const genericTasks = ["المقصف", "الساحة"];
+        const isGenericTask = genericTasks.includes(task);
+        const fetchTask = isGenericTask ? 'all' : task;
+
         try {
-            const response = await fetch(`/get-reportmoni-data?day=${encodeURIComponent(day)}&task=${encodeURIComponent(task)}`);
+            const response = await fetch(`/get-reportmoni-data?day=${encodeURIComponent(day)}&task=${encodeURIComponent(fetchTask)}`);
             const result = await response.json();
 
             const tbody = document.getElementById('reportTableBody');
@@ -164,11 +171,16 @@
                     mainInfo = result.mainInfo; 
                 }
 
-                if (result.data && result.data.length > 0) {
-                    currentReportData = result.data;
+                let dataList = result.data || [];
+                if (isGenericTask) {
+                    dataList = dataList.filter(item => (item.task || '').includes(task));
+                }
+
+                if (dataList.length > 0) {
+                    currentReportData = dataList;
                     document.getElementById('btnDownloadPDF').disabled = false;
 
-                    result.data.forEach(item => {
+                    dataList.forEach(item => {
                         const rawTeachers = item.teachers || '';
                         const teacherHtml = rawTeachers.length > 0
                             ? rawTeachers.split(/،|,/)
