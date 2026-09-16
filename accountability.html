@@ -152,7 +152,53 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تفكيك التاريخ الهجري إلى أجزاء
+    // 🗓️ تنسيق التاريخ ليقرأ من اليمين إلى اليسار (اليوم-الشهر-السنة) كما في rotation_setting
+    function formatHijriDate(rawDate) {
+        if (!rawDate) return '';
+        let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
+        if (!str) return '';
+
+        let day = null, month = null, year = null;
+
+        const parts = str.split(/[\/\-\.\s]+/);
+        if (parts.length === 3) {
+            let p1 = parseInt(parts[0], 10);
+            let p2 = parseInt(parts[1], 10);
+            let p3 = parseInt(parts[2], 10);
+
+            if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
+                if (p1 > 1000) {
+                    year = p1; month = p2; day = p3;
+                } else if (p3 > 1000) {
+                    day = p1; month = p2; year = p3;
+                }
+            }
+        }
+
+        if (!day || !month || !year) {
+            if (typeof moment !== 'undefined') {
+                let m = moment(str, [
+                    'iYYYY/iM/iD', 'iYYYY-iM-iD', 'iYYYY/iMM/iDD', 'iYYYY-iMM-iDD',
+                    'iD/iM/iYYYY', 'iD-iM-iYYYY', 'iDD/iMM/iYYYY', 'iDD-iMM-iDD',
+                    'YYYY-MM-DD', 'YYYY/MM/DD', 'DD/MM/YYYY', 'DD-MM-YYYY'
+                ], true);
+                if (!m.isValid()) m = moment(str);
+                if (m.isValid()) {
+                    day = m.iDate();
+                    month = m.iMonth() + 1;
+                    year = m.iYear();
+                }
+            }
+        }
+
+        if (day && month && year) {
+            return `${day}-${month}-${year}`;
+        }
+
+        return str;
+    }
+
+    // 🗓️ تفكيك التاريخ الهجري لاستخراج السنة
     function parseHijriParts(rawDate) {
         if (!rawDate) return null;
         let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
@@ -192,13 +238,6 @@
         }
 
         return (day && month && year) ? { day, month, year } : null;
-    }
-
-    // 🗓️ تنسيق التاريخ الهجري
-    function formatHijriDate(rawDate) {
-        const parts = parseHijriParts(rawDate);
-        if (parts) return `${parts.day}/${parts.month}/${parts.year}`;
-        return rawDate ? toWesternDigits(rawDate).toString().trim() : '';
     }
 
     // 📆 اسم اليوم بالعربي من تاريخ هجري
@@ -336,7 +375,8 @@
                 const recordId = item._id || item.id || originalIndex;
                 const teacherName = item.teacher_name || item.teacher || item['اسم المعلم'] || '-';
                 const violationType = item.violation_type || item.violation || item['نوع المساءلة'] || '-';
-                const hijriDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
+                const rawDate = item.hijri_date || item.date || item['التاريخ الهجري'] || item['التاريخ'] || '-';
+                const hijriDate = formatHijriDate(rawDate);
                 const currentStatus = item.status || '';
 
                 const tr = document.createElement('tr');
@@ -447,17 +487,16 @@
         const hijriDate = formatHijriDate(hijriDateRaw);
         const dayName = getArabicDayName(hijriDateRaw);
 
-        // السنة الهجرية الفعلية (تُستخرج من تاريخ المساءلة نفسه) لتعبئة الأسطر الفارغة تلقائياً
+        // السنة الهجرية الفعلية
         const hijriParts = parseHijriParts(hijriDateRaw);
         const currentHijriYear = hijriParts ? toWesternDigits(hijriParts.year) : (typeof moment !== 'undefined' ? moment().iYear() : '');
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // ضبط معامل ارتفاع السطر
         doc.setLineHeightFactor(1.5);
 
-        // 🔳 إضافة حدود الصفحة (Border)
+        // 🔳 حدود الصفحة
         const addBorder = () => {
             doc.setDrawColor(0, 0, 0);
             doc.setLineWidth(0.5);
@@ -503,11 +542,10 @@
         doc.text("مدرسة " + toWesternDigits(mainInfo.B2 || ""), 195, 23, { align: 'right' });
         doc.line(10, 32, 200, 32);
 
-        const RX = 195;        // أقصى يمين لمحاذاة النص
-        const maxW = 180;      // العرض الأقصى للنص قبل اللف
+        const RX = 195;
+        const maxW = 180;
         let y = 38;
 
-        // دالة مساعدة: طباعة نص RTL مع تباعد أسطر 1.5
         function printRTLLine(text, fontSize = 10, gapAfter = 6) {
             doc.setFont(fontName, 'normal');
             doc.setFontSize(fontSize);
@@ -520,22 +558,6 @@
             y += (gapAfter - lineHeight);
         }
 
-        // دالة مساعدة: طباعة سطر مكوّن من عدة أجزاء (تسمية + قيمة) كل جزء بموضعه الصحيح يدوياً
-        // بدل خلطها بسطر نصي واحد، لأن jsPDF لا يطبّق خوارزمية اتجاه النص (Bidi) تلقائياً
-        // segments: مصفوفة بترتيب القراءة من اليمين لليسار (أول عنصر = أقصى اليمين)
-        function printRTLSegments(segments, startX, fontSize = 10.5) {
-            doc.setFont(fontName, 'normal');
-            doc.setFontSize(fontSize);
-            let x = startX;
-            segments.forEach(seg => {
-                const text = (seg === null || seg === undefined) ? '' : seg.toString();
-                if (!text) return;
-                doc.text(text, x, y, { align: 'right' });
-                x -= doc.getTextWidth(text);
-            });
-        }
-
-        // دالة مساعدة: طباعة عناوين الأقسام بخلفية رمادية
         function printSectionTitle(titleText) {
             doc.setFillColor(235, 235, 235);
             doc.setDrawColor(0, 0, 0);
@@ -582,7 +604,7 @@
         });
 
         y = doc.lastAutoTable.finalY + 8;
-        doc.setFont(fontName, 'normal'); // 🔒 إعادة تفعيل الخط العربي بعد autoTable (يُرجعه jspdf-autotable للخط الافتراضي تلقائياً)
+        doc.setFont(fontName, 'normal');
 
         // ===== 1️⃣ قسم: طلب إفادة =====
         printSectionTitle("طلب إفادة");
@@ -590,11 +612,9 @@
         printRTLLine(`المكرم: ${teacherName}`, 10.5, 5);
         printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 5);
 
-        printRTLLine(`من خلال متابعة سير العمل ليوم : ${dayName}`, 10, 5);
-        doc.setFont(fontName, 'normal');
-        doc.setFontSize(10);
-        doc.text(`الموافق ${hijriDate}`, RX, y, { align: 'right' });
-        y += 8;
+        // طباعة اليوم والتاريخ الهجري كاملاً بشكل متناسق ومضمون الظهور
+        const fullDateLine = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق : ${hijriDate} هـ`;
+        printRTLLine(fullDateLine, 10, 5);
 
         let line3 = `لوحظ عليكم ما يلي ${violationType}`;
         if (delayMinutes > 0) {
@@ -694,7 +714,6 @@
         const selectedViolation = document.getElementById('violationType').value;
         const detailsText = document.getElementById('details').value.trim();
 
-        // ⚠️ لو اختار "أخرى" لازم يكتب التفاصيل، لأنها هي اللي تصير نوع المساءلة المعروض والمطبوع
         if (selectedViolation === "أخرى" && !detailsText) {
             Toastify({ text: "يرجى كتابة نوع المساءلة/التفاصيل عند اختيار (أخرى)", style: { background: "#e74c3c" } }).showToast();
             return;
