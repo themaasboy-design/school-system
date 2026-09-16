@@ -152,7 +152,7 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ ليقرأ من اليمين إلى اليسار (اليوم-الشهر-السنة)
+    // 🗓️ تنسيق التاريخ الهجري (اليوم-الشهر-السنة)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
         let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
@@ -240,7 +240,7 @@
         return (day && month && year) ? { day, month, year } : null;
     }
 
-    // 📆 اسم اليوم بالعربي من تاريخ هجري
+    // 📆 اسم اليوم بالعربي
     function getArabicDayName(hijriDateStr) {
         const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
         try {
@@ -269,7 +269,7 @@
         }
     }
 
-    // 2️⃣ إظهار / إخفاء حقل مدة التأخير + التعامل مع خيار "أخرى"
+    // 2️⃣ إظهار / إخفاء حقل مدة التأخير
     const violationSelect = document.getElementById('violationType');
     const delayContainer = document.getElementById('delayMinutesContainer');
     const delayInput = document.getElementById('delayMinutes');
@@ -360,7 +360,7 @@
         }
     }
 
-    // 🖥️ عرض قائمة سجلات داخل الجدول
+    // 🖥️ عرض السجلات في الجدول
     function renderRecordsTable(recordsList) {
         const tbody = document.getElementById('recordsTableBody');
         if (!tbody) return;
@@ -568,7 +568,8 @@
             y += 8;
         }
 
-        // 🗓️ دالة هندسية تضمن ظهور التاريخ كاملاً بالشرطات والسلاشات من اليمين إلى اليسار
+        // 🗓️ دالة هندسية تضمن ظهور حقل التاريخ بالكامل من اليمين لليسار:
+        // التاريخ :  ____ / ____ / 1448 هـ
         function printDateSignatureField(startX, targetY, year) {
             doc.setFont(fontName, 'normal');
             doc.setFontSize(9.5);
@@ -578,20 +579,23 @@
             // 1. كلمة "التاريخ :"
             doc.text("التاريخ :", startX, targetY, { align: 'right' });
 
-            // 2. خانة اليوم (شرطة للكتابة اليدوية)
+            // 2. خانة اليوم (شرطة سفلية)
             doc.text("____", startX - 12, targetY, { align: 'right' });
 
-            // 3. السلاش الأول (رسم خط هندسي مائل يضمن ظهوره دائماً)
+            // 3. السلاش الأول (رسم هندسي مائل)
             doc.line(startX - 21.5, targetY + 1, startX - 19.5, targetY - 3.5);
 
-            // 4. خانة الشهر (شرطة للكتابة اليدوية)
+            // 4. خانة الشهر (شرطة سفلية)
             doc.text("____", startX - 23.5, targetY, { align: 'right' });
 
-            // 5. السلاش الثاني (رسم خط هندسي مائل)
+            // 5. السلاش الثاني (رسم هندسي مائل)
             doc.line(startX - 33, targetY + 1, startX - 31, targetY - 3.5);
 
-            // 6. السنة الهجرية وبجانبها هـ
-            doc.text(`${year} هـ`, startX - 35.5, targetY, { align: 'right' });
+            // 6. طباعة الرقم أولاً على اليمين لضمان عدم انقلابه
+            doc.text(year.toString(), startX - 35, targetY, { align: 'right' });
+
+            // 7. طباعة "هـ" على يسار الرقم مباشرة لتظهر دائماً: "1448 هـ" من اليمين لليسار
+            doc.text("هـ", startX - 44, targetY, { align: 'right' });
         }
 
         // ===== عنوان "مسائلة" الرئيسي =====
