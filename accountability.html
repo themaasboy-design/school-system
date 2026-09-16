@@ -453,6 +453,7 @@
 
         // دالة مساعدة: طباعة نص RTL مع تباعد أسطر 1.5
         function printRTLLine(text, fontSize = 10, gapAfter = 6) {
+            doc.setFont(fontName, 'normal');
             doc.setFontSize(fontSize);
             const lineHeight = (fontSize * 0.3527) * 1.5;
             const lines = doc.splitTextToSize(text, maxW);
@@ -467,6 +468,7 @@
         // بدل خلطها بسطر نصي واحد، لأن jsPDF لا يطبّق خوارزمية اتجاه النص (Bidi) تلقائياً
         // segments: مصفوفة بترتيب القراءة من اليمين لليسار (أول عنصر = أقصى اليمين)
         function printRTLSegments(segments, startX, fontSize = 10.5) {
+            doc.setFont(fontName, 'normal');
             doc.setFontSize(fontSize);
             let x = startX;
             segments.forEach(seg => {
@@ -524,6 +526,7 @@
         });
 
         y = doc.lastAutoTable.finalY + 8;
+        doc.setFont(fontName, 'normal'); // 🔒 إعادة تفعيل الخط العربي بعد autoTable (يُرجعه jspdf-autotable للخط الافتراضي تلقائياً)
 
         // ===== 1️⃣ قسم: طلب إفادة =====
         printSectionTitle("طلب إفادة");
