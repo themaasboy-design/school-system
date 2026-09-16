@@ -152,7 +152,7 @@
         return str.toString().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
-    // 🗓️ تنسيق التاريخ الهجري ليُقرأ بسلاسة من اليمين إلى اليسار (اليوم-الشهر-السنة)
+    // 🗓️ تنسيق التاريخ ليقرأ من اليمين إلى اليسار (اليوم-الشهر-السنة)
     function formatHijriDate(rawDate) {
         if (!rawDate) return '';
         let str = toWesternDigits(rawDate).toString().trim().replace(/هـ/g, '').trim();
@@ -288,7 +288,6 @@
             delayInput.value = "";
         }
 
-        // ✍️ عند اختيار "أخرى": حقل التفاصيل يصير إلزامي وهو نفسه اللي يُعرض ويُطبع كـ "نوع المساءلة"
         if (val === "أخرى") {
             detailsInput.required = true;
             detailsLabel.textContent = "اكتب نوع المساءلة / التفاصيل (سيظهر بدل \"أخرى\"):";
@@ -411,7 +410,7 @@
         }
     }
 
-    // 🔄 تحديث الإجراء المتخذ (مقبول / مرفوض) لسجل معين
+    // 🔄 تحديث الإجراء المتخذ
     async function updateActionStatus(id, newStatus) {
         try {
             const res = await fetch(`/api/accountability/${id}`, {
@@ -453,7 +452,7 @@
         }
     }
 
-    // 🔍 البحث الفوري باسم المعلم أو نوع المخالفة
+    // 🔍 البحث الفوري
     function filterAccountabilityRecords() {
         const searchInput = document.getElementById('recordsSearchInput');
         const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -569,15 +568,30 @@
             y += 8;
         }
 
-        // 🗓️ دالة مساعدة لطباعة حقل التاريخ الفارغ المخصص للتوقيع من اليمين إلى اليسار
-        // يظهر بهذا الترتيب: "التاريخ :" ثم فراغ اليوم ثم "/" ثم فراغ الشهر ثم "/" ثم "السنة هـ"
+        // 🗓️ دالة هندسية تضمن ظهور التاريخ كاملاً بالشرطات والسلاشات من اليمين إلى اليسار
         function printDateSignatureField(startX, targetY, year) {
             doc.setFont(fontName, 'normal');
             doc.setFontSize(9.5);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.4);
+
+            // 1. كلمة "التاريخ :"
             doc.text("التاريخ :", startX, targetY, { align: 'right' });
-            doc.text("/", startX - 12, targetY, { align: 'center' });
-            doc.text("/", startX - 23, targetY, { align: 'center' });
-            doc.text(`${year} هـ`, startX - 26, targetY, { align: 'right' });
+
+            // 2. خانة اليوم (شرطة للكتابة اليدوية)
+            doc.text("____", startX - 12, targetY, { align: 'right' });
+
+            // 3. السلاش الأول (رسم خط هندسي مائل يضمن ظهوره دائماً)
+            doc.line(startX - 21.5, targetY + 1, startX - 19.5, targetY - 3.5);
+
+            // 4. خانة الشهر (شرطة للكتابة اليدوية)
+            doc.text("____", startX - 23.5, targetY, { align: 'right' });
+
+            // 5. السلاش الثاني (رسم خط هندسي مائل)
+            doc.line(startX - 33, targetY + 1, startX - 31, targetY - 3.5);
+
+            // 6. السنة الهجرية وبجانبها هـ
+            doc.text(`${year} هـ`, startX - 35.5, targetY, { align: 'right' });
         }
 
         // ===== عنوان "مسائلة" الرئيسي =====
@@ -623,7 +637,6 @@
         printRTLLine(`المكرم: ${teacherName}`, 10.5, 5);
         printRTLLine("السلام عليكم ورحمة الله وبركاته      وبعد", 10, 5);
 
-        // طباعة اليوم والتاريخ الهجري كاملاً بشكل متناسق ومضمون الظهور
         const fullDateLine = `من خلال متابعة سير العمل ليوم : ${dayName} الموافق : ${hijriDate} هـ`;
         printRTLLine(fullDateLine, 10, 5);
 
@@ -638,8 +651,8 @@
         const managerName = toWesternDigits(mainInfo.B3 || "");
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        printDateSignatureField(130, y, currentHijriYear);
-        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        printDateSignatureField(135, y, currentHijriYear);
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 60, y, { align: 'right' });
         y += 10;
 
         // ===== 2️⃣ قسم: الإفادة =====
@@ -662,8 +675,8 @@
 
         doc.setFontSize(9.5);
         doc.text("الاسم : ــــــــــــــــــــــــــــــــــــــــ", 195, y, { align: 'right' });
-        printDateSignatureField(130, y, currentHijriYear);
-        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        printDateSignatureField(135, y, currentHijriYear);
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 60, y, { align: 'right' });
         y += 10;
 
         // ===== 3️⃣ قسم: مدير المدرسة =====
@@ -682,8 +695,8 @@
 
         doc.setFontSize(9.5);
         doc.text(`مدير المدرسة : ${managerName}`, 195, y, { align: 'right' });
-        printDateSignatureField(130, y, currentHijriYear);
-        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 65, y, { align: 'right' });
+        printDateSignatureField(135, y, currentHijriYear);
+        doc.text("التوقيع : ــــــــــــــــــــــــــــ", 60, y, { align: 'right' });
         y += 10;
 
         // ===== 4️⃣ قسم: ملحوظات هامة =====
