@@ -164,19 +164,22 @@
                     mainInfo = result.mainInfo; 
                 }
 
-                if (result.data.length > 0) {
+                if (result.data && result.data.length > 0) {
                     currentReportData = result.data;
                     document.getElementById('btnDownloadPDF').disabled = false;
 
                     result.data.forEach(item => {
-                        const teacherHtml = item.teachers.split(/،|,/)
-                            .map(name => `<div class="text-dark fs-5 fw-medium my-2">${name.trim()}</div>`)
-                            .join('');
+                        const rawTeachers = item.teachers || '';
+                        const teacherHtml = rawTeachers.length > 0
+                            ? rawTeachers.split(/،|,/)
+                                .map(name => `<div class="text-dark fs-5 fw-medium my-2">${name.trim()}</div>`)
+                                .join('')
+                            : '<div class="text-muted fs-6">لا يوجد معلمين مسجلين</div>';
 
                         const row = `
                             <tr>
                                 <td class="bg-white p-2 align-middle">${teacherHtml}</td>
-                                <td class="fw-bold text-center bg-light fs-5 text-secondary align-middle">${item.task}</td>
+                                <td class="fw-bold text-center bg-light fs-5 text-secondary align-middle">${item.task || 'غير محدد'}</td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
@@ -249,7 +252,10 @@
                 doc.setDrawColor(180, 180, 180);
                 doc.setLineWidth(0.3);
                 
-                const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
+                const rawTeachers = item.teachers || '';
+                const teacherLines = rawTeachers.length > 0 
+                    ? rawTeachers.split(/،|,/).map(name => name.trim())
+                    : ['—'];
                 const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
                 
                 doc.rect(15, currentY, 180, rowHeight);
@@ -261,7 +267,7 @@
                 doc.text(teacherLines, 155, teachersYStart, { align: 'center' });
 
                 const taskY = currentY + (rowHeight / 2) + 1.5;
-                doc.text(item.task, 65, taskY, { align: 'center' });
+                doc.text(item.task || '', 65, taskY, { align: 'center' });
                 
                 currentY += rowHeight;
             });
@@ -405,7 +411,10 @@
 
         daysWithData.forEach(dayInfo => {
             dayInfo.data.forEach(item => {
-                const teacherLines = item.teachers.split(/،|,/).map(name => name.trim());
+                const rawTeachers = item.teachers || '';
+                const teacherLines = rawTeachers.length > 0 
+                    ? rawTeachers.split(/،|,/).map(name => name.trim())
+                    : ['—'];
                 const rowHeight = Math.max(14, teacherLines.length * 6 + 4);
 
                 if (currentY + rowHeight > 260) {
@@ -427,7 +436,7 @@
                 const teachersYStart = currentY + (rowHeight / 2) - ((teacherLines.length - 1) * 5 / 2) + 1.5;
                 doc.text(teacherLines, (teachersColX1 + teachersColX2) / 2, teachersYStart, { align: 'center' });
 
-                doc.text(item.task, (taskColX1 + taskColX2) / 2, currentY + (rowHeight / 2) + 1.5, { align: 'center' });
+                doc.text(item.task || '', (taskColX1 + taskColX2) / 2, currentY + (rowHeight / 2) + 1.5, { align: 'center' });
 
                 currentY += rowHeight;
             });
