@@ -314,6 +314,17 @@
             return cleaned;
         }
 
+        // تطبيع الاسم لمطابقة دقيقة بين اسم البديل في التقرير واسمه في ورقة المعلمين
+        function normName(name) {
+            return (name || '').toString()
+                .replace(/[\u064B-\u0652\u0640]/g, '')
+                .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+                .replace(/\s+/g, ' ').trim();
+        }
+        function getTeacherPhone(name) {
+            return teachersPhoneMap[normName(name)] || '';
+        }
+
         async function generateReport() {
             const selectedDay = document.getElementById('reportDay').value;
             const dateInput = document.getElementById('hijriDate') || document.getElementById('reportDate');
@@ -330,15 +341,22 @@
                 const res = await fetch('/get-report-data');
                 const data = await res.json();
                 
+                // 📱 أرقام المعلمين من ورقة المعلمين بملف الإكسل: الاسم بالعمود B والجوال بالعمود C
                 teachersPhoneMap = {};
-                if (data.teacherList && Array.isArray(data.teacherList)) {
-                    data.teacherList.forEach(t => {
-                        const name = t['اسم المعلم'] || t[0] || t[1];
-                        const phone = t['رقم الجوال'] || t['الجوال'] || t[2];
-                        if (name && phone) {
-                            teachersPhoneMap[name.trim()] = formatPhoneToInternational(phone);
-                        }
-                    });
+                try {
+                    const tRes = await fetch('/api/teachers-raw');
+                    const tRows = await tRes.json();
+                    if (Array.isArray(tRows)) {
+                        tRows.forEach(row => {
+                            const name = row && row[1];
+                            const phone = row && row[2];
+                            if (name && phone) {
+                                teachersPhoneMap[normName(name)] = formatPhoneToInternational(phone);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('تعذر جلب أرقام المعلمين:', e);
                 }
 
                 const filteredData = (data.teachers || []).filter(item => {
@@ -374,11 +392,6 @@
                     for (let i = 0; i < 7; i++) {
                         const className  = vals[classCols[i]] || '---';
                         const subTeacher = vals[subCols[i]] || '---';
-
-                        const rowPhone = row['الجوال'] || row['رقم الجوال'] || vals[17] || '';
-                        if (subTeacher !== '---' && rowPhone) {
-                            teachersPhoneMap[subTeacher.trim()] = formatPhoneToInternational(rowPhone);
-                        }
 
                         if (className !== '---' || subTeacher !== '---') {
                             rowsHtml += `
@@ -656,7 +669,7 @@
 
             subNames.forEach((subName) => {
                 const tasks = substituteMap[subName];
-                const phone = teachersPhoneMap[subName] || '';
+                const phone = getTeacherPhone(subName);
 
                 let msg = `السلام عليكم ورحمة الله وبركاته\n`;
                 msg += `أخي المعلم المكرم: *${subName}*\n`;
