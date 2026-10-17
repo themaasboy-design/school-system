@@ -220,6 +220,7 @@
                 <div class="dropdown-menu">
                     <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>                   
                     <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                    <a href="whats_setting.html"> ربط واتساب المدرسة </a>
                 </div>
             </div>
             <a href="/login.html" class="logout">تسجيل الخروج</a>
@@ -280,6 +281,7 @@
                 <i class="fas fa-paper-plane"></i> إرسال التكليفات للجميع تلقائياً (في الخلفية)
             </button>
 
+            <div id="waStatusBanner" style="display:none;"></div>
             <div id="whatsappList"></div>
             <div style="text-align: left; margin-top: 20px;">
                 <button type="button" onclick="closeWhatsAppModal()" style="background-color: #6c757d; padding: 8px 20px; border:none; color:white; border-radius:6px; cursor:pointer;">إغلاق</button>
@@ -667,9 +669,6 @@
                 msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
 
                 const encodedMsg = encodeURIComponent(msg);
-                const waUrl = phone 
-                    ? `https://wa.me/${phone}?text=${encodedMsg}` 
-                    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
 
                 listContainer.innerHTML += `
                     <div class="wa-teacher-item">
@@ -679,21 +678,48 @@
                             ${phone ? `<br><span class="phone-badge">📱 +${phone}</span>` : `<br><span style="color:#e74c3c; font-size:0.75rem;">لم يتم العثور على الرقم</span>`}
                         </div>
                         <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                            <button class="btn-auto-send" onclick="sendSingleAuto('${phone}', '${encodedMsg}', this)">
-                                <i class="fas fa-paper-plane"></i> إرسال تلقائي
+                            <button class="btn-auto-send" data-phone="${phone}" data-msg="${encodedMsg}" onclick="sendSingleAuto('${phone}', '${encodedMsg}', this)">
+                                <i class="fas fa-paper-plane"></i> إرسال عبر واتساب المدرسة
                             </button>
                             <button class="btn-wa-copy" onclick="copyTextMessage('${encodedMsg}')">
                                 <i class="fas fa-copy"></i> نسخ
                             </button>
-                            <a href="${waUrl}" target="_blank" class="btn-wa-send">
-                                <i class="fab fa-whatsapp"></i> واتساب Web
-                            </a>
                         </div>
                     </div>
                 `;
             });
 
             document.getElementById('whatsappModal').style.display = 'flex';
+            checkWaStatus();
+        }
+
+        // 🔌 فحص ربط رقم واتساب المدرسة وتعطيل أزرار الإرسال إن لم يكن متصلاً
+        async function checkWaStatus() {
+            const banner = document.getElementById('waStatusBanner');
+            const setDisabled = (off) => {
+                document.querySelectorAll('.btn-auto-send, #btnSendAllAuto').forEach(b => { b.disabled = off; b.style.opacity = off ? '0.5' : '1'; });
+            };
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                const st = await res.json();
+                if (st.success && st.state === 'connected') {
+                    banner.style.cssText = 'display:block; background:#e8f8ef; color:#166534; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.85rem;';
+                    banner.innerHTML = `<i class="fas fa-circle-check"></i> رقم المدرسة المرتبط: <strong dir="ltr">+${st.phone || ''}</strong>`;
+                    setDisabled(false);
+                } else if (st.success && st.linked) {
+                    banner.style.cssText = 'display:block; background:#fff7e6; color:#92400e; border:1px solid #fde68a; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.85rem;';
+                    banner.innerHTML = `<i class="fas fa-spinner fa-spin"></i> جاري إعادة الاتصال برقم المدرسة...`;
+                    setDisabled(true);
+                    setTimeout(checkWaStatus, 3000);
+                } else {
+                    banner.style.cssText = 'display:block; background:#fdecea; color:#991b1b; border:1px solid #fecaca; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.85rem;';
+                    banner.innerHTML = `<i class="fas fa-triangle-exclamation"></i> لم يتم ربط رقم واتساب للمدرسة بعد. <a href="whats_setting.html" style="color:#991b1b; font-weight:bold;">اربط الرقم الآن</a>`;
+                    setDisabled(true);
+                }
+            } catch (e) {
+                banner.style.cssText = 'display:block; background:#fdecea; color:#991b1b; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.85rem;';
+                banner.innerHTML = 'تعذر التحقق من حالة واتساب';
+            }
         }
 
         // إرسال فردي في الخلفية للسيرفر
@@ -744,9 +770,9 @@
 
             for (let btn of autoButtons) {
                 if (!btn.disabled) {
-                    await btn.click();
-                    // تأخير ثانية ونصف بين كل رسالة لحماية السيرفر وتجنب الحظر
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await sendSingleAuto(btn.dataset.phone, btn.dataset.msg, btn);
+                    // فاصل عشوائي (2.5 - 4.5 ثانية) بين الرسائل لتقليل خطر تقييد الرقم
+                    await new Promise(resolve => setTimeout(resolve, 2500 + Math.random() * 2000));
                 }
             }
 
@@ -840,6 +866,7 @@
                     currentY = 15;
                 }
 
+                
                 doc.setFontSize(10.5);
                 doc.text(`إخواني المعلمين نظرًا لغياب المعلم: ${teacherName} لهذا اليوم ${day} الموافق ${date} هـ`, 195, currentY, { align: 'right' });
                 doc.text("آمل تسديد مكانه في الحصص ، ولكم جزيل الشكر", 195, currentY + 6, { align: 'right' });

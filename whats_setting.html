@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ربط واتساب المدرسة</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <style>
+        .wa-status { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 600; }
+        .wa-status.connected { background: #e8f8ef; color: #166534; border: 1px solid #bbf7d0; }
+        .wa-status.waiting   { background: #fff7e6; color: #92400e; border: 1px solid #fde68a; }
+        .wa-status.off       { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+        .wa-status i { font-size: 1.4rem; }
+        .qr-box { text-align: center; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; margin-bottom: 20px; }
+        .qr-box img { width: 280px; max-width: 100%; height: auto; background: #fff; padding: 8px; border-radius: 8px; }
+        .wa-steps { margin: 0 0 20px; padding-right: 22px; line-height: 2; color: #34495e; }
+        .wa-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .wa-actions button { margin-top: 0; font-size: 15px; padding: 10px 18px !important; }
+        .btn-wa-connect { background-color: #25D366; }
+        .btn-wa-connect:hover { background-color: #1ebe5b; }
+        .btn-wa-logout { background-color: #e74c3c; }
+        .btn-wa-logout:hover { background-color: #c0392b; }
+        .wa-note { font-size: 0.85rem; color: #7f8c8d; line-height: 1.8; border-top: 1px solid #eee; margin-top: 22px; padding-top: 14px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h2 id="schoolName">المدرسة </h2>
+        <img src="logo.png" alt="شعار الوزارة" class="navbar-logo">
+
+        <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <div class="navbar-links" id="navbarLinks">
+            <a href="index.html">الرئيسية</a>
+            <a href="dashboard.html#">الانتظار</a>
+            <a href="/monitoring">الإشراف</a>
+
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger">التقارير</a>
+                <div class="dropdown-menu">
+                    <a href="report.html">تقرير الغياب</a>
+                    <a href="reportmoni.html">تقرير الإشراف</a>
+                </div>
+            </div>
+            <div class="dropdown-container">
+                <a href="#" class="dropdown-trigger" style="color: white; padding-bottom: 5px; display: inline-block;">إعدادات</a>
+                <div class="dropdown-menu">
+                    <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>
+                    <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                    <a href="whats_setting.html"> ربط واتساب المدرسة </a>
+                </div>
+            </div>
+            <a href="/login.html" class="logout">تسجيل الخروج</a>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="card">
+            <h3><i class="fab fa-whatsapp" style="color:#25D366;"></i> ربط واتساب المدرسة</h3>
+
+            <div id="statusBox" class="wa-status off">
+                <i class="fas fa-circle-notch fa-spin"></i>
+                <span>جاري التحقق من حالة الربط...</span>
+            </div>
+
+            <div id="qrSection" style="display:none;">
+                <div class="qr-box">
+                    <img id="qrImage" alt="باركود الربط">
+                </div>
+                <ol class="wa-steps">
+                    <li>افتح تطبيق <strong>واتساب</strong> على جوال المدرسة.</li>
+                    <li>اضغط على <strong>الإعدادات</strong> ثم <strong>الأجهزة المرتبطة</strong>.</li>
+                    <li>اختر <strong>ربط جهاز</strong> ثم وجّه الكاميرا إلى الباركود أعلاه.</li>
+                </ol>
+            </div>
+
+            <div class="wa-actions">
+                <button type="button" id="btnConnect" class="btn-wa-connect" style="display:none;" onclick="startLink()">
+                    <i class="fab fa-whatsapp"></i> ربط رقم واتساب
+                </button>
+                <button type="button" id="btnLogout" class="btn-wa-logout" style="display:none;" onclick="unlinkNumber()">
+                    <i class="fas fa-link-slash"></i> فصل الرقم
+                </button>
+            </div>
+
+            <div class="wa-note">
+                <i class="fas fa-circle-info"></i>
+                الربط دائم ويُحفظ للمدرسة، ولا تحتاج لمسح الباركود مرة أخرى ما دام الجهاز مرتبطاً.
+                تُرسل رسائل التكليف للمعلمين من رقم المدرسة مباشرة من صفحة تقرير الغياب دون فتح تطبيق واتساب.
+                يُنصح باستخدام رقم مخصص للمدرسة، وبإبقاء الجوال متصلاً بالإنترنت (مرة واحدة على الأقل كل أسبوعين)
+                حتى لا يفصل واتساب الجهاز المرتبط تلقائياً.
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let pollTimer = null;
+
+        function notify(message, type = 'success') {
+            Toastify({
+                text: message, duration: 3500, gravity: "top", position: "right",
+                style: { background: type === 'success' ? "linear-gradient(to left, #2ecc71, #27ae60)" : "linear-gradient(to left, #e74c3c, #c0392b)", borderRadius: "8px", direction: "rtl" }
+            }).showToast();
+        }
+
+        function setStatus(cls, icon, html) {
+            const box = document.getElementById('statusBox');
+            box.className = 'wa-status ' + cls;
+            box.innerHTML = `<i class="${icon}"></i><span>${html}</span>`;
+        }
+
+        function render(st) {
+            const qrSection = document.getElementById('qrSection');
+            const btnConnect = document.getElementById('btnConnect');
+            const btnLogout = document.getElementById('btnLogout');
+            qrSection.style.display = 'none';
+            btnConnect.style.display = 'none';
+            btnLogout.style.display = 'none';
+
+            if (st.state === 'connected') {
+                setStatus('connected', 'fas fa-circle-check', `متصل — الرقم المرتبط: <span dir="ltr">+${st.phone || ''}</span>`);
+                btnLogout.style.display = 'inline-block';
+            } else if (st.state === 'qr' && st.qr) {
+                setStatus('waiting', 'fas fa-qrcode', 'امسح الباركود من تطبيق واتساب لإكمال الربط');
+                document.getElementById('qrImage').src = st.qr;
+                qrSection.style.display = 'block';
+            } else if (st.state === 'connecting' || st.linked) {
+                setStatus('waiting', 'fas fa-circle-notch fa-spin', 'جاري الاتصال بواتساب...');
+                if (st.linked) btnLogout.style.display = 'inline-block';
+            } else {
+                setStatus('off', 'fas fa-link-slash', st.error ? `غير مرتبط — ${st.error}` : 'لا يوجد رقم واتساب مرتبط بالمدرسة');
+                btnConnect.style.display = 'inline-block';
+            }
+        }
+
+        async function refresh() {
+            clearTimeout(pollTimer);
+            let delay = 3000;
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+                const st = await res.json();
+                render(st);
+                if (st.state === 'connected') delay = 20000;
+                else if (st.state === 'disconnected' && !st.linked) delay = 0;   // لا حاجة للمتابعة حتى يضغط المستخدم ربط
+            } catch (e) {
+                setStatus('off', 'fas fa-triangle-exclamation', 'تعذر الاتصال بالسيرفر');
+            }
+            if (delay) pollTimer = setTimeout(refresh, delay);
+        }
+
+        async function startLink() {
+            const btn = document.getElementById('btnConnect');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+                const r = await res.json();
+                if (!r.success) throw new Error(r.error || 'تعذر بدء الربط');
+                setStatus('waiting', 'fas fa-circle-notch fa-spin', 'جاري تجهيز الباركود...');
+                refresh();
+            } catch (e) {
+                notify('❌ ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function unlinkNumber() {
+            if (!confirm('هل تريد فصل رقم واتساب عن المدرسة؟ ستحتاج لمسح الباركود من جديد للربط مرة أخرى.')) return;
+            try {
+                const res = await fetch('/api/whatsapp/logout', { method: 'POST' });
+                const r = await res.json();
+                if (!r.success) throw new Error(r.error || 'تعذر فصل الرقم');
+                notify('تم فصل الرقم بنجاح');
+                refresh();
+            } catch (e) {
+                notify('❌ ' + e.message, 'error');
+            }
+        }
+
+        async function loadSchoolName() {
+            try {
+                const response = await fetch('/get-report-data');
+                const data = await response.json();
+                if (data.mainInfo && data.mainInfo.B2) {
+                    document.getElementById('schoolName').textContent = "مدرسة " + data.mainInfo.B2;
+                }
+            } catch (e) { console.error("خطأ في جلب اسم المدرسة:", e); }
+        }
+
+        $(document).ready(function () {
+            $("#menuToggle").on("click", function () { $("#navbarLinks").toggleClass("active"); });
+            loadSchoolName();
+            refresh();
+        });
+    </script>
+</body>
+</html>

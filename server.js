@@ -95,6 +95,16 @@ async function initDb() {
       );
     `);
     
+    // 💬 جدول حفظ جلسات واتساب (ربط دائم لكل مدرسة)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS wa_auth (
+        username VARCHAR(255) NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        PRIMARY KEY (username, key)
+      );
+    `);
+
     client.release();
     console.log("✅ تم الاتصال بقاعدة بيانات PostgreSQL وبناء الجداول وتأمين التخزين الدائم بنجاح!");
   } catch (err) {
@@ -1232,6 +1242,254 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
     res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);
   }
 });
+
+// =========================================================================
+// 💬 واتساب: رقم خاص لكل مدرسة (ربط دائم بالباركود) وإرسال الرسائل مباشرة
+// المكتبة: @whiskeysockets/baileys (اتصال WebSocket خفيف بدون متصفح)
+// تُحفظ جلسة كل مدرسة بقاعدة PostgreSQL فلا تضيع عند إعادة تشغيل السيرفر
+// =========================================================================
+const QRCode = require('qrcode');
+const pino = require('pino');
+
+let _waLib = null;
+async function waLib() {
+  if (_waLib) return _waLib;
+  const mod = await import('@whiskeysockets/baileys');
+  const pick = (k) => mod[k] ?? (mod.default ? mod.default[k] : undefined);
+  _waLib = {
+    makeWASocket: pick('makeWASocket') || (typeof mod.default === 'function' ? mod.default : (mod.default && mod.default.default)),
+    DisconnectReason: pick('DisconnectReason'),
+    initAuthCreds: pick('initAuthCreds'),
+    BufferJSON: pick('BufferJSON'),
+    proto: pick('proto'),
+    fetchLatestBaileysVersion: pick('fetchLatestBaileysVersion'),
+    makeCacheableSignalKeyStore: pick('makeCacheableSignalKeyStore')
+  };
+  return _waLib;
+}
+
+// 🔐 تخزين مفاتيح الجلسة في PostgreSQL بدل الملفات
+async function waAuthState(username) {
+  const { initAuthCreds, BufferJSON, proto } = await waLib();
+  const read = async (k) => {
+    const r = await pool.query('SELECT value FROM wa_auth WHERE username = $1 AND key = $2', [username, k]);
+    return r.rows[0] ? JSON.parse(r.rows[0].value, BufferJSON.reviver) : null;
+  };
+  const write = (k, v) => pool.query(
+    `INSERT INTO wa_auth (username, key, value) VALUES ($1, $2, $3)
+     ON CONFLICT (username, key) DO UPDATE SET value = EXCLUDED.value`,
+    [username, k, JSON.stringify(v, BufferJSON.replacer)]
+  );
+  const del = (k) => pool.query('DELETE FROM wa_auth WHERE username = $1 AND key = $2', [username, k]);
+
+  const creds = (await read('creds')) || initAuthCreds();
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type, ids) => {
+          const out = {};
+          await Promise.all(ids.map(async (id) => {
+            let v = await read(`${type}-${id}`);
+            if (type === 'app-state-sync-key' && v) v = proto.Message.AppStateSyncKeyData.fromObject(v);
+            out[id] = v;
+          }));
+          return out;
+        },
+        set: async (data) => {
+          const jobs = [];
+          for (const type in data) {
+            for (const id in data[type]) {
+              const v = data[type][id];
+              jobs.push(v ? write(`${type}-${id}`, v) : del(`${type}-${id}`));
+            }
+          }
+          await Promise.all(jobs);
+        }
+      }
+    },
+    saveCreds: () => write('creds', creds)
+  };
+}
+
+const waWipe = (username) => pool.query('DELETE FROM wa_auth WHERE username = $1', [username]);
+
+async function waIsLinked(username) {
+  const r = await pool.query("SELECT value FROM wa_auth WHERE username = $1 AND key = 'creds'", [username]);
+  if (!r.rows[0]) return false;
+  try { return !!JSON.parse(r.rows[0].value).me; } catch (e) { return false; }
+}
+
+// حالة كل مدرسة بالذاكرة: disconnected | connecting | qr | connected
+const waSessions = new Map();
+function waGet(u) {
+  if (!waSessions.has(u)) {
+    waSessions.set(u, { state: 'disconnected', qr: null, phone: '', sock: null, starting: false, wasOpen: false, keepAlive: true, lastUsed: 0, error: null });
+  }
+  return waSessions.get(u);
+}
+
+async function waStart(username) {
+  const s = waGet(username);
+  if (s.sock || s.starting) return s;
+  s.starting = true; s.state = 'connecting'; s.qr = null; s.keepAlive = true;
+  try {
+    const lib = await waLib();
+    const { state, saveCreds } = await waAuthState(username);
+    const logger = pino({ level: 'silent' });
+    let version;
+    try { version = (await lib.fetchLatestBaileysVersion()).version; } catch (e) { /* نستخدم الافتراضي */ }
+    const keys = lib.makeCacheableSignalKeyStore ? lib.makeCacheableSignalKeyStore(state.keys, logger) : state.keys;
+
+    const sock = lib.makeWASocket({
+      version, logger,
+      auth: { creds: state.creds, keys },
+      printQRInTerminal: false,
+      browser: ['Wakeel', 'Chrome', '1.0.0'],
+      markOnlineOnConnect: false,
+      syncFullHistory: false
+    });
+    s.sock = sock;
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', async (u) => {
+      if (s.sock !== sock) return;
+      const { connection, lastDisconnect, qr } = u;
+      if (qr) {
+        try { s.qr = await QRCode.toDataURL(qr, { margin: 1, width: 280 }); s.state = 'qr'; } catch (e) {}
+      }
+      if (connection === 'open') {
+        s.state = 'connected'; s.qr = null; s.wasOpen = true; s.error = null; s.lastUsed = Date.now();
+        s.phone = ((sock.user && sock.user.id) || '').split(':')[0].split('@')[0];
+      }
+      if (connection === 'close') {
+        const code = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode;
+        s.sock = null; s.qr = null;
+        if (code === lib.DisconnectReason.loggedOut) {
+          await waWipe(username);              // فُصل الربط من الجوال
+          s.state = 'disconnected'; s.phone = ''; s.wasOpen = false;
+        } else if (code === lib.DisconnectReason.restartRequired || (s.wasOpen && s.keepAlive)) {
+          s.state = 'connecting';              // يحدث مباشرة بعد مسح الباركود
+          setTimeout(() => waStart(username).catch(() => {}), 1500);
+        } else {
+          s.state = 'disconnected';
+        }
+      }
+    });
+  } catch (e) {
+    console.error('❌ فشل تشغيل واتساب:', e.message);
+    s.sock = null; s.state = 'disconnected'; s.error = e.message;
+  } finally {
+    s.starting = false;
+  }
+  return s;
+}
+
+async function waEnsure(username) {
+  if (!(await waIsLinked(username))) {
+    throw new Error('لم يتم ربط رقم واتساب للمدرسة. اربط الرقم أولاً من صفحة إعداد الواتساب.');
+  }
+  const s = waGet(username);
+  if (s.state !== 'connected') {
+    await waStart(username);
+    const t0 = Date.now();
+    while (s.state !== 'connected' && Date.now() - t0 < 25000) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (s.state !== 'connected') throw new Error('تعذر الاتصال بواتساب حالياً، حاول بعد قليل.');
+  }
+  s.lastUsed = Date.now();
+  return s;
+}
+
+function waNormalizePhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.startsWith('0') && d.length === 10) d = '966' + d.slice(1);   // 05xxxxxxxx
+  else if (d.length === 9 && d.startsWith('5')) d = '966' + d;        // 5xxxxxxxx
+  return d.length >= 10 && d.length <= 15 ? d : '';
+}
+
+const waAuth = (req, res, next) => {
+  if (req.session && req.session.username) return next();
+  return res.status(401).json({ success: false, error: 'يرجى تسجيل الدخول أولاً' });
+};
+
+// حالة الربط (تُستدعى من صفحة الإعداد)
+app.get('/api/whatsapp/status', waAuth, async (req, res) => {
+  try {
+    const u = req.session.username;
+    const s = waGet(u);
+    const linked = await waIsLinked(u);
+    if (linked && !s.sock && !s.starting && s.state !== 'connected') waStart(u).catch(() => {});
+    res.json({ success: true, linked, state: s.state, qr: s.state === 'qr' ? s.qr : null, phone: s.phone || null, error: s.error || null });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// بدء الربط (يولّد الباركود)
+app.post('/api/whatsapp/connect', waAuth, async (req, res) => {
+  try {
+    const s = waGet(req.session.username);
+    s.error = null;
+    if (s.state !== 'connected') await waStart(req.session.username);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// فصل الرقم نهائياً
+app.post('/api/whatsapp/logout', waAuth, async (req, res) => {
+  const u = req.session.username;
+  const s = waGet(u);
+  try {
+    s.keepAlive = false;
+    const sock = s.sock;
+    if (sock) { try { await sock.logout(); } catch (e) {} try { sock.end(undefined); } catch (e) {} }
+    s.sock = null;
+    await waWipe(u);
+    s.state = 'disconnected'; s.phone = ''; s.qr = null; s.wasOpen = false;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// إرسال رسالة لمعلم عبر رقم المدرسة (يُستخدم من report.html)
+app.post('/send-whatsapp', waAuth, async (req, res) => {
+  try {
+    const { phone, message } = req.body || {};
+    const num = waNormalizePhone(phone);
+    if (!num) return res.status(400).json({ success: false, error: 'رقم الجوال غير صحيح' });
+    if (!message || !String(message).trim()) return res.status(400).json({ success: false, error: 'نص الرسالة فارغ' });
+
+    const s = await waEnsure(req.session.username);
+    const found = await s.sock.onWhatsApp(`${num}@s.whatsapp.net`);
+    const target = found && found[0];
+    if (!target || !target.exists) {
+      return res.status(404).json({ success: false, error: 'هذا الرقم غير مسجل في واتساب' });
+    }
+    await s.sock.sendMessage(target.jid, { text: String(message) });
+    s.lastUsed = Date.now();
+    res.json({ success: true });
+  } catch (e) {
+    console.error('❌ خطأ إرسال واتساب:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// توفير الذاكرة: نغلق الاتصال الخامل بعد 30 دقيقة (الربط يبقى محفوظاً ويعود تلقائياً عند الحاجة)
+setInterval(() => {
+  const now = Date.now();
+  for (const [, s] of waSessions) {
+    if (s.sock && s.state === 'connected' && now - s.lastUsed > 30 * 60 * 1000) {
+      s.keepAlive = false;
+      try { s.sock.end(undefined); } catch (e) {}
+    }
+  }
+}, 5 * 60 * 1000).unref();
 
 // =========================================================================
 // 🚀 تشغيل السيرفر
