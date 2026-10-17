@@ -684,6 +684,14 @@ app.get('/get-report-data', async (req, res) => {
       ? xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET]) 
       : [];
 
+    // قراءة ورقة المعلمين مع الخيار raw: false لمنع تلف أرقام الجوالات وتحويلها لأرقام علمية
+    let teacherList = [];
+    const teacherSheetName = workbook.SheetNames.find(n => n.includes('teacher') || n === TEACHERS_SHEET);
+    if (teacherSheetName) {
+      const tSheet = workbook.Sheets[teacherSheetName];
+      teacherList = xlsx.utils.sheet_to_json(tSheet, { raw: false, defval: "" });
+    }
+
     let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
     if (workbook.SheetNames.includes(MAIN_INFO_SHEET)) {
       const infoData = xlsx.utils.sheet_to_json(workbook.Sheets[MAIN_INFO_SHEET], { header: 1 });
@@ -695,12 +703,11 @@ app.get('/get-report-data', async (req, res) => {
       };
     }
 
-    res.json({ teachers: reportData, mainInfo });
+    res.json({ teachers: reportData, teacherList, mainInfo });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
-
 // =========================================================================
 // 📋 مسارات الإشراف الأسبوعي
 // =========================================================================
