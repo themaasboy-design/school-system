@@ -671,15 +671,14 @@
                 const tasks = substituteMap[subName];
                 const phone = getTeacherPhone(subName);
 
-                let msg = `السلام عليكم ورحمة الله وبركاته\n`;
-                msg += `أخي المعلم المكرم: *${subName}*\n`;
+                let msg = `أخي المعلم المكرم: *${subName}*\n`;
                 msg += `نود إحاطتك بتكليفك بحصص الانتظار ليوم *${day}* الموافق *${date}* هـ كالتالي:\n\n`;
 
                 tasks.forEach(t => {
                     msg += `🔹 *${t.period}* | الفصل: *${t.className}* (بدلاً عن المعلم: ${t.absentTeacher})\n`;
                 });
 
-                msg += `\nشاكرين ومقدرين لكم حسن تعاونكم 🌹`;
+                msg += `\nشاكرين ومقدرين لكم حسن تعاونكم `;
 
                 const encodedMsg = encodeURIComponent(msg);
 
