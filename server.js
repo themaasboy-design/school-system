@@ -95,6 +95,23 @@ async function initDb() {
       );
     `);
     
+    // 🟢 جدول الإشراف الأسبوعي (صف لكل معلم في كل مهمة في كل يوم)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monitoring_schedule (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        day_key VARCHAR(3) NOT NULL CHECK (day_key IN ('sun','mon','tue','wed','thu')),
+        task TEXT NOT NULL,
+        teacher_name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (username, day_key, task, teacher_name)
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_monitoring_username ON monitoring_schedule (username);`);
+
+    // علامة لكل مدرسة: هل تم نقل جدول الإشراف القديم من الإكسل إلى القاعدة؟
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS monitoring_migrated BOOLEAN DEFAULT FALSE;`);
+
     // 💬 جدول حفظ جلسات واتساب (ربط دائم لكل مدرسة)
     await client.query(`
       CREATE TABLE IF NOT EXISTS wa_auth (
@@ -128,6 +145,13 @@ async function syncExcelToDb(username, filePath) {
     console.error(`❌ فشل مزامنة ملف الإكسل لقاعدة البيانات: ${e.message}`);
     return false;
   }
+}
+
+// ✅ حفظ موثوق: لا نردّ "تم الحفظ" إلا بعد التأكد أن الملف وصل فعلاً لقاعدة البيانات الدائمة
+async function syncOrThrow(username, filePath) {
+  if (!username) throw new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد');
+  const ok = await syncExcelToDb(username, filePath);
+  if (!ok) throw new Error('تعذر حفظ التعديل في قاعدة البيانات الدائمة، حاول مرة أخرى');
 }
 
 // 🔐 مسار تسجيل الدخول للمدارس
@@ -420,7 +444,7 @@ app.post('/save-waiting-schedule-day', async (req, res) => {
     }
 
     xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
+    await syncOrThrow(username, userExcel);
 
     res.json({ success: true });
   } catch (e) {
@@ -549,7 +573,7 @@ app.post('/api/save-rotation', async (req, res) => {
     }
 
     xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
+    await syncOrThrow(username, userExcel);
 
     res.json({ success: true, message: "تم حفظ بيانات الأسبوع بنجاح" });
   } catch (e) {
@@ -585,7 +609,7 @@ app.post('/save-report', async (req, res) => {
     }
 
     xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
+    await syncOrThrow(username, userExcel);
 
     res.json({ success: true });
   } catch (e) {
@@ -722,71 +746,202 @@ app.get('/get-monitoring-teachers', async (req, res) => {
   }
 });
 
-app.post('/save-monitoring', async (req, res) => {
-  const weeklySchedule = req.body;
-  try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    
-    const headers = ["المهمة", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
-    const tasksList = ["المقصف الغربي", "المقصف الشرقي", "الساحة الغربية", "الساحة الشرقية", "الدور الثاني"];
-    const dayKeys = ["sun", "mon", "tue", "wed", "thu"];
+// -------------------------------------------------------------------------
+// 🗄️ الإشراف الأسبوعي — يُحفظ في PostgreSQL (جدول monitoring_schedule)
+// -------------------------------------------------------------------------
+const MONITORING_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu'];
+const MONITORING_DAY_NAMES = { sun: 'الأحد', mon: 'الإثنين', tue: 'الثلاثاء', wed: 'الأربعاء', thu: 'الخميس' };
 
-    let aoaData = [headers];
+function requireSessionUser(req) {
+  const username = req.session?.username;
+  if (!username) {
+    const err = new Error('انتهت الجلسة، يرجى تسجيل الدخول من جديد');
+    err.status = 401;
+    throw err;
+  }
+  return String(username).trim();
+}
 
-    tasksList.forEach(task => {
-      let row = [task];
-      dayKeys.forEach(day => {
-        row.push(weeklySchedule[day]?.[task] || "");
-      });
-      aoaData.push(row);
+// يقبل قائمة أسماء أو نصاً مفصولاً بـ "،" ويعيد قائمة نظيفة بلا تكرار
+function toTeacherList(val) {
+  let list = [];
+  if (Array.isArray(val)) list = val;
+  else if (typeof val === 'string') list = val.split(/[،,]/);
+  return [...new Set(list.map(s => String(s ?? '').trim()).filter(Boolean))];
+}
+
+// يحوّل الجسم المرسل { sun: { "المقصف": [...] } } إلى صفوف جاهزة للإدخال
+function scheduleToRows(schedule) {
+  const rows = [];
+  if (!schedule || typeof schedule !== 'object') return rows;
+  MONITORING_DAY_KEYS.forEach(day => {
+    const dayObj = schedule[day];
+    if (!dayObj || typeof dayObj !== 'object') return;
+    Object.keys(dayObj).forEach(rawTask => {
+      const task = String(rawTask).trim();
+      if (!task) return;
+      toTeacherList(dayObj[rawTask]).forEach(teacher => rows.push([day, task, teacher]));
     });
+  });
+  return rows;
+}
 
-    const newSheet = xlsx.utils.aoa_to_sheet(aoaData);
+// 🔁 نقل جدول الإشراف القديم من ورقة moni في الإكسل إلى القاعدة (مرة واحدة لكل مدرسة)
+async function migrateMonitoringFromExcel(req, username) {
+  const flag = await pool.query('SELECT monitoring_migrated FROM users WHERE username = $1', [username]);
+  if (flag.rows.length === 0 || flag.rows[0].monitoring_migrated) return;
 
-    if (!workbook.SheetNames.includes(MONITORING_SHEET)) {
-      xlsx.utils.book_append_sheet(workbook, newSheet, MONITORING_SHEET);
-    } else {
-      workbook.Sheets[MONITORING_SHEET] = newSheet;
+  let rows = [];
+  try {
+    const filePath = await getUserExcelPath(req);
+    const workbook = xlsx.readFile(filePath);
+    const worksheet = workbook.Sheets[MONITORING_SHEET];
+    if (worksheet) {
+      const schedule = {};
+      xlsx.utils.sheet_to_json(worksheet).forEach(row => {
+        const task = row['المهمة'] || row['task'];
+        if (!task) return;
+        MONITORING_DAY_KEYS.forEach(day => {
+          const cell = row[MONITORING_DAY_NAMES[day]];
+          if (cell) {
+            schedule[day] = schedule[day] || {};
+            schedule[day][task] = String(cell);
+          }
+        });
+      });
+      rows = scheduleToRows(schedule);
     }
+  } catch (e) {
+    console.error(`⚠️ تعذر قراءة ورقة الإشراف من الإكسل للمستخدم (${username}):`, e.message);
+    return; // نعيد المحاولة في الطلب القادم
+  }
 
-    xlsx.writeFile(workbook, userExcel);
-    if (username) await syncExcelToDb(username, userExcel);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // "حجز" عملية النقل حتى لا تتكرر إذا وصل طلبان في نفس اللحظة
+    const claim = await client.query(
+      'UPDATE users SET monitoring_migrated = TRUE WHERE username = $1 AND monitoring_migrated IS NOT TRUE RETURNING id',
+      [username]
+    );
+    if (claim.rows.length === 0) { await client.query('ROLLBACK'); return; }
 
+    for (const [day, task, teacher] of rows) {
+      await client.query(
+        `INSERT INTO monitoring_schedule (username, day_key, task, teacher_name)
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+        [username, day, task, teacher]
+      );
+    }
+    await client.query('COMMIT');
+    console.log(`📦 تم نقل ${rows.length} تكليف إشراف من الإكسل إلى القاعدة للمستخدم (${username})`);
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// يعيد الجدول بالشكل { sun: { "المقصف": ["أحمد", ...] }, mon: {...}, ... }
+async function loadMonitoringSchedule(req, username) {
+  await migrateMonitoringFromExcel(req, username);
+  const result = await pool.query(
+    'SELECT day_key, task, teacher_name FROM monitoring_schedule WHERE username = $1 ORDER BY id',
+    [username]
+  );
+  const schedule = { sun: {}, mon: {}, tue: {}, wed: {}, thu: {} };
+  result.rows.forEach(r => {
+    (schedule[r.day_key][r.task] = schedule[r.day_key][r.task] || []).push(r.teacher_name);
+  });
+  return schedule;
+}
+
+// يستبدل جدول المدرسة بالكامل داخل معاملة واحدة (إما يُحفظ كله أو لا شيء)
+async function replaceMonitoringSchedule(username, rows) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM monitoring_schedule WHERE username = $1', [username]);
+    for (const [day, task, teacher] of rows) {
+      await client.query(
+        `INSERT INTO monitoring_schedule (username, day_key, task, teacher_name)
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+        [username, day, task, teacher]
+      );
+    }
+    // بعد أول حفظ لا نعود للإكسل أبداً
+    await client.query('UPDATE users SET monitoring_migrated = TRUE WHERE username = $1', [username]);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+function sendMonitoringError(res, e, prefix) {
+  console.error(prefix, e);
+  res.status(e.status || 500).json({ success: false, message: prefix + ' ' + e.message, error: e.message });
+}
+
+// 📥 جلب جدول الإشراف
+app.get('/api/monitoring', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const schedule = await loadMonitoringSchedule(req, username);
+    res.json({ success: true, schedule });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء جلب جدول الإشراف:');
+  }
+});
+
+// 💾 حفظ جدول الإشراف بالكامل
+app.put('/api/monitoring', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const rows = scheduleToRows(req.body?.schedule);
+    await replaceMonitoringSchedule(username, rows);
+    res.json({ success: true, message: 'تم حفظ جدول الإشراف بنجاح', count: rows.length });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء حفظ جدول الإشراف:');
+  }
+});
+
+// 🗑️ تفريغ جدول الإشراف
+app.delete('/api/monitoring', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    await replaceMonitoringSchedule(username, []);
+    res.json({ success: true, message: 'تم تفريغ جدول الإشراف' });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء تفريغ جدول الإشراف:');
+  }
+});
+
+// ↩️ المسارات القديمة — باقية لأي صفحة أخرى تستخدمها، لكنها الآن تقرأ وتكتب من القاعدة
+app.post('/save-monitoring', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    await replaceMonitoringSchedule(username, scheduleToRows(req.body));
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
+    res.status(e.status || 500).json({ success: false, error: 'خطأ أثناء الحفظ: ' + e.message });
   }
 });
 
 app.get('/get-monitoring-schedule', async (req, res) => {
   try {
-    const filePath = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(filePath);
-    const worksheet = workbook.Sheets[MONITORING_SHEET];
-
-    if (!worksheet) return res.json({ success: true, schedule: {} });
-
-    const rawData = xlsx.utils.sheet_to_json(worksheet);
-    let schedule = { sun: {}, mon: {}, tue: {}, wed: {}, thu: {} };
-    const daysMapping = { 'الأحد': 'sun', 'الإثنين': 'mon', 'الثلاثاء': 'tue', 'الأربعاء': 'wed', 'الخميس': 'thu' };
-
-    rawData.forEach(row => {
-      const taskName = row['المهمة'] || row['task'];
-      if (taskName) {
-        Object.keys(daysMapping).forEach(arabicDay => {
-          const englishKey = daysMapping[arabicDay];
-          if (row[arabicDay]) {
-            schedule[englishKey][taskName] = row[arabicDay];
-          }
-        });
-      }
+    const username = requireSessionUser(req);
+    const schedule = await loadMonitoringSchedule(req, username);
+    // نفس الشكل القديم: الأسماء نص واحد مفصول بـ "، "
+    MONITORING_DAY_KEYS.forEach(day => {
+      Object.keys(schedule[day]).forEach(task => { schedule[day][task] = schedule[day][task].join('، '); });
     });
-
     res.json({ success: true, schedule });
-  } catch (error) {
-    res.json({ success: false, error: "تعذر قراءة البيانات من ملف الإكسل: " + error.message });
+  } catch (e) {
+    res.json({ success: false, error: 'تعذر قراءة جدول الإشراف: ' + e.message });
   }
 });
 
@@ -797,12 +952,13 @@ app.get('/reportmoni', (req, res) => {
 app.get('/get-reportmoni-data', async (req, res) => {
   try {
     const { day, task } = req.query;
+    const username = requireSessionUser(req);
+
+    // معلومات المدرسة ما زالت في ورقة maininfo بالإكسل
     const filePath = await getUserExcelPath(req);
     const workbook = xlsx.readFile(filePath);
-
     const infoSheet = workbook.Sheets[MAIN_INFO_SHEET];
     let mainInfo = { B1: '', B2: '', B3: '', B4: '' };
-
     if (infoSheet) {
       mainInfo.B1 = infoSheet['B1'] ? infoSheet['B1'].v : '';
       mainInfo.B2 = infoSheet['B2'] ? infoSheet['B2'].v : '';
@@ -810,41 +966,22 @@ app.get('/get-reportmoni-data', async (req, res) => {
       mainInfo.B4 = infoSheet['B4'] ? infoSheet['B4'].v : '';
     }
 
-    const worksheet = workbook.Sheets[MONITORING_SHEET];
-    if (!worksheet) return res.json({ success: true, data: [], mainInfo });
+    if (!MONITORING_DAY_KEYS.includes(day)) return res.json({ success: true, data: [], mainInfo });
 
-    const rawData = xlsx.utils.sheet_to_json(worksheet);
-    let filteredResults = [];
+    const schedule = await loadMonitoringSchedule(req, username);
+    const dayTasks = schedule[day] || {};
 
-    function normalizeText(str) {
-      if (!str) return '';
-      return str.toString().trim().replace(/[أإآا]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
-    }
-
-    const dayTargets = {
-      'sun': 'الأحد', 'mon': 'الإثنين', 'tue': 'الثلاثاء', 'wed': 'الأربعاء', 'thu': 'الخميس'
-    };
-    const targetDayName = dayTargets[day];
-
-    rawData.forEach(row => {
-      const rowTask = row['المهمة'] || row['task'] || '';
-      const teacherInDay = targetDayName ? row[targetDayName] : '';
-
-      if (task !== 'all' && normalizeText(rowTask) !== normalizeText(task)) return;
-
-      if (teacherInDay && teacherInDay.toString().trim() !== "") {
-        filteredResults.push({
-          task: rowTask,
-          teachers: teacherInDay.toString().trim()
-        });
-      }
-    });
+    const filteredResults = Object.keys(dayTasks)
+      .filter(t => !task || task === 'all' || normalizeArabicText(t) === normalizeArabicText(task))
+      .filter(t => dayTasks[t].length > 0)
+      .map(t => ({ task: t, teachers: dayTasks[t].join('، ') }));
 
     res.json({ success: true, data: filteredResults, mainInfo });
   } catch (error) {
-    res.json({ success: false, error: "حدث خطأ في قراءة ملف الإكسل: " + error.message });
+    res.json({ success: false, error: 'حدث خطأ في قراءة جدول الإشراف: ' + error.message });
   }
 });
+
 
 // =========================================================================
 // 📦 3. إعداد رفع الملفات وإنشاء الحسابات
@@ -1235,6 +1372,7 @@ app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Cache-Control', 'no-store');
 
     return res.send(school.excel_data);
   } catch (error) {
