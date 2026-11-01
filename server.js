@@ -109,6 +109,22 @@ async function initDb() {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_monitoring_username ON monitoring_schedule (username);`);
 
+    // ✅ سجل أداء الإشراف الفعلي (لكل معلم في كل تاريخ): done = أدّى ، missed = لم يؤدِّ
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monitoring_attendance (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        att_date DATE NOT NULL,
+        day_key VARCHAR(3) NOT NULL,
+        task TEXT NOT NULL,
+        teacher_name TEXT NOT NULL,
+        status VARCHAR(10) NOT NULL CHECK (status IN ('done','missed')),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (username, att_date, task, teacher_name)
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_mon_att_user_date ON monitoring_attendance (username, att_date);`);
+
     // علامة لكل مدرسة: هل تم نقل جدول الإشراف القديم من الإكسل إلى القاعدة؟
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS monitoring_migrated BOOLEAN DEFAULT FALSE;`);
 
@@ -982,6 +998,226 @@ app.get('/get-reportmoni-data', async (req, res) => {
   }
 });
 
+
+// -------------------------------------------------------------------------
+// ✅ أداء الإشراف الفعلي + 💬 تذكير المشرفين بالواتساب
+// -------------------------------------------------------------------------
+const UTC_DAY_TO_KEY = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu' };
+
+// يتحقق من التاريخ (YYYY-MM-DD) ويعيد مفتاح اليوم، أو يرمي خطأ واضح
+function parseMonitoringDate(dateStr) {
+  const s = String(dateStr || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const err = new Error('التاريخ غير صحيح'); err.status = 400; throw err;
+  }
+  const d = new Date(s + 'T00:00:00Z');
+  if (isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) {
+    const err = new Error('التاريخ غير صحيح'); err.status = 400; throw err;
+  }
+  const dayKey = UTC_DAY_TO_KEY[d.getUTCDay()];
+  if (!dayKey) {
+    const err = new Error('التاريخ المختار يوم إجازة (الجمعة أو السبت)'); err.status = 400; throw err;
+  }
+  return { date: s, dayKey };
+}
+
+function formatHijriDate(dateStr) {
+  try {
+    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' })
+      .format(new Date(dateStr + 'T12:00:00Z'));
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+// 📞 أرقام جوالات المعلمين من ورقة teacher_name
+// نبحث أولاً عن عمود عنوانه فيه "جوال/هاتف/phone"، وإلا نلتقط أي خلية شكلها رقم جوال سعودي
+// (لا نعتمد على أي عمود رقمي عشوائي حتى لا نرسل لرقم الهوية بالخطأ)
+const SAUDI_MOBILE_RE = /^(?:\+?966|00966|0)?5\d{8}$/;
+
+async function getTeacherPhones(req) {
+  const workbook = xlsx.readFile(await getUserExcelPath(req));
+  const rows = xlsx.utils.sheet_to_json(getSheet(workbook, TEACHERS_SHEET), { header: 1 });
+  const header = (rows[0] || []).map(h => String(h ?? ''));
+  const phoneCol = header.findIndex(h => /جوال|هاتف|موبايل|تواصل|phone|mobile/i.test(h));
+
+  const phones = new Map();
+  rows.slice(1).forEach(row => {
+    if (!row || !row[1]) return;
+    const name = String(row[1]).trim();
+    let phone = '';
+    if (phoneCol >= 0 && row[phoneCol] != null) phone = String(row[phoneCol]);
+    if (!phone) {
+      const cell = row.find((c, i) => i !== 1 && c != null && SAUDI_MOBILE_RE.test(String(c).replace(/[\s-]/g, '')));
+      if (cell != null) phone = String(cell);
+    }
+    if (name && phone) phones.set(name, phone);
+  });
+  return phones;
+}
+
+// 📥 حالة الأداء لتاريخ معيّن
+app.get('/api/monitoring/attendance', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const { date } = parseMonitoringDate(req.query.date);
+    const result = await pool.query(
+      `SELECT task, teacher_name, status FROM monitoring_attendance WHERE username = $1 AND att_date = $2`,
+      [username, date]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء جلب حالة الإشراف:');
+  }
+});
+
+// 🔄 تسجيل أدّى / لم يؤدِّ (status = null يلغي التسجيل)
+app.put('/api/monitoring/attendance', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const { date, dayKey } = parseMonitoringDate(req.body?.date);
+    const task = String(req.body?.task || '').trim();
+    const teacher = String(req.body?.teacher_name || '').trim();
+    const status = req.body?.status ?? null;
+
+    if (!task || !teacher) return res.status(400).json({ success: false, message: 'بيانات المعلم أو المهمة ناقصة' });
+    if (status !== null && status !== 'done' && status !== 'missed') {
+      return res.status(400).json({ success: false, message: 'الحالة غير صحيحة' });
+    }
+
+    if (status === null) {
+      await pool.query(
+        'DELETE FROM monitoring_attendance WHERE username = $1 AND att_date = $2 AND task = $3 AND teacher_name = $4',
+        [username, date, task, teacher]
+      );
+      return res.json({ success: true, message: 'تم إلغاء التسجيل' });
+    }
+
+    // لا نسجّل إلا لمعلم مكلّف فعلاً بهذه المهمة في هذا اليوم
+    const assigned = await pool.query(
+      'SELECT 1 FROM monitoring_schedule WHERE username = $1 AND day_key = $2 AND task = $3 AND teacher_name = $4',
+      [username, dayKey, task, teacher]
+    );
+    if (assigned.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'المعلم غير مكلّف بهذه المهمة في هذا اليوم حسب جدول الإشراف' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO monitoring_attendance (username, att_date, day_key, task, teacher_name, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (username, att_date, task, teacher_name)
+       DO UPDATE SET status = EXCLUDED.status, updated_at = CURRENT_TIMESTAMP
+       RETURNING task, teacher_name, status`,
+      [username, date, dayKey, task, teacher, status]
+    );
+    res.json({ success: true, message: 'تم التسجيل', data: result.rows[0] });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء تسجيل حالة الإشراف:');
+  }
+});
+
+// 📊 رصيد كل معلم (لصفحة الإحصائيات لاحقاً) — from / to اختياريان بصيغة YYYY-MM-DD
+app.get('/api/monitoring/attendance/stats', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const from = req.query.from ? parseMonitoringDateLoose(req.query.from) : null;
+    const to = req.query.to ? parseMonitoringDateLoose(req.query.to) : null;
+    const result = await pool.query(
+      `SELECT teacher_name,
+              COUNT(*) FILTER (WHERE status = 'done')::int   AS done_days,
+              COUNT(*) FILTER (WHERE status = 'missed')::int AS missed_days,
+              MAX(att_date) AS last_date
+       FROM monitoring_attendance
+       WHERE username = $1
+         AND ($2::date IS NULL OR att_date >= $2::date)
+         AND ($3::date IS NULL OR att_date <= $3::date)
+       GROUP BY teacher_name
+       ORDER BY teacher_name`,
+      [username, from, to]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء حساب أرصدة الإشراف:');
+  }
+});
+
+function parseMonitoringDateLoose(s) {
+  const v = String(s).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(new Date(v + 'T00:00:00Z'))) {
+    const err = new Error('صيغة التاريخ يجب أن تكون YYYY-MM-DD'); err.status = 400; throw err;
+  }
+  return v;
+}
+
+// 💬 إرسال تذكير واتساب لمشرفي اليوم
+// body: { date, tasks?: [أسماء المهام المعروضة], only?: [أسماء معلمين] , template?: نص }
+// المتغيرات في النص: {الاسم} {المهمة} {اليوم} {التاريخ}
+const DEFAULT_MONITORING_TEMPLATE =
+  'المكرم الأستاذ/ {الاسم} حفظه الله\n' +
+  'السلام عليكم ورحمة الله وبركاته\n' +
+  'نذكّركم بأن لديكم إشرافاً اليوم {اليوم} الموافق {التاريخ} على: {المهمة}\n' +
+  'شاكرين لكم تعاونكم ،،،';
+
+app.post('/api/monitoring/notify', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const { date, dayKey } = parseMonitoringDate(req.body?.date);
+    const taskFilter = Array.isArray(req.body?.tasks) ? req.body.tasks.map(t => String(t).trim()) : null;
+    const onlyFilter = Array.isArray(req.body?.only) ? req.body.only.map(t => String(t).trim()) : null;
+    let template = String(req.body?.template || '').trim() || DEFAULT_MONITORING_TEMPLATE;
+    if (template.length > 1500) template = template.slice(0, 1500);
+
+    // المكلّفون من القاعدة (وليس من المتصفح) — ونجمع مهام المعلم الواحد في رسالة واحدة
+    const schedule = await loadMonitoringSchedule(req, username);
+    const byTeacher = new Map();
+    Object.entries(schedule[dayKey] || {}).forEach(([task, teachers]) => {
+      if (taskFilter && !taskFilter.includes(task)) return;
+      teachers.forEach(t => {
+        if (onlyFilter && !onlyFilter.includes(t)) return;
+        if (!byTeacher.has(t)) byTeacher.set(t, []);
+        byTeacher.get(t).push(task);
+      });
+    });
+
+    if (byTeacher.size === 0) {
+      return res.status(400).json({ success: false, message: 'لا يوجد مشرفون مكلّفون في هذا اليوم حسب الاختيار' });
+    }
+
+    const phones = await getTeacherPhones(req);
+    const s = await waEnsure(username); // يرمي رسالة واضحة إذا لم يُربط واتساب المدرسة
+
+    const dayName = MONITORING_DAY_NAMES[dayKey];
+    const hijri = formatHijriDate(date);
+    const results = [];
+
+    for (const [teacher, tasks] of byTeacher) {
+      const num = waNormalizePhone(phones.get(teacher));
+      if (!num) { results.push({ teacher, sent: false, error: 'لا يوجد رقم جوال صحيح للمعلم في ملف المعلمين' }); continue; }
+      try {
+        const found = await s.sock.onWhatsApp(`${num}@s.whatsapp.net`);
+        const target = found && found[0];
+        if (!target || !target.exists) { results.push({ teacher, sent: false, error: 'الرقم غير مسجل في واتساب' }); continue; }
+        const text = template
+          .split('{الاسم}').join(teacher)
+          .split('{المهمة}').join(tasks.join('، '))
+          .split('{اليوم}').join(dayName)
+          .split('{التاريخ}').join(hijri);
+        await s.sock.sendMessage(target.jid, { text });
+        s.lastUsed = Date.now();
+        results.push({ teacher, sent: true });
+      } catch (err) {
+        results.push({ teacher, sent: false, error: err.message });
+      }
+      // مهلة بسيطة بين الرسائل لتقليل خطر حظر الرقم
+      await new Promise(r => setTimeout(r, 1200 + Math.floor(Math.random() * 800)));
+    }
+
+    const sentCount = results.filter(r => r.sent).length;
+    res.json({ success: true, message: `تم إرسال ${sentCount} من ${results.length} رسالة`, results });
+  } catch (e) {
+    sendMonitoringError(res, e, 'تعذر إرسال الرسائل:');
+  }
+});
 
 // =========================================================================
 // 📦 3. إعداد رفع الملفات وإنشاء الحسابات

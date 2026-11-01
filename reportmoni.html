@@ -23,6 +23,17 @@
             font-size: 1.1rem;
             padding: 12px;
         }
+        .teacher-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 4px;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        .teacher-line:last-child { border-bottom: none; }
+        .att-btn { min-width: 86px; font-weight: 600; }
+        .send-status { font-size: 11px; }
     </style>
 </head>
 <body> 
@@ -66,14 +77,9 @@
         <div class="row g-3">
             
             <div class="col-md-5">
-                <label class="form-label fw-semibold">اختر اليوم:</label>
-                <select id="dayFilter" class="form-select">
-                    <option value="sun">الأحد</option>
-                    <option value="mon">الإثنين</option>
-                    <option value="tue">الثلاثاء</option>
-                    <option value="wed">الأربعاء</option>
-                    <option value="thu">الخميس</option>
-                </select>
+                <label class="form-label fw-semibold">اختر التاريخ:</label>
+                <input type="date" id="dateFilter" class="form-control">
+                <div id="dateInfo" class="small text-muted mt-1"></div>
             </div>
 
             <div class="col-md-5">
@@ -106,12 +112,32 @@
             <p class="text-muted" id="reportSubtitle"></p>
         </div>
 
+        <!-- 💬 تذكير المشرفين بالواتساب -->
+        <div id="notifyBox" class="border rounded-3 p-3 mb-3 bg-light d-none">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span class="fw-bold">💬 تذكير المشرفين المعروضين برسالة واتساب</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#templateCollapse">
+                        ✏️ تعديل نص الرسالة
+                    </button>
+                    <button type="button" id="btnNotifyAll" class="btn btn-sm btn-success fw-bold px-3">إرسال للجميع 📤</button>
+                </div>
+            </div>
+            <div class="collapse mt-2" id="templateCollapse">
+                <textarea id="messageTemplate" class="form-control" rows="5"></textarea>
+                <div class="small text-muted mt-1">المتغيرات: {الاسم} {المهمة} {اليوم} {التاريخ}</div>
+            </div>
+        </div>
+
+        <!-- ملخص أداء اليوم -->
+        <div id="attSummary" class="mb-2 small fw-semibold d-none"></div>
+
         <div class="table-responsive">
             <table class="table table-bordered text-center align-middle m-0">
                 <thead>
                     <tr>
-                        <th style="width: 55%;"> اسم المعلم </th>
-                        <th style="width: 45%;">المهمة الإشرافية</th>
+                        <th style="width: 65%;"> اسم المعلم وحالة الإشراف </th>
+                        <th style="width: 35%;">المهمة الإشرافية</th>
                     </tr>
                 </thead>
                 <tbody id="reportTableBody">
@@ -135,78 +161,254 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentReportData = [];
     let currentDayText = "الأحد";
+    let currentDate = "";
     let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
+    let attendanceMap = new Map(); // "المهمة||المعلم" -> done | missed
+
+    const DAY_KEYS = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu' };
+    const DAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+    const DEFAULT_TEMPLATE =
+        'المكرم الأستاذ/ {الاسم} حفظه الله\n' +
+        'السلام عليكم ورحمة الله وبركاته\n' +
+        'نذكّركم بأن لديكم إشرافاً اليوم {اليوم} الموافق {التاريخ} على: {المهمة}\n' +
+        'شاكرين لكم تعاونكم ،،،';
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function toast(text, ok = true) {
+        Toastify({ text, duration: 3500, gravity: "top", position: "right",
+            style: { background: ok ? "linear-gradient(to left, #2ecc71, #27ae60)" : "linear-gradient(to left, #e74c3c, #c0392b)", direction: "rtl" } }).showToast();
+    }
+
+    function todayLocalISO() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function dateParts(iso) {
+        const d = new Date(iso + 'T12:00:00Z');
+        const wd = d.getUTCDay();
+        let hijri = iso;
+        try {
+            hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+        } catch (e) { /* نعرض الميلادي */ }
+        return { dayKey: DAY_KEYS[wd] || null, dayName: DAY_NAMES[wd], hijri };
+    }
+
+    function updateDateInfo() {
+        const iso = document.getElementById('dateFilter').value;
+        const info = document.getElementById('dateInfo');
+        if (!iso) { info.textContent = ''; return; }
+        const p = dateParts(iso);
+        info.innerHTML = p.dayKey
+            ? `${p.dayName} — ${escapeHtml(p.hijri)}`
+            : `<span class="text-danger">${p.dayName} يوم إجازة</span>`;
+    }
 
     async function fetchReportData() {
-        const day = document.getElementById('dayFilter').value;
-        currentDayText = document.getElementById('dayFilter').options[document.getElementById('dayFilter').selectedIndex].text;
+        const iso = document.getElementById('dateFilter').value;
+        if (!iso) { toast("يرجى اختيار التاريخ", false); return; }
+        const parts = dateParts(iso);
+        if (!parts.dayKey) { toast(`يوم ${parts.dayName} إجازة، اختر يوماً دراسياً`, false); return; }
+
+        const day = parts.dayKey;
+        currentDayText = parts.dayName;
+        currentDate = iso;
         const task = document.getElementById('taskFilter').value;
         const taskText = document.getElementById('taskFilter').options[document.getElementById('taskFilter').selectedIndex].text;
 
-        const reportTitleEle = document.getElementById('reportTitle');
-        if (reportTitleEle) reportTitleEle.textContent = `جدول الإشراف ليوم ${currentDayText}`;
+        document.getElementById('reportTitle').textContent = `جدول الإشراف ليوم ${currentDayText}`;
+        document.getElementById('reportSubtitle').textContent = `${parts.hijri} — المهمة المستهدفة: ${taskText}`;
 
-        const reportSubtitleEle = document.getElementById('reportSubtitle');
-        if (reportSubtitleEle) reportSubtitleEle.textContent = `المهمة المستهدفة: ${taskText}`;
-
-        // 🔍 الخيارات العامة (المقصف / الساحة) لا تطابق أي مهمة بالضبط حرفياً في قاعدة البيانات
-        // (لأن المهام المسجلة فعلياً دائماً محددة: الغربي أو الشرقي)
-        // لذلك نجيب كل مهام اليوم ونفلترها بالمتصفح لأي مهمة تحتوي على هذه الكلمة
+        // الخيارات العامة (المقصف / الساحة) تشمل كل مهمة تحتوي على هذه الكلمة
         const genericTasks = ["المقصف", "الساحة"];
         const isGenericTask = genericTasks.includes(task);
         const fetchTask = isGenericTask ? 'all' : task;
 
+        const tbody = document.getElementById('reportTableBody');
         try {
-            const response = await fetch(`/get-reportmoni-data?day=${encodeURIComponent(day)}&task=${encodeURIComponent(fetchTask)}`);
+            const [response, attRes] = await Promise.all([
+                fetch(`/get-reportmoni-data?day=${encodeURIComponent(day)}&task=${encodeURIComponent(fetchTask)}`),
+                fetch(`/api/monitoring/attendance?date=${encodeURIComponent(iso)}`)
+            ]);
             const result = await response.json();
+            const attResult = await attRes.json();
 
-            const tbody = document.getElementById('reportTableBody');
-            tbody.innerHTML = "";
-
-            if (result.success) {
-                if (result.mainInfo) {
-                    mainInfo = result.mainInfo; 
-                }
-
-                let dataList = result.data || [];
-                if (isGenericTask) {
-                    dataList = dataList.filter(item => (item.task || '').includes(task));
-                }
-
-                if (dataList.length > 0) {
-                    currentReportData = dataList;
-                    document.getElementById('btnDownloadPDF').disabled = false;
-
-                    dataList.forEach(item => {
-                        const rawTeachers = item.teachers || '';
-                        const teacherHtml = rawTeachers.length > 0
-                            ? rawTeachers.split(/،|,/)
-                                .map(name => `<div class="text-dark fs-5 fw-medium my-2">${name.trim()}</div>`)
-                                .join('')
-                            : '<div class="text-muted fs-6">لا يوجد معلمين مسجلين</div>';
-
-                        const row = `
-                            <tr>
-                                <td class="bg-white p-2 align-middle">${teacherHtml}</td>
-                                <td class="fw-bold text-center bg-light fs-5 text-secondary align-middle">${item.task || 'غير محدد'}</td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
-                    });
-                } else {
-                    currentReportData = [];
-                    document.getElementById('btnDownloadPDF').disabled = true;
-                    tbody.innerHTML = `<tr><td colspan="2" class="text-danger fw-semibold py-4">⚠️ لا توجد بيانات مسجلة لهذا اليوم بناءً على الفلاتر المختارة.</td></tr>`;
-                }
+            attendanceMap = new Map();
+            if (attResult.success) {
+                attResult.data.forEach(r => attendanceMap.set(`${r.task}||${r.teacher_name}`, r.status));
             }
 
+            if (!result.success) {
+                tbody.innerHTML = `<tr><td colspan="2" class="text-danger py-4">${escapeHtml(result.error || 'تعذر جلب البيانات')}</td></tr>`;
+                return;
+            }
+            if (result.mainInfo) mainInfo = result.mainInfo;
+
+            let dataList = result.data || [];
+            if (isGenericTask) dataList = dataList.filter(item => (item.task || '').includes(task));
+
+            currentReportData = dataList;
+            document.getElementById('btnDownloadPDF').disabled = dataList.length === 0;
+            document.getElementById('notifyBox').classList.toggle('d-none', dataList.length === 0);
+            renderReportTable();
         } catch (error) {
             console.error("خطأ في الاتصال بالخادم:", error);
+            tbody.innerHTML = `<tr><td colspan="2" class="text-danger py-4">تعذر الاتصال بالسيرفر</td></tr>`;
         }
     }
+
+    function splitTeachers(raw) {
+        return String(raw || '').split(/،|,/).map(s => s.trim()).filter(Boolean);
+    }
+
+    function attButtonsHtml(task, teacher) {
+        const st = attendanceMap.get(`${task}||${teacher}`);
+        return `
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn att-btn ${st === 'done' ? 'btn-success' : 'btn-outline-success'}" data-att="done">✅ أدّى</button>
+                <button type="button" class="btn att-btn ${st === 'missed' ? 'btn-danger' : 'btn-outline-danger'}" data-att="missed">❌ لم يؤدِّ</button>
+            </div>`;
+    }
+
+    function renderReportTable() {
+        const tbody = document.getElementById('reportTableBody');
+        tbody.innerHTML = "";
+
+        if (currentReportData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="2" class="text-danger fw-semibold py-4">⚠️ لا توجد بيانات مسجلة لهذا اليوم بناءً على الفلاتر المختارة.</td></tr>`;
+            renderSummary();
+            return;
+        }
+
+        currentReportData.forEach(item => {
+            const teachers = splitTeachers(item.teachers);
+            const teacherHtml = teachers.length > 0
+                ? teachers.map(name => `
+                    <div class="teacher-line" data-task="${escapeHtml(item.task)}" data-teacher="${escapeHtml(name)}">
+                        <div class="text-start">
+                            <div class="text-dark fs-5 fw-medium">${escapeHtml(name)}</div>
+                            <span class="send-status"></span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            ${attButtonsHtml(item.task, name)}
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-send title="إرسال تذكير لهذا المعلم فقط">📩</button>
+                        </div>
+                    </div>`).join('')
+                : '<div class="text-muted fs-6">لا يوجد معلمين مسجلين</div>';
+
+            tbody.insertAdjacentHTML('beforeend', `
+                <tr>
+                    <td class="bg-white p-2 align-middle">${teacherHtml}</td>
+                    <td class="fw-bold text-center bg-light fs-5 text-secondary align-middle">${escapeHtml(item.task || 'غير محدد')}</td>
+                </tr>`);
+        });
+        renderSummary();
+    }
+
+    function renderSummary() {
+        const box = document.getElementById('attSummary');
+        const lines = [...document.querySelectorAll('.teacher-line')];
+        if (lines.length === 0) { box.classList.add('d-none'); return; }
+        let done = 0, missed = 0;
+        lines.forEach(l => {
+            const st = attendanceMap.get(`${l.dataset.task}||${l.dataset.teacher}`);
+            if (st === 'done') done++; else if (st === 'missed') missed++;
+        });
+        const pending = lines.length - done - missed;
+        box.innerHTML = `<span class="text-success">✅ أدّى: ${done}</span> &nbsp;|&nbsp; <span class="text-danger">❌ لم يؤدِّ: ${missed}</span> &nbsp;|&nbsp; <span class="text-secondary">⏳ لم يُسجَّل: ${pending}</span>`;
+        box.classList.remove('d-none');
+    }
+
+    // ✅ / ❌ — الضغط على نفس الزر مرة ثانية يلغي التسجيل
+    async function setAttendance(line, status) {
+        const task = line.dataset.task, teacher = line.dataset.teacher;
+        const key = `${task}||${teacher}`;
+        const prev = attendanceMap.get(key) || null;
+        const next = prev === status ? null : status;
+
+        line.querySelectorAll('[data-att]').forEach(b => b.disabled = true);
+        try {
+            const res = await fetch('/api/monitoring/attendance', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: currentDate, task, teacher_name: teacher, status: next })
+            });
+            const result = await res.json();
+            if (!result.success) { toast(result.message || 'تعذر التسجيل', false); return; }
+            if (next) attendanceMap.set(key, next); else attendanceMap.delete(key);
+            line.querySelector('.btn-group').outerHTML = attButtonsHtml(task, teacher);
+            renderSummary();
+        } catch (e) {
+            toast('تعذر الاتصال بالسيرفر', false);
+        } finally {
+            line.querySelectorAll('[data-att]').forEach(b => b.disabled = false);
+        }
+    }
+
+    // 💬 الإرسال (للجميع أو لمعلم واحد)
+    async function sendReminders(onlyTeacher = null) {
+        const lines = [...document.querySelectorAll('.teacher-line')]
+            .filter(l => !onlyTeacher || l.dataset.teacher === onlyTeacher);
+        if (lines.length === 0) return;
+
+        if (!onlyTeacher && !confirm(`سيتم إرسال رسالة واتساب إلى ${new Set(lines.map(l => l.dataset.teacher)).size} معلم. متابعة؟`)) return;
+
+        const btnAll = document.getElementById('btnNotifyAll');
+        btnAll.disabled = true;
+        lines.forEach(l => l.querySelector('.send-status').innerHTML = '<span class="text-secondary">⏳ جاري الإرسال...</span>');
+
+        try {
+            const res = await fetch('/api/monitoring/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: currentDate,
+                    tasks: currentReportData.map(i => i.task),
+                    only: onlyTeacher ? [onlyTeacher] : null,
+                    template: document.getElementById('messageTemplate').value
+                })
+            });
+            const result = await res.json();
+
+            if (!result.success) {
+                lines.forEach(l => l.querySelector('.send-status').innerHTML = '');
+                toast(result.message || 'تعذر الإرسال', false);
+                return;
+            }
+
+            const byTeacher = new Map(result.results.map(r => [r.teacher, r]));
+            lines.forEach(l => {
+                const r = byTeacher.get(l.dataset.teacher);
+                l.querySelector('.send-status').innerHTML = !r ? ''
+                    : r.sent ? '<span class="text-success">✔ أُرسلت الرسالة</span>'
+                             : `<span class="text-danger">✖ ${escapeHtml(r.error || 'لم تُرسل')}</span>`;
+            });
+            const allOk = result.results.every(r => r.sent);
+            toast(result.message, allOk);
+        } catch (e) {
+            lines.forEach(l => l.querySelector('.send-status').innerHTML = '');
+            toast('تعذر الاتصال بالسيرفر', false);
+        } finally {
+            btnAll.disabled = false;
+        }
+    }
+
+    document.getElementById('reportTableBody').addEventListener('click', (e) => {
+        const line = e.target.closest('.teacher-line');
+        if (!line) return;
+        const attBtn = e.target.closest('[data-att]');
+        if (attBtn) return setAttendance(line, attBtn.dataset.att);
+        if (e.target.closest('[data-send]')) return sendReminders(line.dataset.teacher);
+    });
+    document.getElementById('btnNotifyAll').addEventListener('click', () => sendReminders());
 
     async function generateReportPDF() {
         if (currentReportData.length === 0) return;
@@ -494,7 +696,12 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-        loadSchoolName(); 
+        loadSchoolName();
+        const dateInput = document.getElementById('dateFilter');
+        dateInput.value = todayLocalISO();
+        dateInput.addEventListener('change', updateDateInfo);
+        updateDateInfo();
+        document.getElementById('messageTemplate').value = DEFAULT_TEMPLATE;
     });
 </script>
 </body>
