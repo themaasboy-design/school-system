@@ -1149,6 +1149,94 @@ function parseMonitoringDateLoose(s) {
   return v;
 }
 
+// -------------------------------------------------------------------------
+// 📊 صفحة أداء المعلمين — تجمع مؤشرات كل معلم من مصادر متعددة
+// (الإشراف الآن، والغياب والانتظار لاحقاً بعد تحويلهما لقاعدة البيانات)
+// -------------------------------------------------------------------------
+app.get('/performance', (req, res) => {
+  res.sendFile(path.join(__dirname, 'performance.html'));
+});
+
+function readTeacherNamesFromExcel(workbook) {
+  const rows = xlsx.utils.sheet_to_json(getSheet(workbook, TEACHERS_SHEET) || {}, { header: 1 });
+  return rows.slice(1).map(r => (r && r[1] != null ? String(r[1]).trim() : '')).filter(Boolean);
+}
+
+// GET /api/performance?from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get('/api/performance', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const from = req.query.from ? parseMonitoringDateLoose(req.query.from) : null;
+    const to = req.query.to ? parseMonitoringDateLoose(req.query.to) : null;
+
+    // كل معلمي المدرسة يظهرون حتى لو ليس لهم أي تسجيل بعد
+    let names = [];
+    try {
+      names = readTeacherNamesFromExcel(xlsx.readFile(await getUserExcelPath(req)));
+    } catch (e) {
+      console.warn('⚠️ تعذر قراءة قائمة المعلمين:', e.message);
+    }
+
+    const mon = await pool.query(
+      `SELECT teacher_name,
+              COUNT(*) FILTER (WHERE status = 'done')::int   AS done,
+              COUNT(*) FILTER (WHERE status = 'missed')::int AS missed,
+              to_char(MAX(att_date) FILTER (WHERE status = 'done'), 'YYYY-MM-DD') AS last_done
+       FROM monitoring_attendance
+       WHERE username = $1
+         AND ($2::date IS NULL OR att_date >= $2::date)
+         AND ($3::date IS NULL OR att_date <= $3::date)
+       GROUP BY teacher_name`,
+      [username, from, to]
+    );
+
+    const byName = new Map();
+    const blank = (n) => ({
+      teacher_name: n,
+      monitoring: { done: 0, missed: 0, last_done: null },
+      absence: null,  // 🔜 بعد تحويل الغياب لقاعدة البيانات
+      waiting: null   // 🔜 بعد تحويل الانتظار لقاعدة البيانات
+    });
+    names.forEach(n => byName.set(n, blank(n)));
+    mon.rows.forEach(r => {
+      if (!byName.has(r.teacher_name)) byName.set(r.teacher_name, blank(r.teacher_name));
+      byName.get(r.teacher_name).monitoring = {
+        done: r.done,
+        missed: r.missed,
+        last_done: r.last_done || null
+      };
+    });
+
+    res.json({ success: true, from, to, data: [...byName.values()] });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء جلب أداء المعلمين:');
+  }
+});
+
+// GET /api/performance/teacher?name=...&from=&to=  — تفاصيل معلم واحد (للنافذة المنبثقة)
+app.get('/api/performance/teacher', async (req, res) => {
+  try {
+    const username = requireSessionUser(req);
+    const name = String(req.query.name || '').trim();
+    if (!name) return res.status(400).json({ success: false, message: 'اسم المعلم مطلوب' });
+    const from = req.query.from ? parseMonitoringDateLoose(req.query.from) : null;
+    const to = req.query.to ? parseMonitoringDateLoose(req.query.to) : null;
+
+    const result = await pool.query(
+      `SELECT to_char(att_date, 'YYYY-MM-DD') AS date, day_key, task, status
+       FROM monitoring_attendance
+       WHERE username = $1 AND teacher_name = $2
+         AND ($3::date IS NULL OR att_date >= $3::date)
+         AND ($4::date IS NULL OR att_date <= $4::date)
+       ORDER BY att_date DESC, task`,
+      [username, name, from, to]
+    );
+    res.json({ success: true, monitoring: result.rows });
+  } catch (e) {
+    sendMonitoringError(res, e, 'حدث خطأ أثناء جلب تفاصيل المعلم:');
+  }
+});
+
 // 💬 إرسال تذكير واتساب لمشرفي اليوم
 // body: { date, tasks?: [أسماء المهام المعروضة], only?: [أسماء معلمين] , template?: نص }
 // المتغيرات في النص: {الاسم} {المهمة} {اليوم} {التاريخ}
