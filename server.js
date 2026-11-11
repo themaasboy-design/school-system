@@ -128,6 +128,74 @@ async function initDb() {
     // علامة لكل مدرسة: هل تم نقل جدول الإشراف القديم من الإكسل إلى القاعدة؟
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS monitoring_migrated BOOLEAN DEFAULT FALSE;`);
 
+    // 🗄️ بيانات المدرسة الأساسية (معلمون/فصول/معلومات) + الانتظار + الغياب
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS school_teachers (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        national_id TEXT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        sort_order INTEGER DEFAULT 0
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_school_teachers_user ON school_teachers (username);`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS school_classes (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        name TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_school_classes_user ON school_classes (username);`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS school_info (
+        username VARCHAR(255) PRIMARY KEY,
+        education_dept TEXT DEFAULT '',
+        school_name TEXT DEFAULT '',
+        principal TEXT DEFAULT '',
+        deputy TEXT DEFAULT ''
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS waiting_slots (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        day_name TEXT NOT NULL,
+        row_no INTEGER NOT NULL,
+        period INTEGER NOT NULL,
+        teacher_id INTEGER REFERENCES school_teachers(id) ON DELETE CASCADE,
+        teacher_label TEXT DEFAULT '',
+        UNIQUE (username, day_name, row_no, period)
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS absence_records (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        abs_date TEXT NOT NULL,
+        day_name TEXT NOT NULL,
+        teacher_id INTEGER REFERENCES school_teachers(id) ON DELETE SET NULL,
+        teacher_name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_absence_user_date ON absence_records (username, abs_date);`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS absence_slots (
+        id SERIAL PRIMARY KEY,
+        absence_id INTEGER NOT NULL REFERENCES absence_records(id) ON DELETE CASCADE,
+        period INTEGER NOT NULL,
+        class_name TEXT DEFAULT '',
+        sub_id INTEGER REFERENCES school_teachers(id) ON DELETE SET NULL,
+        sub_name TEXT DEFAULT '',
+        UNIQUE (absence_id, period)
+      );
+    `);
+    // علامة لكل مدرسة: هل نُقل الانتظار والغياب والمعلمون من الإكسل إلى القاعدة؟
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS waiting_migrated BOOLEAN DEFAULT FALSE;`);
+
     // 💬 جدول حفظ جلسات واتساب (ربط دائم لكل مدرسة)
     await client.query(`
       CREATE TABLE IF NOT EXISTS wa_auth (
@@ -369,168 +437,537 @@ app.get('/monitoring', (req, res) => {
   res.sendFile(path.join(__dirname, 'monitoring.html'));
 });
 
+// =========================================================================
+// 🗄️ بيانات المدرسة الأساسية + الانتظار + الغياب — كلها في PostgreSQL
+// (المعلمون، الفصول، معلومات المدرسة، جدول الانتظار، سجلات الغياب والبدلاء)
+// لا يوجد أي اعتماد على ملف الإكسل أثناء الطلبات. الإكسل يُقرأ فقط:
+//   1) مرة واحدة تلقائياً لنقل البيانات القديمة، 2) عند رفع ملف جديد من المدير/الأدمن.
+// =========================================================================
+
+function normName(s) {
+  return String(s ?? '')
+    .replace(/[ً-ْـ]/g, '')
+    .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function toWesternDigits(s) {
+  return String(s ?? '')
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+}
+
+// ---------------------------- التواريخ ----------------------------------
+// المعتمد في المنصة: تاريخ هجري بصيغة YYYY/MM/DD. أي تاريخ ميلادي قديم يُحوَّل لهجري.
+const _hijriFmt = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
+});
+
+function gregorianToHijriStr(y, m, d) {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (isNaN(dt.getTime()) || dt.getUTCMonth() !== m - 1) return null;
+  const p = {};
+  _hijriFmt.formatToParts(dt).forEach(x => { p[x.type] = x.value; });
+  return `${String(p.year).padStart(4, '0')}/${String(p.month).padStart(2, '0')}/${String(p.day).padStart(2, '0')}`;
+}
+
+function ymdToHijri(y, m, d) {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  if (y >= 1300 && y <= 1600) return `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+  if (y >= 1900 && y <= 2200) return gregorianToHijriStr(y, m, d);
+  return null;
+}
+
+function parseDateStrict(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return gregorianToHijriStr(v.getUTCFullYear(), v.getUTCMonth() + 1, v.getUTCDate());
+  if (typeof v === 'number') {
+    if (v > 20000 && v < 80000) { // رقم تسلسلي من إكسل
+      const dt = new Date(Math.round((v - 25569) * 86400000));
+      return gregorianToHijriStr(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    }
+    return null;
+  }
+  const s = toWesternDigits(v).replace(/[‎‏]/g, '').trim();
+  let m = s.match(/^(\d{4})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{1,2})$/);
+  if (m) return ymdToHijri(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4})$/);
+  if (m) return ymdToHijri(+m[3], +m[2], +m[1]);
+  return null;
+}
+
+function normalizeDateLoose(v) {
+  return parseDateStrict(v) || toWesternDigits(v).replace(/[‎‏]/g, '').trim().replace(/-/g, '/');
+}
+
+// ---------------------------- أدوات قاعدة البيانات -------------------------
+async function withTx(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+function sendWaitingError(res, e, prefix) {
+  const status = e.status || 500;
+  const msg = (prefix ? prefix + ' ' : '') + e.message;
+  if (status >= 500) console.error('❌', msg);
+  return res.status(status).json({ success: false, error: msg, message: msg });
+}
+
+// ---------------------------- الاستيراد من الإكسل -------------------------
+function findSheetName(workbook, wanted) {
+  const w = String(wanted).trim().toLowerCase();
+  return workbook.SheetNames.find(n => String(n).trim().toLowerCase() === w) || null;
+}
+
+function cellStr(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim();
+}
+
+function parseTeachersSheet(workbook) {
+  const name = findSheetName(workbook, TEACHERS_SHEET);
+  if (!name) return null;
+  const rows = xlsx.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+  const header = (rows[0] || []).map(h => String(h ?? ''));
+  let phoneCol = header.findIndex(h => /جوال|هاتف|موبايل|تواصل|phone|mobile/i.test(h));
+  if (phoneCol < 0) phoneCol = 2;
+  const out = [];
+  rows.slice(1).forEach(r => {
+    if (!r) return;
+    const nm = cellStr(r[1]);
+    if (!nm) return;
+    out.push({ national_id: cellStr(r[0]), name: nm, phone: cellStr(r[phoneCol]) });
+  });
+  return out;
+}
+
+function parseClassesSheet(workbook) {
+  const name = findSheetName(workbook, CLASSES_SHEET);
+  if (!name) return null;
+  const rows = xlsx.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+  const seen = new Set();
+  const out = [];
+  rows.slice(1).forEach(r => {
+    const c = cellStr(r && r[0]);
+    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+  });
+  return out;
+}
+
+function parseInfoSheet(workbook) {
+  const name = findSheetName(workbook, MAIN_INFO_SHEET);
+  if (!name) return null;
+  const rows = xlsx.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+  const v = i => cellStr(rows[i] && rows[i][1]);
+  // القالب النظيف القديم: (المدرسة، القطاع، المدير) بدل (الإدارة، المدرسة، المدير، الوكيل)
+  if (cellStr(rows[0] && rows[0][0]) === 'المدرسة') {
+    return { education_dept: v(1), school_name: v(0), principal: v(2), deputy: v(3) };
+  }
+  return { education_dept: v(0), school_name: v(1), principal: v(2), deputy: v(3) };
+}
+
+function parseWaitingSheet(workbook) {
+  const name = findSheetName(workbook, WAITING_SHEET);
+  if (!name) return [];
+  const data = xlsx.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+  const out = []; // { day, row_no, period, value }
+  CANONICAL_WAITING_DAYS.forEach(day => {
+    const idx = data.findIndex(r => r && normalizeArabicText(r[0]) === normalizeArabicText(day));
+    if (idx === -1) return;
+    for (let r = 0; r < 4; r++) {
+      const row = data[idx + 1 + r] || [];
+      for (let c = 0; c < 7; c++) {
+        const val = cellStr(row[c]);
+        if (val) out.push({ day, row_no: r, period: c + 1, value: val });
+      }
+    }
+  });
+  return out;
+}
+
+function parseReportSheet(workbook) {
+  const name = findSheetName(workbook, REPORT_SHEET);
+  if (!name) return [];
+  const data = xlsx.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+  const out = [];
+  data.forEach(row => {
+    if (!row) return;
+    const date = parseDateStrict(row[0]);
+    const teacher = cellStr(row[2]);
+    if (!date || !teacher) return; // يتجاوز صفوف العناوين والصفوف الفارغة
+    const dayRaw = cellStr(row[1]);
+    const slots = [];
+    for (let p = 1; p <= 7; p++) {
+      const cls = cellStr(row[3 + (p - 1) * 2]);
+      const sub = cellStr(row[4 + (p - 1) * 2]);
+      if (cls || sub) slots.push({ period: p, class_name: cls, sub_name: sub });
+    }
+    out.push({ date, day: canonicalizeDayName(dayRaw), teacher, slots });
+  });
+  return out;
+}
+
+async function loadTeacherMaps(client, username) {
+  const r = await client.query(
+    'SELECT id, national_id, name, phone FROM school_teachers WHERE username = $1 ORDER BY sort_order, id', [username]);
+  const byName = new Map();
+  r.rows.forEach(t => { const k = normName(t.name); if (k && !byName.has(k)) byName.set(k, t); });
+  return { rows: r.rows, byName };
+}
+
+// يحدّث المعلمين/الفصول/معلومات المدرسة من ملف إكسل دون المساس بالانتظار والغياب.
+// المعلم يُطابَق بالسجل المدني (ثم بالاسم)، فتعديل اسمه ينعكس تلقائياً على الجداول والتقارير.
+async function applyBaseFromWorkbook(client, username, workbook) {
+  const teachers = parseTeachersSheet(workbook);
+  if (teachers) {
+    const existing = (await client.query(
+      'SELECT id, national_id, name FROM school_teachers WHERE username = $1', [username])).rows;
+    const used = new Set();
+    const byNid = new Map();
+    const byNm = new Map();
+    existing.forEach(t => {
+      if (t.national_id) byNid.set(String(t.national_id), t);
+      const k = normName(t.name);
+      if (k && !byNm.has(k)) byNm.set(k, t);
+    });
+    let order = 0;
+    for (const t of teachers) {
+      order += 1;
+      let match = t.national_id ? byNid.get(t.national_id) : null;
+      if (match && used.has(match.id)) match = null;
+      if (!match) {
+        const m2 = byNm.get(normName(t.name));
+        if (m2 && !used.has(m2.id)) match = m2;
+      }
+      if (match) {
+        used.add(match.id);
+        await client.query(
+          'UPDATE school_teachers SET national_id = $1, name = $2, phone = $3, sort_order = $4 WHERE id = $5',
+          [t.national_id, t.name, t.phone, order, match.id]);
+      } else {
+        await client.query(
+          'INSERT INTO school_teachers (username, national_id, name, phone, sort_order) VALUES ($1, $2, $3, $4, $5)',
+          [username, t.national_id, t.name, t.phone, order]);
+      }
+    }
+    for (const t of existing) {
+      if (!used.has(t.id)) await client.query('DELETE FROM school_teachers WHERE id = $1', [t.id]);
+    }
+    // ربط الخانات النصية القديمة بمعلم صار موجوداً بنفس الاسم
+    const { byName } = await loadTeacherMaps(client, username);
+    const loose = await client.query(
+      "SELECT id, teacher_label FROM waiting_slots WHERE username = $1 AND teacher_id IS NULL", [username]);
+    for (const s of loose.rows) {
+      const hit = byName.get(normName(s.teacher_label));
+      if (hit) await client.query('UPDATE waiting_slots SET teacher_id = $1, teacher_label = $2 WHERE id = $3', [hit.id, '', s.id]);
+    }
+  }
+
+  const classes = parseClassesSheet(workbook);
+  if (classes) {
+    await client.query('DELETE FROM school_classes WHERE username = $1', [username]);
+    let i = 0;
+    for (const c of classes) {
+      i += 1;
+      await client.query('INSERT INTO school_classes (username, name, sort_order) VALUES ($1, $2, $3)', [username, c, i]);
+    }
+  }
+
+  const info = parseInfoSheet(workbook);
+  if (info) {
+    const u = await client.query('SELECT school_name FROM users WHERE username = $1', [username]);
+    const schoolName = info.school_name || (u.rows[0] && u.rows[0].school_name) || '';
+    await client.query('DELETE FROM school_info WHERE username = $1', [username]);
+    await client.query(
+      'INSERT INTO school_info (username, education_dept, school_name, principal, deputy) VALUES ($1, $2, $3, $4, $5)',
+      [username, info.education_dept, schoolName, info.principal, info.deputy]);
+  }
+}
+
+async function insertAbsence(client, username, rec, byName) {
+  const t = byName.get(normName(rec.teacher));
+  const ins = await client.query(
+    'INSERT INTO absence_records (username, abs_date, day_name, teacher_id, teacher_name) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [username, rec.date, rec.day, t ? t.id : null, t ? t.name : rec.teacher]);
+  const id = ins.rows[0].id;
+  for (const s of rec.slots) {
+    const sub = s.sub_name ? byName.get(normName(s.sub_name)) : null;
+    await client.query(
+      'INSERT INTO absence_slots (absence_id, period, class_name, sub_id, sub_name) VALUES ($1, $2, $3, $4, $5)',
+      [id, s.period, s.class_name, sub ? sub.id : null, sub ? sub.name : s.sub_name]);
+  }
+  return id;
+}
+
+async function setWaitingSlots(client, username, day, cells, byName) {
+  await client.query('DELETE FROM waiting_slots WHERE username = $1 AND day_name = $2', [username, day]);
+  for (const c of cells) {
+    const t = byName.get(normName(c.value));
+    await client.query(
+      'INSERT INTO waiting_slots (username, day_name, row_no, period, teacher_id, teacher_label) VALUES ($1, $2, $3, $4, $5, $6)',
+      [username, day, c.row_no, c.period, t ? t.id : null, t ? '' : c.value]);
+  }
+}
+
+// استيراد كامل (أول مرة): الأساسيات + الانتظار + الغياب
+async function importFullFromWorkbook(username, workbook) {
+  await withTx(async (client) => {
+    await client.query('DELETE FROM waiting_slots WHERE username = $1', [username]);
+    await client.query(
+      'DELETE FROM absence_slots WHERE absence_id IN (SELECT id FROM absence_records WHERE username = $1)', [username]);
+    await client.query('DELETE FROM absence_records WHERE username = $1', [username]);
+
+    await applyBaseFromWorkbook(client, username, workbook);
+    const { byName } = await loadTeacherMaps(client, username);
+
+    const cells = parseWaitingSheet(workbook);
+    for (const day of CANONICAL_WAITING_DAYS) {
+      await setWaitingSlots(client, username, day, cells.filter(c => c.day === day), byName);
+    }
+    for (const rec of parseReportSheet(workbook)) {
+      await insertAbsence(client, username, rec, byName);
+    }
+    await client.query('UPDATE users SET waiting_migrated = TRUE WHERE username = $1', [username]);
+  });
+}
+
+async function importBaseFromWorkbook(username, workbook) {
+  await withTx(async (client) => { await applyBaseFromWorkbook(client, username, workbook); });
+}
+
+const _waitingReady = new Set();
+const _waitingPending = new Map();
+
+// نقل البيانات القديمة من الإكسل مرة واحدة لكل مدرسة (آمن لو وصل طلبان معاً)
+function ensureWaitingReady(username) {
+  if (_waitingReady.has(username)) return Promise.resolve();
+  if (_waitingPending.has(username)) return _waitingPending.get(username);
+  const p = (async () => {
+    const r = await pool.query('SELECT waiting_migrated, excel_data FROM users WHERE username = $1', [username]);
+    if (r.rows.length === 0) return;
+    if (r.rows[0].waiting_migrated) { _waitingReady.add(username); return; }
+    if (r.rows[0].excel_data) {
+      const wb = xlsx.read(r.rows[0].excel_data, { type: 'buffer' });
+      await importFullFromWorkbook(username, wb);
+      console.log(`🔁 تم نقل بيانات الانتظار والغياب للمستخدم (${username}) من الإكسل إلى قاعدة البيانات.`);
+    } else {
+      await pool.query('UPDATE users SET waiting_migrated = TRUE WHERE username = $1', [username]);
+    }
+    _waitingReady.add(username);
+  })().finally(() => _waitingPending.delete(username));
+  _waitingPending.set(username, p);
+  return p;
+}
+
+// بعد رفع ملف إكسل جديد: لو المدرسة لم تُنقل بعد نستورد كل شيء من الملف الجديد،
+// وإلا نحدّث المعلمين والفصول والمعلومات فقط (الانتظار والغياب لا تُمسّ أبداً).
+async function refreshFromUploadedExcel(username, buffer) {
+  const wb = xlsx.read(buffer, { type: 'buffer' });
+  const r = await pool.query('SELECT waiting_migrated FROM users WHERE username = $1', [username]);
+  if (r.rows.length === 0) return;
+  if (r.rows[0].waiting_migrated) {
+    await importBaseFromWorkbook(username, wb);
+  } else {
+    await importFullFromWorkbook(username, wb);
+  }
+  _waitingReady.add(username);
+}
+
+async function prepareWaiting(req) {
+  const username = requireSessionUser(req);
+  await ensureWaitingReady(username);
+  return username;
+}
+
+// عند تغيير اسم المستخدم من لوحة الأدمن تتبعه كل الجداول
+async function renameSchoolUsername(oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return;
+  for (const t of ['school_teachers', 'school_classes', 'school_info', 'waiting_slots', 'absence_records',
+                   'monitoring_schedule', 'monitoring_attendance', 'accountability', 'wa_auth']) {
+    await pool.query(`UPDATE ${t} SET username = $1 WHERE username = $2`, [newName, oldName]);
+  }
+  _waitingReady.delete(oldName);
+  _waitingReady.add(newName);
+}
+
+async function deleteSchoolData(username) {
+  await pool.query('DELETE FROM waiting_slots WHERE username = $1', [username]);
+  await pool.query('DELETE FROM absence_slots WHERE absence_id IN (SELECT id FROM absence_records WHERE username = $1)', [username]);
+  await pool.query('DELETE FROM absence_records WHERE username = $1', [username]);
+  for (const t of ['school_teachers', 'school_classes', 'school_info']) {
+    await pool.query(`DELETE FROM ${t} WHERE username = $1`, [username]);
+  }
+  _waitingReady.delete(username);
+}
+
+// ---------------------------- قراءة من القاعدة ---------------------------
+async function dbTeachers(username) {
+  const r = await pool.query(
+    'SELECT id, national_id, name, phone FROM school_teachers WHERE username = $1 ORDER BY sort_order, id', [username]);
+  return r.rows;
+}
+
+async function dbClasses(username) {
+  const r = await pool.query('SELECT name FROM school_classes WHERE username = $1 ORDER BY sort_order, id', [username]);
+  return r.rows.map(x => x.name);
+}
+
+async function dbSchoolInfo(username) {
+  const r = await pool.query(
+    'SELECT education_dept, school_name, principal, deputy FROM school_info WHERE username = $1', [username]);
+  const i = r.rows[0] || {};
+  return { B1: i.education_dept || '', B2: i.school_name || '', B3: i.principal || '', B4: i.deputy || '' };
+}
+
+async function dbWaitingMatrix(username) {
+  const r = await pool.query(
+    `SELECT w.day_name, w.row_no, w.period, w.teacher_label, t.name AS teacher_name
+       FROM waiting_slots w LEFT JOIN school_teachers t ON t.id = w.teacher_id
+      WHERE w.username = $1`, [username]);
+  const schedule = {};
+  CANONICAL_WAITING_DAYS.forEach(d => { schedule[d] = [0, 1, 2, 3].map(() => ['', '', '', '', '', '', '']); });
+  r.rows.forEach(s => {
+    const day = canonicalizeDayName(s.day_name);
+    if (!schedule[day] || s.row_no < 0 || s.row_no > 3 || s.period < 1 || s.period > 7) return;
+    schedule[day][s.row_no][s.period - 1] = s.teacher_name || s.teacher_label || '';
+  });
+  return schedule;
+}
+
+// سجلات الغياب بالشكل القديم تماماً (ترتيب المفاتيح مهم لدوال الـ PDF التي تعتمد Object.values)
+async function dbAbsenceItems(username, filter = {}) {
+  const recs = (await pool.query(
+    `SELECT r.id, r.abs_date, r.day_name, r.teacher_name, t.name AS cur_name, t.phone AS cur_phone
+       FROM absence_records r LEFT JOIN school_teachers t ON t.id = r.teacher_id
+      WHERE r.username = $1 ORDER BY r.id`, [username])).rows;
+  const slots = (await pool.query(
+    `SELECT s.absence_id, s.period, s.class_name, s.sub_name, st.name AS cur_sub, st.phone AS sub_phone
+       FROM absence_slots s
+       JOIN absence_records r ON r.id = s.absence_id
+       LEFT JOIN school_teachers st ON st.id = s.sub_id
+      WHERE r.username = $1`, [username])).rows;
+  const teachers = await dbTeachers(username);
+  const phoneByName = new Map();
+  teachers.forEach(t => { if (t.phone) phoneByName.set(normName(t.name), t.phone); });
+
+  const slotMap = new Map();
+  slots.forEach(s => {
+    if (!slotMap.has(s.absence_id)) slotMap.set(s.absence_id, {});
+    slotMap.get(s.absence_id)[s.period] = s;
+  });
+
+  const wantDate = filter.date ? normalizeDateLoose(filter.date) : '';
+  const wantDay = filter.day ? normalizeArabicText(filter.day) : '';
+
+  const items = [];
+  recs.forEach(r => {
+    if (wantDate && normalizeDateLoose(r.abs_date) !== wantDate) return;
+    if (wantDay && normalizeArabicText(r.day_name) !== wantDay) return;
+    const name = r.cur_name || r.teacher_name;
+    const item = { 'التاريخ': r.abs_date, 'اليوم': r.day_name, 'المعلم الغائب': name };
+    const subPhones = [];
+    for (let p = 1; p <= 7; p++) {
+      const s = (slotMap.get(r.id) || {})[p];
+      const sub = s ? (s.cur_sub || s.sub_name || '') : '';
+      item[`فصل ${p}`] = s ? (s.class_name || '') : '';
+      item[`بديل ${p}`] = sub;
+      subPhones.push(s ? (s.sub_phone || phoneByName.get(normName(sub)) || '') : '');
+    }
+    item._id = r.id;
+    item.absentPhone = r.cur_phone || phoneByName.get(normName(name)) || '';
+    item.subPhones = subPhones;
+    items.push(item);
+  });
+  return items;
+}
+
+// =========================================================================
+// 📊 مسارات المعلمين والفصول (من القاعدة)
+// =========================================================================
 app.get('/get-data', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, TEACHERS_SHEET);
-    res.json(xlsx.utils.sheet_to_json(sheet));
-  } catch (e) {
-    res.status(401).json({ error: e.message });
-  }
+    const username = await prepareWaiting(req);
+    const rows = await dbTeachers(username);
+    res.json(rows.map(t => ({ 'السجل المدني': t.national_id || '', Name_teacher: t.name, 'رقم الجوال': t.phone || '' })));
+  } catch (e) { sendWaitingError(res, e); }
 });
 
 app.get('/get-classes', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, CLASSES_SHEET);
-    res.json(xlsx.utils.sheet_to_json(sheet));
-  } catch (e) {
-    res.status(401).json({ error: e.message });
-  }
-});
-
-app.get('/get-waiting-teachers', async (req, res) => {
-  const { day, period } = req.query;
-  try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, WAITING_SHEET);
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-
-    let dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(day));
-    if (dayIndex === -1) return res.json({ teachers: [] });
-
-    const colIndex = parseInt(period) - 1;
-    let resultTeachers = [];
-
-    for (let i = 1; i <= 4; i++) {
-      let row = data[dayIndex + i];
-      if (row && row[colIndex] !== undefined) {
-        resultTeachers.push(row[colIndex]);
-      }
-    }
-    res.json({ teachers: resultTeachers });
-  } catch (e) {
-    res.status(500).json({ error: "خطأ في قراءة الملف: " + e.message });
-  }
-});
-
-app.post('/save-waiting-schedule-day', async (req, res) => {
-  const { day, schedule } = req.body;
-  try {
-    if (!day || !Array.isArray(schedule)) {
-      return res.status(400).json({ success: false, error: "بيانات غير صالحة: يجب إرسال day و schedule" });
-    }
-
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-
-    const canonicalDay = canonicalizeDayName(day);
-
-    let data = [];
-    if (workbook.SheetNames.includes(WAITING_SHEET)) {
-      data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
-    }
-
-    let dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(canonicalDay));
-
-    if (dayIndex === -1) {
-      dayIndex = data.length;
-      data.push([canonicalDay]);
-      for (let r = 0; r < 4; r++) data.push([]);
-    }
-
-    for (let r = 0; r < 4; r++) {
-      const rowIndex = dayIndex + 1 + r;
-      const rowValues = schedule[r] || [];
-      if (!data[rowIndex]) data[rowIndex] = [];
-      for (let c = 0; c < 7; c++) {
-        data[rowIndex][c] = rowValues[c] || "";
-      }
-    }
-
-    const newSheet = xlsx.utils.aoa_to_sheet(data);
-    if (workbook.SheetNames.includes(WAITING_SHEET)) {
-      workbook.Sheets[WAITING_SHEET] = newSheet;
-    } else {
-      xlsx.utils.book_append_sheet(workbook, newSheet, WAITING_SHEET);
-    }
-
-    xlsx.writeFile(workbook, userExcel);
-    await syncOrThrow(username, userExcel);
-
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ success: false, error: "خطأ أثناء الحفظ: " + e.message });
-  }
-});
-
-app.get('/get-waiting-schedule-full', async (req, res) => {
-  try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-
-    if (!workbook.SheetNames.includes(WAITING_SHEET)) {
-      return res.json({ success: true, schedule: {} });
-    }
-
-    const data = xlsx.utils.sheet_to_json(workbook.Sheets[WAITING_SHEET], { header: 1 });
-    let schedule = {};
-
-    CANONICAL_WAITING_DAYS.forEach(day => {
-      const dayIndex = data.findIndex(row => row && normalizeArabicText(row[0]) === normalizeArabicText(day));
-      if (dayIndex === -1) {
-        schedule[day] = [[], [], [], []];
-        return;
-      }
-      let matrix = [];
-      for (let r = 1; r <= 4; r++) {
-        matrix.push(data[dayIndex + r] || []);
-      }
-      schedule[day] = matrix;
-    });
-
-    res.json({ success: true, schedule });
-  } catch (e) {
-    res.status(500).json({ success: false, error: "خطأ أثناء قراءة الجدول: " + e.message });
-  }
+    const username = await prepareWaiting(req);
+    res.json((await dbClasses(username)).map(n => ({ Name_class: n })));
+  } catch (e) { sendWaitingError(res, e); }
 });
 
 app.get('/api/teachers', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, TEACHERS_SHEET);
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-
-    const teachersNames = data.slice(1)
-      .map(row => row[1])
-      .filter(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "");
-
-    res.json(teachersNames);
-  } catch (e) {
-    res.status(401).json({ error: e.message });
-  }
+    const username = await prepareWaiting(req);
+    res.json((await dbTeachers(username)).map(t => t.name));
+  } catch (e) { sendWaitingError(res, e); }
 });
 
-// 📋 مسار يرجّع بيانات المعلمين كاملة (كل الأعمدة بترتيبها الخام) - يُستخدم بتقرير المساءلة
+// بيانات المعلمين الكاملة [السجل المدني، الاسم، الجوال] — تُستخدم في تقرير المساءلة والواتساب
 app.get('/api/teachers-raw', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, TEACHERS_SHEET);
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+    const username = await prepareWaiting(req);
+    res.json((await dbTeachers(username)).map(t => [t.national_id || '', t.name, t.phone || '']));
+  } catch (e) { sendWaitingError(res, e); }
+});
 
-    const rows = data.slice(1)
-      .filter(row => row && row[1] !== undefined && row[1] !== null && row[1].toString().trim() !== "");
+// =========================================================================
+// ⏳ جدول الانتظار (من القاعدة)
+// =========================================================================
+app.get('/get-waiting-teachers', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    const day = canonicalizeDayName(req.query.day);
+    const period = parseInt(req.query.period, 10);
+    if (!(period >= 1 && period <= 7)) return res.json({ teachers: [] });
+    const schedule = await dbWaitingMatrix(username);
+    const dayRows = schedule[day];
+    if (!dayRows) return res.json({ teachers: [] });
+    res.json({ teachers: dayRows.map(r => r[period - 1]).filter(Boolean) });
+  } catch (e) { sendWaitingError(res, e); }
+});
 
-    res.json(rows);
-  } catch (e) {
-    res.status(401).json({ error: e.message });
-  }
+app.post('/save-waiting-schedule-day', async (req, res) => {
+  try {
+    const { day, schedule } = req.body || {};
+    if (!day || !Array.isArray(schedule)) {
+      return res.status(400).json({ success: false, error: 'بيانات غير صالحة: يجب إرسال day و schedule' });
+    }
+    const username = await prepareWaiting(req);
+    const canonicalDay = canonicalizeDayName(day);
+    const { byName } = await loadTeacherMaps(pool, username);
+
+    const cells = [];
+    for (let r = 0; r < 4; r++) {
+      const rowValues = Array.isArray(schedule[r]) ? schedule[r] : [];
+      for (let c = 0; c < 7; c++) {
+        const val = cellStr(rowValues[c]);
+        if (val) cells.push({ row_no: r, period: c + 1, value: val });
+      }
+    }
+    await withTx(async (client) => { await setWaitingSlots(client, username, canonicalDay, cells, byName); });
+    res.json({ success: true });
+  } catch (e) { sendWaitingError(res, e, 'خطأ أثناء الحفظ:'); }
+});
+
+app.get('/get-waiting-schedule-full', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    res.json({ success: true, schedule: await dbWaitingMatrix(username) });
+  } catch (e) { sendWaitingError(res, e, 'خطأ أثناء قراءة الجدول:'); }
 });
 
 app.get('/api/get-rotation', async (req, res) => {
@@ -597,149 +1034,127 @@ app.post('/api/save-rotation', async (req, res) => {
   }
 });
 
+// =========================================================================
+// 📝 سجلات الغياب والبدلاء (من القاعدة)
+// =========================================================================
 app.post('/save-report', async (req, res) => {
-  const reportData = req.body;
   try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const header = ["التاريخ", "اليوم", "المعلم الغائب", "فصل 1", "بديل 1", "فصل 2", "بديل 2", "فصل 3", "بديل 3", "فصل 4", "بديل 4", "فصل 5", "بديل 5", "فصل 6", "بديل 6", "فصل 7", "بديل 7"];
-
-    let data = [];
-    if (workbook.SheetNames.includes(REPORT_SHEET)) {
-      data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
-    } else {
-      data.push(header);
+    const b = req.body || {};
+    const date = normalizeDateLoose(b.date);
+    const absent = cellStr(b.absentTeacher);
+    if (!date || !absent) {
+      return res.status(400).json({ success: false, error: 'يرجى تحديد التاريخ واسم المعلم الغائب' });
     }
-
-    let row = [reportData.date, reportData.day, reportData.absentTeacher];
+    const username = await prepareWaiting(req);
+    const { byName } = await loadTeacherMaps(pool, username);
+    const slots = [];
     for (let i = 1; i <= 7; i++) {
-      row.push(reportData[`class${i}_room`], reportData[`class${i}_teacher`]);
+      const cls = cellStr(b[`class${i}_room`]);
+      const sub = cellStr(b[`class${i}_teacher`]);
+      if (cls || sub) slots.push({ period: i, class_name: cls, sub_name: sub });
     }
-    data.push(row);
-
-    const newSheet = xlsx.utils.aoa_to_sheet(data);
-    workbook.Sheets[REPORT_SHEET] = newSheet;
-    if (!workbook.SheetNames.includes(REPORT_SHEET)) {
-      xlsx.utils.book_append_sheet(workbook, newSheet, REPORT_SHEET);
-    }
-
-    xlsx.writeFile(workbook, userExcel);
-    await syncOrThrow(username, userExcel);
-
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: "خطأ أثناء الحفظ: " + e.message });
-  }
+    const day = canonicalizeDayName(cellStr(b.day));
+    const id = await withTx(client => insertAbsence(client, username, { date, day, teacher: absent, slots }, byName));
+    res.json({ success: true, id });
+  } catch (e) { sendWaitingError(res, e, 'خطأ أثناء الحفظ:'); }
 });
 
-// 🗑️ مسار حذف سجل غياب (يدعم المطابقة عبر التاريخ أو اسم اليوم)
+// 🗑️ حذف سجل غياب: بالمعرّف إن وُجد، وإلا بالمطابقة (التاريخ أو اليوم + اسم المعلم)
 app.post('/delete-absence-record', async (req, res) => {
-  const teacherName = req.body.teacherName || req.body.absentTeacher || req.body.teacher;
-  const date = req.body.date || req.body.hijriDate || req.body.day;
-
-  console.log(`🔍 طلب حذف وارد -> المعلم: "${teacherName}" | التاريخ/اليوم: "${date}"`);
-
   try {
-    const username = req.session?.username || req.headers['x-username'] || req.body?.username;
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
+    const username = await prepareWaiting(req);
+    const teacherName = req.body.teacherName || req.body.absentTeacher || req.body.teacher;
+    const recordId = parseInt(req.body.recordId ?? req.body.id, 10);
 
-    if (!workbook.SheetNames.includes(REPORT_SHEET)) {
-      return res.status(404).json({ success: false, message: 'ورقة التقرير غير موجودة في الملف' });
+    let target = null;
+    if (recordId > 0) {
+      const r = await pool.query('SELECT id FROM absence_records WHERE id = $1 AND username = $2', [recordId, username]);
+      target = r.rows[0] || null;
     }
-
-    let data = xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET], { header: 1 });
-    if (data.length <= 1) {
-      return res.json({ success: true, message: 'لا توجد سجلات للحذف' });
+    if (!target && teacherName) {
+      const wantName = normName(teacherName);
+      const wantDate = req.body.date ? normalizeDateLoose(req.body.date) : '';
+      const wantDay = req.body.day ? normalizeArabicText(req.body.day) : '';
+      const all = (await pool.query(
+        `SELECT r.id, r.abs_date, r.day_name, r.teacher_name, t.name AS cur_name
+           FROM absence_records r LEFT JOIN school_teachers t ON t.id = r.teacher_id
+          WHERE r.username = $1 ORDER BY r.id`, [username])).rows;
+      target = all.find(r => {
+        if (normName(r.cur_name || r.teacher_name) !== wantName && normName(r.teacher_name) !== wantName) return false;
+        const dateOk = wantDate && normalizeDateLoose(r.abs_date) === wantDate;
+        const dayOk = wantDay && normalizeArabicText(r.day_name) === wantDay;
+        // يقبل التاريخ أو اليوم (قد يصل اسم اليوم في حقل التاريخ في الصفحات القديمة)
+        const dateAsDay = wantDate && normalizeArabicText(r.day_name) === normalizeArabicText(req.body.date);
+        return (dateOk && (!wantDay || dayOk)) || dateAsDay || (!wantDate && dayOk);
+      }) || null;
     }
-
-    const header = data[0];
-    const rows = data.slice(1);
-
-    // 🧹 دالة تنظيف وتوحيد الأحرف والمسافات
-    const cleanStr = (s) => {
-      if (s === null || s === undefined) return '';
-      return s.toString()
-        .trim()
-        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-        .replace(/[أإآا]/g, 'ا')
-        .replace(/ة/g, 'ه')
-        .replace(/ى/g, 'ي')
-        .replace(/[\/\-\s\u200f\u200e]/g, '');
-    };
-
-    const targetDateOrDay = cleanStr(date);
-    const targetTeacher = cleanStr(teacherName);
-
-    let matchFound = false;
-
-    const filteredRows = rows.filter((row) => {
-      const rowDate = cleanStr(row[0]);   // العمود الأول: التاريخ الرقمي
-      const rowDay = cleanStr(row[1]);    // العمود الثاني: اسم اليوم (الأحد، الإثنين...)
-      const rowTeacher = cleanStr(row[2]);// العمود الثالث: اسم المعلم
-
-      // المطابقة المرنة: يفحص التاريخ أو اليوم + اسم المعلم
-      const isDateOrDayMatch = (rowDate === targetDateOrDay || rowDay === targetDateOrDay);
-      const isTeacherMatch = (rowTeacher === targetTeacher);
-
-      if (isDateOrDayMatch && isTeacherMatch && !matchFound) {
-        matchFound = true; // حذف السجل المطابق
-        return false;
-      }
-      return true;
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'لم يتم العثور على السجل المطلوب حذفه.' });
+    }
+    await withTx(async (client) => {
+      await client.query('DELETE FROM absence_slots WHERE absence_id = $1', [target.id]);
+      await client.query('DELETE FROM absence_records WHERE id = $1 AND username = $2', [target.id, username]);
     });
-
-    if (!matchFound) {
-      console.warn(`❌ لم يتم العثور على سجل مطابق للمعلم "${teacherName}" والتاريخ/اليوم "${date}".`);
-      return res.status(404).json({
-        success: false,
-        message: 'لم يتم العثور على السجل المطلوب حذفه.'
-      });
-    }
-
-    const newData = [header, ...filteredRows];
-    workbook.Sheets[REPORT_SHEET] = xlsx.utils.aoa_to_sheet(newData);
-    xlsx.writeFile(workbook, userExcel);
-
-    if (username) {
-      await syncExcelToDb(username, userExcel);
-    }
-
-    console.log(`✅ تم حذف سجل المعلم (${teacherName}) بنجاح.`);
     res.json({ success: true, message: 'تم حذف السجل بنجاح' });
-
-  } catch (e) {
-    console.error("❌ خطأ أثناء حذف سجل الغياب:", e);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء الحذف: " + e.message });
-  }
+  } catch (e) { sendWaitingError(res, e, 'حدث خطأ أثناء الحذف:'); }
 });
 
+// 📥 سجلات الغياب ليوم وتاريخ محددين (تستخدمها صفحة التقرير)
+app.get('/api/absences', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    const records = await dbAbsenceItems(username, { date: req.query.date, day: req.query.day });
+    res.json({ success: true, records });
+  } catch (e) { sendWaitingError(res, e); }
+});
+
+// تبقى بنفس الشكل القديم: teachers = سجلات الغياب ، mainInfo = معلومات المدرسة
 app.get('/get-report-data', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-
-    let reportData = workbook.SheetNames.includes(REPORT_SHEET) 
-      ? xlsx.utils.sheet_to_json(workbook.Sheets[REPORT_SHEET]) 
-      : [];
-
-    let mainInfo = { B1: "", B2: "", B3: "", B4: "" };
-    if (workbook.SheetNames.includes(MAIN_INFO_SHEET)) {
-      const infoData = xlsx.utils.sheet_to_json(workbook.Sheets[MAIN_INFO_SHEET], { header: 1 });
-      mainInfo = {
-        B1: infoData[0]?.[1] || "",
-        B2: infoData[1]?.[1] || "",
-        B3: infoData[2]?.[1] || "",
-        B4: infoData[3]?.[1] || ""
-      };
-    }
-
-    res.json({ teachers: reportData, mainInfo });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    const username = await prepareWaiting(req);
+    const [teachers, mainInfo] = await Promise.all([dbAbsenceItems(username), dbSchoolInfo(username)]);
+    res.json({ teachers, mainInfo });
+  } catch (e) { sendWaitingError(res, e); }
 });
+
+// 📤 يبني ملف إكسل كاملاً من القاعدة (للتنزيل من لوحة الأدمن)
+async function buildWorkbookFromDb(username) {
+  await ensureWaitingReady(username);
+  const u = (await pool.query(
+    'SELECT excel_data, school_name, region, full_name FROM users WHERE username = $1', [username])).rows[0] || {};
+  const wb = u.excel_data
+    ? xlsx.read(u.excel_data, { type: 'buffer' })
+    : createCleanSchoolWorkbook(u.school_name || '', u.region || '', u.full_name || '');
+
+  const put = (name, aoa) => {
+    const ws = xlsx.utils.aoa_to_sheet(aoa);
+    const existing = wb.SheetNames.find(n => String(n).trim() === String(name).trim());
+    if (existing) wb.Sheets[existing] = ws;
+    else xlsx.utils.book_append_sheet(wb, ws, name);
+  };
+
+  const teachers = await dbTeachers(username);
+  put(TEACHERS_SHEET, [['السجل المدني', 'Name_teacher', 'رقم الجوال'], ...teachers.map(t => [t.national_id || '', t.name, t.phone || ''])]);
+  put(CLASSES_SHEET, [['Name_class'], ...(await dbClasses(username)).map(c => [c])]);
+
+  const info = await dbSchoolInfo(username);
+  put(MAIN_INFO_SHEET, [['إدارة التعليم', info.B1], ['اسم المدرسة', info.B2], ['مدير المدرسة', info.B3], ['وكيل المدرسة', info.B4]]);
+
+  const schedule = await dbWaitingMatrix(username);
+  const waitRows = [];
+  CANONICAL_WAITING_DAYS.forEach(d => {
+    waitRows.push([d]);
+    schedule[d].forEach(r => waitRows.push(r));
+    waitRows.push([]);
+  });
+  put(WAITING_SHEET, waitRows);
+
+  const header = ['التاريخ', 'اليوم', 'المعلم الغائب', 'فصل 1', 'بديل 1', 'فصل 2', 'بديل 2', 'فصل 3', 'بديل 3', 'فصل 4', 'بديل 4', 'فصل 5', 'بديل 5', 'فصل 6', 'بديل 6', 'فصل 7', 'بديل 7'];
+  const items = await dbAbsenceItems(username);
+  put(REPORT_SHEET, [header, ...items.map(it => header.map(h => it[h] ?? ''))]);
+
+  return wb;
+}
 
 // =========================================================================
 // 📋 مسارات الإشراف الأسبوعي
@@ -747,18 +1162,10 @@ app.get('/get-report-data', async (req, res) => {
 
 app.get('/get-monitoring-teachers', async (req, res) => {
   try {
-    const userExcel = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(userExcel);
-    const sheet = getSheet(workbook, TEACHERS_SHEET);
-    const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
-
-    const teachersList = data.slice(1)
-      .map(row => row[1])
-      .filter(cell => cell !== undefined && cell !== null && cell.toString().trim() !== "");
-
-    res.json({ success: true, teachers: teachersList });
+    const username = await prepareWaiting(req);
+    res.json({ success: true, teachers: (await dbTeachers(username)).map(t => t.name) });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    res.status(e.status || 500).json({ success: false, error: e.message });
   }
 });
 
@@ -970,17 +1377,8 @@ app.get('/get-reportmoni-data', async (req, res) => {
     const { day, task } = req.query;
     const username = requireSessionUser(req);
 
-    // معلومات المدرسة ما زالت في ورقة maininfo بالإكسل
-    const filePath = await getUserExcelPath(req);
-    const workbook = xlsx.readFile(filePath);
-    const infoSheet = workbook.Sheets[MAIN_INFO_SHEET];
-    let mainInfo = { B1: '', B2: '', B3: '', B4: '' };
-    if (infoSheet) {
-      mainInfo.B1 = infoSheet['B1'] ? infoSheet['B1'].v : '';
-      mainInfo.B2 = infoSheet['B2'] ? infoSheet['B2'].v : '';
-      mainInfo.B3 = infoSheet['B3'] ? infoSheet['B3'].v : '';
-      mainInfo.B4 = infoSheet['B4'] ? infoSheet['B4'].v : '';
-    }
+    await ensureWaitingReady(username);
+    const mainInfo = await dbSchoolInfo(username);
 
     if (!MONITORING_DAY_KEYS.includes(day)) return res.json({ success: true, data: [], mainInfo });
 
@@ -1036,22 +1434,11 @@ function formatHijriDate(dateStr) {
 const SAUDI_MOBILE_RE = /^(?:\+?966|00966|0)?5\d{8}$/;
 
 async function getTeacherPhones(req) {
-  const workbook = xlsx.readFile(await getUserExcelPath(req));
-  const rows = xlsx.utils.sheet_to_json(getSheet(workbook, TEACHERS_SHEET), { header: 1 });
-  const header = (rows[0] || []).map(h => String(h ?? ''));
-  const phoneCol = header.findIndex(h => /جوال|هاتف|موبايل|تواصل|phone|mobile/i.test(h));
-
+  const username = await prepareWaiting(req);
   const phones = new Map();
-  rows.slice(1).forEach(row => {
-    if (!row || !row[1]) return;
-    const name = String(row[1]).trim();
-    let phone = '';
-    if (phoneCol >= 0 && row[phoneCol] != null) phone = String(row[phoneCol]);
-    if (!phone) {
-      const cell = row.find((c, i) => i !== 1 && c != null && SAUDI_MOBILE_RE.test(String(c).replace(/[\s-]/g, '')));
-      if (cell != null) phone = String(cell);
-    }
-    if (name && phone) phones.set(name, phone);
+  (await dbTeachers(username)).forEach(t => {
+    const phone = String(t.phone || '').trim();
+    if (t.name && phone) phones.set(String(t.name).trim(), phone);
   });
   return phones;
 }
@@ -1157,11 +1544,6 @@ app.get('/performance', (req, res) => {
   res.sendFile(path.join(__dirname, 'performance.html'));
 });
 
-function readTeacherNamesFromExcel(workbook) {
-  const rows = xlsx.utils.sheet_to_json(getSheet(workbook, TEACHERS_SHEET) || {}, { header: 1 });
-  return rows.slice(1).map(r => (r && r[1] != null ? String(r[1]).trim() : '')).filter(Boolean);
-}
-
 // GET /api/performance?from=YYYY-MM-DD&to=YYYY-MM-DD
 app.get('/api/performance', async (req, res) => {
   try {
@@ -1172,7 +1554,8 @@ app.get('/api/performance', async (req, res) => {
     // كل معلمي المدرسة يظهرون حتى لو ليس لهم أي تسجيل بعد
     let names = [];
     try {
-      names = readTeacherNamesFromExcel(xlsx.readFile(await getUserExcelPath(req)));
+      await ensureWaitingReady(username);
+      names = (await dbTeachers(username)).map(t => String(t.name).trim()).filter(Boolean);
     } catch (e) {
       console.warn('⚠️ تعذر قراءة قائمة المعلمين:', e.message);
     }
@@ -1436,6 +1819,10 @@ app.post('/update-school-excel', upload.any(), async (req, res) => {
       );
 
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+
+      // 🔄 تحديث المعلمين والفصول ومعلومات المدرسة في القاعدة من الملف الجديد
+      // (جدول الانتظار وسجلات الغياب الموجودة في القاعدة لا تُمسّ)
+      await refreshFromUploadedExcel(username, fileBuffer);
     } else {
       if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
       return res.status(401).json({ success: false, message: "يرجى تسجيل الدخول أولاً لتحديث بيانات مدرستك." });
@@ -1609,8 +1996,11 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
   try {
     const { id } = req.params;
     const { full_name, school_name, region, username, password } = req.body;
+    const oldRow = await pool.query('SELECT username FROM users WHERE id = $1', [id]);
+    const oldUsername = oldRow.rows[0] ? oldRow.rows[0].username : null;
 
     // 🔒 كلمة المرور: نشفّرها فقط لو الأدمن كتب واحدة جديدة فعلاً، وإلا نبقي القديمة كما هي
+    let uploadedBuffer = null;
     let hashedPassword = null;
     if (password && password.trim() !== '') {
       hashedPassword = bcrypt.hashSync(password.trim(), 10);
@@ -1619,6 +2009,7 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
     if (req.file) {
       // 📁 تم رفع ملف إكسل جديد: نقرأه من القرص ونخزنه بقاعدة البيانات مباشرة
       const fileBuffer = fs.readFileSync(req.file.path);
+      uploadedBuffer = fileBuffer;
 
       if (hashedPassword) {
         await pool.query(
@@ -1659,6 +2050,11 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
       }
     }
 
+    // اسم المستخدم الجديد تتبعه كل جداول المدرسة
+    await renameSchoolUsername(oldUsername, username);
+    // ملف إكسل جديد من الأدمن: يحدّث المعلمين والفصول والمعلومات في القاعدة
+    if (uploadedBuffer) await refreshFromUploadedExcel(username, uploadedBuffer);
+
     res.json({ success: true, message: 'تم تحديث بيانات المدرسة بنجاح' });
   } catch (e) {
     console.error('خطأ أثناء تعديل بيانات المدرسة:', e);
@@ -1670,7 +2066,9 @@ app.put('/api/admin/schools/:id', requireAdmin, upload.single('excel_file'), asy
 app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const del = await pool.query('SELECT username FROM users WHERE id = $1', [id]);
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    if (del.rows[0]) await deleteSchoolData(del.rows[0].username);
     res.json({ success: true, message: 'تم حذف المدرسة بنجاح' });
   } catch (e) {
     console.error('خطأ أثناء حذف المدرسة:', e);
@@ -1682,23 +2080,23 @@ app.delete('/api/admin/schools/:id', requireAdmin, async (req, res) => {
 app.get('/api/admin/download-excel/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
-      'SELECT username, school_name, excel_data FROM users WHERE id = $1',
-      [id]
-    );
+    const result = await pool.query('SELECT username, school_name FROM users WHERE id = $1', [id]);
 
-    if (result.rows.length === 0 || !result.rows[0].excel_data) {
-      return res.status(404).json({ success: false, message: 'عذراً، لا يوجد ملف إكسل مخزن لهذه المدرسة.' });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'عذراً، المدرسة غير موجودة.' });
     }
 
     const school = result.rows[0];
+    // الملف يُبنى الآن من قاعدة البيانات (المعلمون، الفصول، الانتظار، الغياب) وبقية الأوراق تبقى كما هي
+    const wb = await buildWorkbookFromDb(school.username);
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const fileName = `school_${school.username || id}_data.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
     res.setHeader('Cache-Control', 'no-store');
 
-    return res.send(school.excel_data);
+    return res.send(buffer);
   } catch (error) {
     console.error('خطأ في تنزيل ملف الإكسل للأدمن:', error);
     res.status(500).send('حدث خطأ أثناء جلب الملف من قاعدة البيانات: ' + error.message);

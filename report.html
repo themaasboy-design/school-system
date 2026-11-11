@@ -338,31 +338,30 @@
             selectedDate = selectedDate.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
 
             try {
-                const res = await fetch('/get-report-data');
+                // السجلات تأتي من قاعدة البيانات مفلترة بالتاريخ واليوم، ومعها أرقام جوالات المعلمين
+                const res = await fetch(`/api/absences?date=${encodeURIComponent(selectedDate)}&day=${encodeURIComponent(selectedDay)}`);
                 const data = await res.json();
-                
-                // 📱 أرقام المعلمين من ورقة المعلمين بملف الإكسل: الاسم بالعمود B والجوال بالعمود C
-                teachersPhoneMap = {};
-                try {
-                    const tRes = await fetch('/api/teachers-raw');
-                    const tRows = await tRes.json();
-                    if (Array.isArray(tRows)) {
-                        tRows.forEach(row => {
-                            const name = row && row[1];
-                            const phone = row && row[2];
-                            if (name && phone) {
-                                teachersPhoneMap[normName(name)] = formatPhoneToInternational(phone);
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.warn('تعذر جلب أرقام المعلمين:', e);
+                if (!res.ok || data.success === false) {
+                    throw new Error(data.error || data.message || 'تعذر جلب السجلات');
                 }
 
-                const filteredData = (data.teachers || []).filter(item => {
-                    const vals = Object.values(item);
-                    return vals[0] === selectedDate && vals[1] === selectedDay;
+                // 📱 أرقام الجوال: الغائب والبدلاء من جدول المعلمين في قاعدة البيانات
+                teachersPhoneMap = {};
+                (data.records || []).forEach(rec => {
+                    const absentName = rec['المعلم الغائب'];
+                    if (absentName && rec.absentPhone) {
+                        teachersPhoneMap[normName(absentName)] = formatPhoneToInternational(rec.absentPhone);
+                    }
+                    for (let p = 1; p <= 7; p++) {
+                        const subName = rec['بديل ' + p];
+                        const subPhone = rec.subPhones && rec.subPhones[p - 1];
+                        if (subName && subPhone) {
+                            teachersPhoneMap[normName(subName)] = formatPhoneToInternational(subPhone);
+                        }
+                    }
                 });
+
+                const filteredData = data.records || [];
 
                 // إضافة رقم معرّف فريد مؤقت لكل سجل لسهولة الحذف والطباعة المنفردة
                 currentFilteredReportData = filteredData.map((item, index) => ({
