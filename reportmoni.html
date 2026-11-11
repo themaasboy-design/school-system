@@ -64,6 +64,7 @@
             <div class="dropdown-menu">
                 <a class="nav-link" href="updata_school.html"> جلب بيانات المدرسة </a>               
                 <a href="waiting_setting.html"> إعداد جدول الانتظار </a>
+                <a href="whats_setting.html"> ربط واتساب المدرسة </a>
             </div>
         </div>
         <a href="/login.html" class="logout">تسجيل الخروج</a>
@@ -114,6 +115,8 @@
 
         <!-- 💬 تذكير المشرفين بالواتساب -->
         <div id="notifyBox" class="border rounded-3 p-3 mb-3 bg-light d-none">
+            <!-- 🔌 حالة ربط واتساب المدرسة (نفس الربط المستخدم في الانتظار) -->
+            <div id="waStatusBanner" class="small mb-2" style="display:none;"></div>
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <span class="fw-bold">💬 تذكير المشرفين المعروضين برسالة واتساب</span>
                 <div class="d-flex gap-2">
@@ -311,6 +314,7 @@
                 </tr>`);
         });
         renderSummary();
+        applyWaState();
     }
 
     function renderSummary() {
@@ -325,6 +329,44 @@
         const pending = lines.length - done - missed;
         box.innerHTML = `<span class="text-success">✅ أدّى: ${done}</span> &nbsp;|&nbsp; <span class="text-danger">❌ لم يؤدِّ: ${missed}</span> &nbsp;|&nbsp; <span class="text-secondary">⏳ لم يُسجَّل: ${pending}</span>`;
         box.classList.remove('d-none');
+    }
+
+    // 🔌 حالة ربط واتساب: ربط واحد للمدرسة يخدم الانتظار والإشراف معاً
+    let waConnected = false;
+    let waTimer = null;
+
+    function applyWaState() {
+        const btnAll = document.getElementById('btnNotifyAll');
+        if (btnAll) btnAll.disabled = !waConnected;
+        document.querySelectorAll('[data-send]').forEach(b => { b.disabled = !waConnected; });
+    }
+
+    async function checkWaStatus() {
+        clearTimeout(waTimer);
+        const banner = document.getElementById('waStatusBanner');
+        const paint = (bg, color, border, html) => {
+            banner.style.cssText = `display:block; background:${bg}; color:${color}; border:1px solid ${border}; padding:8px 12px; border-radius:6px;`;
+            banner.innerHTML = html;
+        };
+        try {
+            const res = await fetch('/api/whatsapp/status');
+            const st = await res.json();
+            if (st.success && st.state === 'connected') {
+                waConnected = true;
+                paint('#e8f8ef', '#166534', '#bbf7d0', `✔ رقم المدرسة المرتبط: <strong dir="ltr">+${escapeHtml(st.phone || '')}</strong>`);
+            } else if (st.success && st.linked) {
+                waConnected = false;
+                paint('#fff7e6', '#92400e', '#fde68a', '⏳ جاري إعادة الاتصال برقم المدرسة...');
+                waTimer = setTimeout(checkWaStatus, 3000);
+            } else {
+                waConnected = false;
+                paint('#fdecea', '#991b1b', '#fecaca', '⚠ لم يتم ربط رقم واتساب للمدرسة بعد. <a href="whats_setting.html" style="color:#991b1b; font-weight:bold;">اربط الرقم الآن</a>');
+            }
+        } catch (e) {
+            waConnected = false;
+            paint('#fdecea', '#991b1b', '#fecaca', 'تعذر التحقق من حالة واتساب');
+        }
+        applyWaState();
     }
 
     // ✅ / ❌ — الضغط على نفس الزر مرة ثانية يلغي التسجيل
@@ -697,6 +739,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         loadSchoolName();
+        checkWaStatus();
         const dateInput = document.getElementById('dateFilter');
         dateInput.value = todayLocalISO();
         dateInput.addEventListener('change', updateDateInfo);
