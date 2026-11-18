@@ -136,9 +136,13 @@ async function initDb() {
         national_id TEXT,
         name TEXT NOT NULL,
         phone TEXT,
+        specialization TEXT DEFAULT '',
+        current_job TEXT DEFAULT '',
         sort_order INTEGER DEFAULT 0
       );
     `);
+    await client.query(`ALTER TABLE school_teachers ADD COLUMN IF NOT EXISTS specialization TEXT DEFAULT '';`);
+    await client.query(`ALTER TABLE school_teachers ADD COLUMN IF NOT EXISTS current_job TEXT DEFAULT '';`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_school_teachers_user ON school_teachers (username);`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS school_classes (
@@ -546,7 +550,7 @@ function parseTeachersSheet(workbook) {
     if (!r) return;
     const nm = cellStr(r[1]);
     if (!nm) return;
-    out.push({ national_id: cellStr(r[0]), name: nm, phone: cellStr(r[phoneCol]) });
+    out.push({ national_id: cellStr(r[0]), name: nm, phone: cellStr(r[phoneCol]), specialization: cellStr(r[3]), current_job: cellStr(r[4]) });
   });
   return out;
 }
@@ -627,7 +631,7 @@ async function loadTeacherMaps(client, username) {
 
 // يحدّث المعلمين/الفصول/معلومات المدرسة من ملف إكسل دون المساس بالانتظار والغياب.
 // المعلم يُطابَق بالسجل المدني (ثم بالاسم)، فتعديل اسمه ينعكس تلقائياً على الجداول والتقارير.
-async function applyBaseFromWorkbook(client, username, workbook) {
+async function applyBaseFromWorkbook(client, username, workbook, opts = {}) {
   const teachers = parseTeachersSheet(workbook);
   if (teachers) {
     const existing = (await client.query(
@@ -652,12 +656,12 @@ async function applyBaseFromWorkbook(client, username, workbook) {
       if (match) {
         used.add(match.id);
         await client.query(
-          'UPDATE school_teachers SET national_id = $1, name = $2, phone = $3, sort_order = $4 WHERE id = $5',
-          [t.national_id, t.name, t.phone, order, match.id]);
+          'UPDATE school_teachers SET national_id = $1, name = $2, phone = $3, specialization = $4, current_job = $5, sort_order = $6 WHERE id = $7',
+          [t.national_id, t.name, t.phone, t.specialization, t.current_job, order, match.id]);
       } else {
         await client.query(
-          'INSERT INTO school_teachers (username, national_id, name, phone, sort_order) VALUES ($1, $2, $3, $4, $5)',
-          [username, t.national_id, t.name, t.phone, order]);
+          'INSERT INTO school_teachers (username, national_id, name, phone, specialization, current_job, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [username, t.national_id, t.name, t.phone, t.specialization, t.current_job, order]);
       }
     }
     for (const t of existing) {
@@ -672,6 +676,9 @@ async function applyBaseFromWorkbook(client, username, workbook) {
       if (hit) await client.query('UPDATE waiting_slots SET teacher_id = $1, teacher_label = $2 WHERE id = $3', [hit.id, '', s.id]);
     }
   }
+
+  // بعد النقل الأول: الفصول ومعلومات المدرسة تُدار من الموقع، والإكسل للمعلمين فقط
+  if (opts.teachersOnly) return;
 
   const classes = parseClassesSheet(workbook);
   if (classes) {
@@ -741,8 +748,8 @@ async function importFullFromWorkbook(username, workbook) {
   });
 }
 
-async function importBaseFromWorkbook(username, workbook) {
-  await withTx(async (client) => { await applyBaseFromWorkbook(client, username, workbook); });
+async function importBaseFromWorkbook(username, workbook, opts = {}) {
+  await withTx(async (client) => { await applyBaseFromWorkbook(client, username, workbook, opts); });
 }
 
 const _waitingReady = new Set();
@@ -776,7 +783,7 @@ async function refreshFromUploadedExcel(username, buffer) {
   const r = await pool.query('SELECT waiting_migrated FROM users WHERE username = $1', [username]);
   if (r.rows.length === 0) return;
   if (r.rows[0].waiting_migrated) {
-    await importBaseFromWorkbook(username, wb);
+    await importBaseFromWorkbook(username, wb, { teachersOnly: true });
   } else {
     await importFullFromWorkbook(username, wb);
   }
@@ -813,7 +820,7 @@ async function deleteSchoolData(username) {
 // ---------------------------- قراءة من القاعدة ---------------------------
 async function dbTeachers(username) {
   const r = await pool.query(
-    'SELECT id, national_id, name, phone FROM school_teachers WHERE username = $1 ORDER BY sort_order, id', [username]);
+    'SELECT id, national_id, name, phone, specialization, current_job FROM school_teachers WHERE username = $1 ORDER BY sort_order, id', [username]);
   return r.rows;
 }
 
@@ -909,6 +916,65 @@ app.get('/get-classes', async (req, res) => {
   } catch (e) { sendWaitingError(res, e); }
 });
 
+// =========================================================================
+// 🏫 البيانات العامة للمدرسة + الفصول (تُدار من الموقع وتُحفظ في القاعدة)
+// =========================================================================
+app.get('/api/school-info', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    const i = await dbSchoolInfo(username);
+    res.json({ success: true, info: { education_dept: i.B1, school_name: i.B2, principal: i.B3, deputy: i.B4 } });
+  } catch (e) { sendWaitingError(res, e); }
+});
+
+app.put('/api/school-info', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    const b = req.body || {};
+    const clean = v => cellStr(v).replace(/\s+/g, ' ').slice(0, 150);
+    const info = {
+      education_dept: clean(b.education_dept), school_name: clean(b.school_name),
+      principal: clean(b.principal), deputy: clean(b.deputy)
+    };
+    if (!info.school_name) {
+      return res.status(400).json({ success: false, message: 'اسم المدرسة مطلوب' });
+    }
+    await withTx(async (client) => {
+      await client.query('DELETE FROM school_info WHERE username = $1', [username]);
+      await client.query(
+        'INSERT INTO school_info (username, education_dept, school_name, principal, deputy) VALUES ($1, $2, $3, $4, $5)',
+        [username, info.education_dept, info.school_name, info.principal, info.deputy]);
+      await client.query('UPDATE users SET school_name = $1 WHERE username = $2', [info.school_name, username]);
+    });
+    res.json({ success: true, info });
+  } catch (e) { sendWaitingError(res, e, 'تعذر حفظ البيانات:'); }
+});
+
+// استبدال قائمة الفصول بالكامل (الأسماء تُبنى في الواجهة: أول 1 ، أول أ ...)
+app.put('/api/classes', async (req, res) => {
+  try {
+    const username = await prepareWaiting(req);
+    const list = Array.isArray(req.body && req.body.classes) ? req.body.classes : null;
+    if (!list) return res.status(400).json({ success: false, message: 'قائمة الفصول غير صالحة' });
+    const seen = new Set();
+    const names = [];
+    list.forEach(n => {
+      const c = cellStr(n).replace(/\s+/g, ' ').slice(0, 60);
+      if (c && !seen.has(c)) { seen.add(c); names.push(c); }
+    });
+    if (names.length > 200) return res.status(400).json({ success: false, message: 'عدد الفصول أكبر من المسموح' });
+    await withTx(async (client) => {
+      await client.query('DELETE FROM school_classes WHERE username = $1', [username]);
+      let i = 0;
+      for (const c of names) {
+        i += 1;
+        await client.query('INSERT INTO school_classes (username, name, sort_order) VALUES ($1, $2, $3)', [username, c, i]);
+      }
+    });
+    res.json({ success: true, count: names.length });
+  } catch (e) { sendWaitingError(res, e, 'تعذر حفظ الفصول:'); }
+});
+
 app.get('/api/teachers', async (req, res) => {
   try {
     const username = await prepareWaiting(req);
@@ -920,7 +986,7 @@ app.get('/api/teachers', async (req, res) => {
 app.get('/api/teachers-raw', async (req, res) => {
   try {
     const username = await prepareWaiting(req);
-    res.json((await dbTeachers(username)).map(t => [t.national_id || '', t.name, t.phone || '']));
+    res.json((await dbTeachers(username)).map(t => [t.national_id || '', t.name, t.phone || '', t.specialization || '', t.current_job || '']));
   } catch (e) { sendWaitingError(res, e); }
 });
 
@@ -1134,7 +1200,7 @@ async function buildWorkbookFromDb(username) {
   };
 
   const teachers = await dbTeachers(username);
-  put(TEACHERS_SHEET, [['السجل المدني', 'Name_teacher', 'رقم الجوال'], ...teachers.map(t => [t.national_id || '', t.name, t.phone || ''])]);
+  put(TEACHERS_SHEET, [['السجل المدني', 'Name_teacher', 'رقم الجوال', 'التخصص', 'العمل الحالي'], ...teachers.map(t => [t.national_id || '', t.name, t.phone || '', t.specialization || '', t.current_job || ''])]);
   put(CLASSES_SHEET, [['Name_class'], ...(await dbClasses(username)).map(c => [c])]);
 
   const info = await dbSchoolInfo(username);
