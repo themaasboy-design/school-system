@@ -7,8 +7,15 @@
     font-display: swap;
 }
 
-/* 🔤 الخط الأساسي: Sefid UI (ملف SefidUI-500-Medium.ttf بجانب هذا الملف بنفس الاسم تماماً — حساس لحالة الأحرف)
-   وإن لم يُحمَّل لأي سبب يرجع الموقع تلقائياً إلى IBM Plex Sans Arabic ثم Tahoma */
+/* 🔤 الخط الأساسي: ثمانية (Thmanyah Serif Text) — ملف thmanyahseriftext-Medium.otf بجانب هذا الملف بنفس الاسم تماماً (حساس لحالة الأحرف)
+   وإن لم يُحمَّل لأي سبب يرجع الموقع تلقائياً إلى Sefid UI ثم IBM Plex Sans Arabic ثم Tahoma */
+@font-face {
+    font-family: 'Thmanyah Serif Text';
+    src: url('thmanyahseriftext-Medium.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
 @font-face {
     font-family: 'Sefid UI';
     src: url('SefidUI-500-Medium.ttf') format('truetype');
@@ -28,7 +35,7 @@
     --success-color: #154629;    /* لون زر الحفظ */
     --border-radius: 8px;
     --success-hover: #1d6b3a;    /* درجة أفتح قليلاً من لون الحفظ (نفس الدرجة اللونية) */
-    --font-main: 'Sefid UI', 'IBM Plex Sans Arabic', Tahoma, sans-serif;  /* مصدر وحيد لنوع الخط في كل الصفحات */
+    --font-main: 'Thmanyah Serif Text', 'Sefid UI', 'IBM Plex Sans Arabic', Tahoma, sans-serif;  /* مصدر وحيد لنوع الخط في كل الصفحات */
 }
 
 /* --- الإعدادات العامة --- */
