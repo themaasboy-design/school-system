@@ -354,17 +354,9 @@
     <i class="bi bi-gear-fill me-2" style="color: #198754;"></i>إعدادات
   </h4>
 
-  <!-- صف بطاقات الإعدادات -->
+  <!-- صف بطاقات الإعدادات (من اليمين لليسار) -->
   <div class="d-flex gap-3 flex-wrap">
-    <!-- بطاقة 1: جلب ورفع بيانات المدرسة -->
-    <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
-      <h5 class="fw-bold mb-2">
-        <a href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal" class="text-decoration-none" style="color: #198754;">جلب بيانات المدرسة</a>
-      </h5>
-      <p class="text-muted small mb-0">رفع ملف الإكسل (أسماء المعلمين وبياناتهم)</p>
-    </div>
-
-    <!-- بطاقة: البيانات العامة للمدرسة -->
+    <!-- 1: البيانات العامة للمدرسة -->
     <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
       <h5 class="fw-bold mb-2">
         <a href="#" data-bs-toggle="modal" data-bs-target="#schoolInfoModal" class="text-decoration-none" style="color: #198754;">البيانات العامة للمدرسة</a>
@@ -372,7 +364,23 @@
       <p class="text-muted small mb-0">إدارة التعليم، اسم المدرسة، المدير، الوكيل، والفصول</p>
     </div>
 
-    <!-- بطاقة 2: تنزيل نموذج الإكسل -->
+    <!-- 2: جلب أسماء المعلمين -->
+    <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
+      <h5 class="fw-bold mb-2">
+        <a href="#" data-bs-toggle="modal" data-bs-target="#updateExcelModal" class="text-decoration-none" style="color: #198754;">جلب أسماء المعلمين</a>
+      </h5>
+      <p class="text-muted small mb-0">رفع ملف الإكسل (أسماء المعلمين وبياناتهم)</p>
+    </div>
+
+    <!-- 3: ربط الواتساب -->
+    <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
+      <h5 class="fw-bold mb-2">
+        <a href="whats_setting.html" class="text-decoration-none" style="color: #198754;">ربط الواتساب</a>
+      </h5>
+      <p class="text-muted small mb-0">ربط رقم المدرسة لإرسال الرسائل للمعلمين</p>
+    </div>
+
+    <!-- 4: تنزيل النموذج -->
     <div class="card main-card p-3 shadow-sm text-center" style="width: 260px; max-width: 100%; border-top: 4px solid #198754 !important;">
       <h5 class="fw-bold mb-2">
         <a href="/download-template" class="text-decoration-none" style="color: #198754;">تنزيل النموذج</a>
@@ -381,11 +389,12 @@
     </div>
   </div>
 </div>
+</div>
 
 <!-- 🖋️ تذييل الصفحة: حقوق التطوير والتواصل مع الدعم -->
 <footer class="text-center mt-5 py-4 border-top">
   <p class="fw-bold text-dark mb-2" style="font-size: 0.95rem;">
-تنفيذ وتطوير أ.محمد الساير - أ. ماجد الزويبعي  </p>
+تنفيذ وتطوير أ.محمد الساير</p>
   <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
     <a href="https://wa.me/966551034502" target="_blank" rel="noopener noreferrer"
        class="text-decoration-none d-inline-flex align-items-center gap-1"
@@ -406,7 +415,7 @@
     <div class="modal-content modal-content-custom">
       
       <div class="modal-header-custom">
-        <h6 class="modal-title" id="updateModalLabel">تحديث بيانات المدرسة</h6>
+        <h6 class="modal-title" id="updateModalLabel">جلب أسماء المعلمين</h6>
         <button type="button" class="btn-close btn-close-white " data-bs-dismiss="modal" aria-label="إغلاق"></button>
       </div>
 
@@ -474,7 +483,16 @@
           </div>
           <!-- الفصول -->
           <div class="tab-pane fade" id="tabClasses">
-            <p class="text-muted small mb-2">لكل صف اختر عدد الفصول ونوع الترقيم: أرقام (أول 1) أو حروف أبجد هوز (أول أ). اترك العدد 0 للصف غير الموجود.</p>
+            <p class="text-muted small mb-2">اختر المرحلة (اختياري)، ثم لكل صف عدد الفصول ونوع الترقيم: أرقام (أول ابتدائي 1) أو حروف أبجد هوز (أول ابتدائي أ). اترك العدد 0 للصف غير الموجود.</p>
+            <div class="mb-3">
+              <label class="form-label">المرحلة الدراسية</label>
+              <select id="stageSelect" class="form-select form-select-sm">
+                <option value="">بدون ذكر المرحلة (أول 1)</option>
+                <option value="ابتدائي">ابتدائي</option>
+                <option value="متوسط">متوسط</option>
+                <option value="ثانوي">ثانوي</option>
+              </select>
+            </div>
             <div id="classesRows"></div>
             <div class="mt-3">
               <label class="form-label">فصول إضافية (اسم في كل سطر)</label>
@@ -605,8 +623,11 @@ document.getElementById('updateExcelForm').addEventListener('submit', async func
 
 // ===================== البيانات العامة والفصول =====================
 const GRADES = ['أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس'];
+const STAGES = ['ابتدائي', 'متوسط', 'ثانوي'];
 const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ك', 'ل', 'م', 'ن', 'س'];
-let extraKnown = [];
+
+// عدد الصفوف حسب المرحلة: الابتدائي 6، المتوسط والثانوي 3، وبدون مرحلة تظهر الستة
+function gradesForStage(stage) { return (stage === 'متوسط' || stage === 'ثانوي') ? GRADES.slice(0, 3) : GRADES; }
 
 function toast(text, ok = true) {
     Toastify({ text, duration: 3000, gravity: "top", position: "right",
@@ -614,12 +635,14 @@ function toast(text, ok = true) {
 }
 
 function buildClassNames() {
+    const stage = document.getElementById('stageSelect').value;
     const names = [];
-    GRADES.forEach((g, gi) => {
+    gradesForStage(stage).forEach((g) => {
+        const gi = GRADES.indexOf(g);
         const n = parseInt(document.getElementById('cnt_' + gi).value, 10) || 0;
         const type = document.getElementById('typ_' + gi).value;
         for (let i = 0; i < Math.min(n, LETTERS.length); i++) {
-            names.push(`${g} ${type === 'letters' ? LETTERS[i] : (i + 1)}`);
+            names.push([g, stage, type === 'letters' ? LETTERS[i] : (i + 1)].filter(Boolean).join(' '));
         }
     });
     document.getElementById('extraClasses').value.split('\n').map(x => x.trim()).filter(Boolean).forEach(x => names.push(x));
@@ -632,22 +655,42 @@ function renderClassesPreview() {
     document.getElementById('classesPreview').textContent = names.join(' ، ') || 'لا توجد فصول';
 }
 
-function initClassesRows() {
+// يرسم صفوف الصفوف حسب المرحلة ويحافظ على القيم المدخلة سابقاً
+function renderClassesRows(keep = null) {
+    const stage = document.getElementById('stageSelect').value;
     const box = document.getElementById('classesRows');
-    box.innerHTML = GRADES.map((g, gi) => `
+    const old = keep || {};
+    if (!keep) {
+        GRADES.forEach((g, gi) => {
+            const c = document.getElementById('cnt_' + gi), t = document.getElementById('typ_' + gi);
+            if (c) old[gi] = { count: c.value, type: t.value };
+        });
+    }
+    box.innerHTML = gradesForStage(stage).map((g) => {
+        const gi = GRADES.indexOf(g);
+        const o = old[gi] || { count: 0, type: 'numbers' };
+        return `
         <div class="row g-2 align-items-center mb-2">
-            <div class="col-3 fw-bold">${g}</div>
-            <div class="col-4"><input type="number" min="0" max="15" value="0" class="form-control form-control-sm" id="cnt_${gi}" aria-label="عدد فصول ${g}"></div>
+            <div class="col-3 fw-bold">${g}${stage ? ' ' + stage : ''}</div>
+            <div class="col-4"><input type="number" min="0" max="15" value="${o.count}" class="form-control form-control-sm" id="cnt_${gi}" aria-label="عدد فصول ${g}"></div>
             <div class="col-5">
                 <select class="form-select form-select-sm" id="typ_${gi}">
-                    <option value="numbers">أرقام (1، 2، 3)</option>
-                    <option value="letters">حروف (أ، ب، ج)</option>
+                    <option value="numbers" ${o.type === 'numbers' ? 'selected' : ''}>أرقام (1، 2، 3)</option>
+                    <option value="letters" ${o.type === 'letters' ? 'selected' : ''}>حروف (أ، ب، ج)</option>
                 </select>
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+    renderClassesPreview();
+}
+
+function initClassesRows() {
+    renderClassesRows({});
+    const box = document.getElementById('classesRows');
     box.addEventListener('input', renderClassesPreview);
     box.addEventListener('change', renderClassesPreview);
     document.getElementById('extraClasses').addEventListener('input', renderClassesPreview);
+    document.getElementById('stageSelect').addEventListener('change', () => renderClassesRows());
 }
 
 async function loadSchoolInfoForm() {
@@ -665,20 +708,21 @@ async function loadSchoolInfoForm() {
 async function loadClassesForm() {
     try {
         const list = (await (await fetch('/get-classes')).json()).map(c => String(c.Name_class || '').trim());
-        const counts = {}; const types = {}; const extras = [];
+        const counts = {}; const types = {}; const extras = []; let stage = '';
         list.forEach(name => {
-            const m = name.match(/^(\S+)\s+(\S+)$/);
+            const m = name.match(/^(\S+)(?:\s+(ابتدائي|متوسط|ثانوي))?\s+(\S+)$/);
             const gi = m ? GRADES.indexOf(m[1]) : -1;
             if (gi < 0) { extras.push(name); return; }
+            if (m[2] && !stage) stage = m[2];
+            if ((m[2] || '') !== stage) { extras.push(name); return; } // مرحلة مختلفة تبقى كفصل إضافي
             counts[gi] = (counts[gi] || 0) + 1;
-            types[gi] = /^\d+$/.test(m[2]) ? 'numbers' : 'letters';
+            types[gi] = /^\d+$/.test(m[3]) ? 'numbers' : 'letters';
         });
-        GRADES.forEach((g, gi) => {
-            document.getElementById('cnt_' + gi).value = counts[gi] || 0;
-            document.getElementById('typ_' + gi).value = types[gi] || 'numbers';
-        });
+        document.getElementById('stageSelect').value = stage;
+        const keep = {};
+        GRADES.forEach((g, gi) => { keep[gi] = { count: counts[gi] || 0, type: types[gi] || 'numbers' }; });
         document.getElementById('extraClasses').value = extras.join('\n');
-        renderClassesPreview();
+        renderClassesRows(keep);
     } catch (e) { console.error(e); }
 }
 
